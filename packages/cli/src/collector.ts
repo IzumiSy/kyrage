@@ -33,11 +33,14 @@ class CollectorConnection implements DatabaseConnection {
       }
 
       this.queries.push(query);
+    } else if (
+      queryKind === "CreateIndexNode" ||
+      queryKind === "DropIndexNode"
+    ) {
+      this.queries.push(query);
     }
 
-    return {
-      rows: [],
-    };
+    return { rows: [] };
   }
 
   async *streamQuery<R>(): AsyncIterableIterator<QueryResult<R>> {
