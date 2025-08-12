@@ -1,5 +1,11 @@
 # @izumisy/kyrage
 
+## 0.6.0
+
+### Minor Changes
+
+- 7c7b0c6: Add pretty option in plan mode
+
 ## 0.5.0
 
 ### Minor Changes
