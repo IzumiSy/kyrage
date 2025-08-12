@@ -142,7 +142,7 @@ $ kyrage apply
 ✔ Migration applied: 1754372124127
 ```
 
-#### PROTIP: You can also apply the changes immediately on generating migration: `kyrage generate --apply`
+**PROTIP**: You can also apply the changes immediately on generating migration: `kyrage generate --apply`
 
 ## 📚 API Reference
 
