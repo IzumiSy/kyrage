@@ -1,6 +1,5 @@
 import {
   ColumnDataType,
-  CreateTableBuilder,
   isColumnDataType,
   Kysely,
   Migration,
@@ -66,31 +65,19 @@ export async function buildMigrationFromDiff(
 ): Promise<void> {
   // 1. 追加テーブル
   for (const added of diff.addedTables) {
-    let builder: CreateTableBuilder<string, any> = db.schema.createTable(
-      added.table
-    );
+    let builder = db.schema.createTable(added.table);
     for (const [colName, colDef] of Object.entries(added.columns)) {
       const dataType = colDef.type;
       assertDataType(dataType);
       builder = builder.addColumn(colName, dataType, (col) => {
         let c = col;
         if (colDef.notNull) c = c.notNull();
+        if (colDef.primaryKey) c = c.primaryKey();
+        if (colDef.unique) c = c.unique();
         if (colDef.defaultSql)
           c = c.defaultTo(sql.raw(colDef.defaultSql as string));
         return c;
       });
-      if (colDef.primaryKey) {
-        builder = builder.addPrimaryKeyConstraint(
-          `${added.table}_${colName}_primary_key`,
-          [colName]
-        );
-      }
-      if (colDef.unique) {
-        builder = builder.addUniqueConstraint(
-          `${added.table}_${colName}_unique`,
-          [colName]
-        );
-      }
     }
     await builder.execute();
   }
@@ -112,20 +99,13 @@ export async function buildMigrationFromDiff(
           let c = col;
           if (addCol.attributes.notNull) c = c.notNull();
           if (addCol.attributes.primaryKey) c = c.primaryKey();
+          if (addCol.attributes.unique) c = c.unique();
           if (addCol.attributes.defaultSql) {
             c = c.defaultTo(sql.raw(addCol.attributes.defaultSql as string));
           }
           return c;
         })
         .execute();
-      if (addCol.attributes.unique) {
-        await db.schema
-          .alterTable(changed.table)
-          .addUniqueConstraint(`${changed.table}_${addCol.column}_unique`, [
-            addCol.column,
-          ])
-          .execute();
-      }
     }
     // 削除カラム
     for (const remCol of changed.removedColumns) {
