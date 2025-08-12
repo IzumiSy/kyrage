@@ -44,8 +44,18 @@ export const postgresColumnExtraIntrospector = (props: {
     }));
   };
 
+  const nameDict = {
+    bool: "boolean",
+    int2: "smallint",
+    int4: "integer",
+    int8: "bigint",
+  };
+  const convertTypeName = (typeName: string) =>
+    nameDict[typeName as keyof typeof nameDict] ?? typeName;
+
   return {
     introspect,
+    convertTypeName,
   };
 };
 

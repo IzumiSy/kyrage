@@ -15,4 +15,5 @@ type ColumnExtraAttribute = {
 
 export type ColumnExtraIntrospector = {
   introspect: () => Promise<ColumnExtraAttributes>;
+  convertTypeName: (type: string) => string;
 };

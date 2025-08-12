@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "id": "1754990117180",
+  "id": "1754999651421",
   "diff": {
     "addedTables": [
       {
@@ -10,7 +10,7 @@
             "type": "uuid",
             "primaryKey": true,
             "notNull": false,
-            "unique": true
+            "unique": false
           },
           "email": {
             "type": "text",
@@ -46,7 +46,7 @@
             "type": "uuid",
             "primaryKey": true,
             "notNull": false,
-            "unique": true
+            "unique": false
           },
           "author_id": {
             "type": "uuid",
@@ -57,7 +57,7 @@
           "title": {
             "type": "text",
             "primaryKey": false,
-            "notNull": true,
+            "notNull": false,
             "unique": false
           },
           "content": {

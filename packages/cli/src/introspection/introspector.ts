@@ -19,38 +19,47 @@ const getColumnExtraIntrospector = (
 
 export const getIntrospector = (client: DBClient) => {
   const columnExtraIntrospector = getColumnExtraIntrospector(client);
-  const introspect = async () => {
-    const kyselyIntrospection = await client.getDB().introspection.getTables();
+  const getTables = async () => {
+    await using db = client.getDB();
+    const kyselyIntrospection = await db.introspection.getTables();
     const columnExtra = await columnExtraIntrospector.introspect();
 
-    const r: ColumnsObject = {};
-    for (const table of kyselyIntrospection) {
-      for (const column of table.columns) {
-        const ex = columnExtra.filter(
-          (c) => c.table === table.name && c.name === column.name
-        );
-        const columnDefault = ex.length > 0 ? ex[0].default : null;
-        const columnCharacterMaximumLength =
-          ex.length > 0 ? ex[0].characterMaximumLength : null;
+    return kyselyIntrospection.map((table) => {
+      const columns: Record<string, Column> = Object.fromEntries(
+        table.columns.map((column) => {
+          const ex = columnExtra.filter(
+            (c) => c.table === table.name && c.name === column.name
+          );
+          const extraInfo = ex[0] || {};
 
-        r[`${table.name}.${column.name}`] = {
-          schema: table.schema,
-          table: table.name,
-          name: column.name,
-          dataType: column.dataType,
-          default: columnDefault,
-          characterMaximumLength: columnCharacterMaximumLength,
-          notNull: !column.isNullable,
-          constraints: ex.map((c) => c.constraint),
-        };
-      }
-    }
+          return [
+            column.name,
+            {
+              schema: table.schema,
+              table: table.name,
+              name: column.name,
+              dataType: columnExtraIntrospector.convertTypeName(
+                column.dataType
+              ),
+              default: extraInfo.default ?? null,
+              characterMaximumLength: extraInfo.characterMaximumLength ?? null,
+              notNull: !column.isNullable,
+              constraints: ex.map((c) => c.constraint),
+            },
+          ];
+        })
+      );
 
-    return r;
+      return {
+        schema: table.schema,
+        name: table.name,
+        columns,
+      };
+    });
   };
 
   return {
-    introspect,
+    getTables,
   };
 };
 
@@ -64,5 +73,3 @@ type Column = {
   notNull: boolean;
   constraints: Array<ColumnConstraint>;
 };
-
-type ColumnsObject = Record<string, Column>;
