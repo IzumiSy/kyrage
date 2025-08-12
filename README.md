@@ -167,8 +167,6 @@ export default {
 ## 🗄️ Supported Databases
 
 * PostgreSQL
-* MySQL
-* SQLite
 * CockroachDB
 
 ## 🏗️ Examples

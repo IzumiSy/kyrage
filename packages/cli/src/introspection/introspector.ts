@@ -8,12 +8,11 @@ const getColumnExtraIntrospector = (
   const dialect = client.getDialect();
 
   switch (dialect) {
-    case "postgres": {
+    case "postgres":
+    case "cockroachdb":
       return postgresColumnExtraIntrospector({ client });
-    }
-    default: {
+    default:
       throw new Error(`Unsupported dialect: ${dialect}`);
-    }
   }
 };
 

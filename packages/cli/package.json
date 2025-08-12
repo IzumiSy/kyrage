@@ -35,6 +35,7 @@
   },
   "devDependencies": {
     "@swc/core": "^1.13.3",
+    "@testcontainers/cockroachdb": "^11.5.1",
     "@testcontainers/postgresql": "^11.5.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.2.0",
