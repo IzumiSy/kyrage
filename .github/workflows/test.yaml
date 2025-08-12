@@ -3,7 +3,23 @@ name: Test
 on: push
 
 jobs:
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          cache-dependency-path: ./pnpm-lock.yaml
+          node-version-file: './package.json'
+      - run: pnpm install
+      - run: pnpm type-check
+
   test:
+    needs: type-check
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -26,17 +42,4 @@ jobs:
         env:
           TEST_DIALECT: ${{ matrix.dialect }}
 
-  type-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-      - uses: actions/setup-node@v4
-        with:
-          cache: pnpm
-          cache-dependency-path: ./pnpm-lock.yaml
-          node-version-file: './package.json'
-      - run: pnpm install
-      - run: pnpm type-check
+
