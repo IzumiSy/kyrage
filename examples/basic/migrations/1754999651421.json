@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "id": "1754552936463",
+  "id": "1754999651421",
   "diff": {
     "addedTables": [
       {
@@ -25,7 +25,7 @@
             "unique": true
           },
           "age": {
-            "type": "integer",
+            "type": "int4",
             "primaryKey": false,
             "notNull": false,
             "unique": false
@@ -57,7 +57,7 @@
           "title": {
             "type": "text",
             "primaryKey": false,
-            "notNull": true,
+            "notNull": false,
             "unique": false
           },
           "content": {

@@ -4,8 +4,9 @@ import { logger } from "../logger";
 import { readMigrationFiles, migrationDirName } from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
-import { Tables, TableColumnAttributes, diffTables, TableDiff } from "../diff";
+import { Tables, diffTables, TableDiff } from "../diff";
 import { ConfigValue } from "../schema";
+import { getIntrospector } from "../introspection/introspector";
 
 export const runGenerate = async (props: {
   client: DBClient;
@@ -34,7 +35,7 @@ export const runGenerate = async (props: {
   }
 
   const newMigration = await generateMigrationFromIntrospection({
-    db,
+    client: props.client,
     config: loadedConfig,
   });
 
@@ -84,22 +85,30 @@ const getPendingMigrations = async (db: Kysely<any>) => {
 };
 
 const generateMigrationFromIntrospection = async (props: {
-  db: Kysely<unknown>;
+  client: DBClient;
   config: ConfigValue;
 }) => {
-  const { db, config } = props;
-  const tables = await db.introspection.getTables();
+  const { client, config } = props;
+  const introspector = getIntrospector(client);
+  const tables = await introspector.getTables();
+
   const dbTables: Tables = tables.map((table) => ({
     name: table.name,
-    columns: (table.columns ?? []).reduce(
-      (cols, col) => {
-        cols[col.name] = {
-          type: col.dataType,
-          notNull: !col.isNullable,
-        };
-        return cols;
-      },
-      {} as Record<string, TableColumnAttributes>
+    columns: Object.fromEntries(
+      Object.entries(table.columns).map(([colName, colDef]) => {
+        return [
+          colName,
+          {
+            type: colDef.dataType,
+            notNull: colDef.notNull,
+            primaryKey: !!colDef.constraints.find(
+              (c) => c.type === "PRIMARY KEY"
+            ),
+            unique: !!colDef.constraints.find((c) => c.type === "UNIQUE"),
+            defaultSql: colDef.default ?? undefined,
+          },
+        ];
+      })
     ),
   }));
 
@@ -108,7 +117,10 @@ const generateMigrationFromIntrospection = async (props: {
     columns: Object.fromEntries(
       Object.entries(table.columns).map(([colName, colDef]) => [
         colName,
-        colDef,
+        {
+          ...colDef,
+          notNull: colDef.primaryKey || colDef.notNull,
+        },
       ])
     ),
   }));

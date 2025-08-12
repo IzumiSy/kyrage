@@ -10,7 +10,6 @@ export const column = (
   primaryKey: options?.primaryKey,
   unique: options?.unique,
   defaultSql: options?.defaultSql,
-  checkSql: options?.checkSql,
 });
 
 type DefinedColumn = ReturnType<typeof column>;
