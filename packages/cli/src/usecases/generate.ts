@@ -4,7 +4,7 @@ import { logger } from "../logger";
 import { readMigrationFiles, migrationDirName } from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
-import { Tables, diffTables, TableDiff, TableColumnAttributes } from "../diff";
+import { Tables, diffTables, TableDiff } from "../diff";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
 
