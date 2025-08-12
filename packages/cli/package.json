@@ -4,6 +4,19 @@
   "type": "module",
   "version": "0.5.0",
   "description": "A minimal, schema-based declarative migration tool for Node.js ecosystem",
+  "author": "Seiya Izumi (https://github.com/IzumiSy)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IzumiSy/kyrage.git"
+  },
+  "homepage": "https://github.com/IzumiSy/kyrage",
+  "keywords": [
+    "migration",
+    "database",
+    "schema",
+    "kysely"
+  ],
   "files": [
     "dist"
   ],
