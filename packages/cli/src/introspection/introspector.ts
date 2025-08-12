@@ -20,7 +20,8 @@ const getColumnExtraIntrospector = (
 export const getIntrospector = (client: DBClient) => {
   const columnExtraIntrospector = getColumnExtraIntrospector(client);
   const introspect = async () => {
-    const kyselyIntrospection = await client.getDB().introspection.getTables();
+    await using db = client.getDB();
+    const kyselyIntrospection = await db.introspection.getTables();
     const columnExtra = await columnExtraIntrospector.introspect();
 
     const r: ColumnsObject = {};
