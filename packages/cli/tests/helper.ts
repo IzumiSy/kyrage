@@ -1,4 +1,4 @@
-import { vi, afterAll } from "vitest";
+import { afterAll } from "vitest";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { configSchema } from "../src/schema";
 import { defineConfig, DefinedTables } from "../src/config/builder";
@@ -18,11 +18,6 @@ export const setupTestDB = async (props: { tables: DefinedTables }) => {
 
   afterAll(async () => {
     await container.stop();
-  });
-
-  vi.mock("fs/promises", async () => {
-    const memfs = await import("memfs");
-    return memfs.fs.promises;
   });
 
   return {
