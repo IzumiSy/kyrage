@@ -1,8 +1,9 @@
 import { sql } from "kysely";
 import { DBClient } from "../client";
-import { ColumnInfoObjects } from "./type";
 
-export const postgresConstraintIntrospector = (props: { client: DBClient }) => {
+export const postgresColumnExtraIntrospector = (props: {
+  client: DBClient;
+}) => {
   const introspect = async () => {
     const client = props.client;
     await using db = client.getDB();
@@ -30,25 +31,17 @@ export const postgresConstraintIntrospector = (props: { client: DBClient }) => {
       .$castTo<PostgresColumnConstraintInfo>()
       .execute(db);
 
-    const columnInfoObjects = rows.reduce<ColumnInfoObjects>((acc, row) => {
-      const key = `${row.table_name}.${row.column_name}`;
-      if (!acc[key]) {
-        acc[key] = {
-          schema: row.table_schema,
-          table: row.table_name,
-          default: row.column_default,
-          characterMaximumLength: row.character_maximum_length,
-          constraints: [],
-        };
-      }
-      acc[key].constraints.push({
+    return rows.map((row) => ({
+      schema: row.table_schema,
+      table: row.table_name,
+      name: row.column_name,
+      default: row.column_default,
+      characterMaximumLength: row.character_maximum_length,
+      constraint: {
         name: row.constraint_name,
         type: row.constraint_type,
-      });
-      return acc;
-    }, {});
-
-    return columnInfoObjects;
+      },
+    }));
   };
 
   return {
