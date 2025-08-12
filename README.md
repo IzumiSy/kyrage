@@ -157,7 +157,6 @@ export default {
         unique?: boolean,          // UNIQUE constraint
         notNull?: boolean,         // NOT NULL constraint 
         defaultSql?: string,       // Default SQL expression
-        checkSql?: string,         // Check SQL expression
       })
     }),
     // ... more tables

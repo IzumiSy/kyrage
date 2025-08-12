@@ -6,7 +6,6 @@ const columnSchema = z.object({
   notNull: z.boolean().optional().default(false),
   unique: z.boolean().optional().default(false),
   defaultSql: z.string().optional(),
-  checkSql: z.string().optional(),
 });
 export type ColumnValue = z.infer<typeof columnSchema>;
 
