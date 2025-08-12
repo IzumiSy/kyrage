@@ -40,6 +40,7 @@ describe("generate and apply", () => {
       client,
       options: {
         plan: false,
+        pretty: false,
       },
     });
 

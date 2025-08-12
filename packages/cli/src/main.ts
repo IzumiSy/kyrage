@@ -66,9 +66,13 @@ const applyCmd = defineCommand({
   },
   args: {
     plan: {
-      name: "plan",
       type: "boolean",
       description: "Plan the migration without applying it",
+      default: false,
+    },
+    pretty: {
+      type: "boolean",
+      description: "Pretty print the migration SQL (only for --plan)",
       default: false,
     },
   },
@@ -83,6 +87,7 @@ const applyCmd = defineCommand({
         client,
         options: {
           plan: ctx.args.plan,
+          pretty: ctx.args.pretty,
         },
       });
     } catch (error) {

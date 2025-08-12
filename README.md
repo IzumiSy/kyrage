@@ -93,6 +93,7 @@ export default defineConfig({
 Compare your schema with the database and generate a migration:
 
 ```bash
+$ kyrage generate
 -- create_table: members
    -> column: id ({"type":"uuid","primaryKey":true,"notNull":false "unique":false})
    -> column: email ({"type":"text","primaryKey":false,"notNull":true,"unique":true})
@@ -116,10 +117,22 @@ Compare your schema with the database and generate a migration:
 You can use `--plan` option beforehand to check SQL queries that will be executed in the next time:
 
 ```bash
-$ kyrage apply --plan
-create table "members" ("id" uuid primary key, "email" text not null unique, "name" text unique, "age" integer, "createdAt" timestamptz default now())
-create table "posts" ("id" uuid primary key, "author_id" uuid not null, "title" text not null, "content" text not null, "published" boolean default false, "published_at" timestamptz default now())
-
+$ kyrage apply --plan --pretty
+create table "members" (
+  "id" uuid primary key,
+  "email" text not null unique,
+  "name" text unique,
+  "age" int4,
+  "createdAt" timestamptz default now ()
+)
+create table "posts" (
+  "id" uuid primary key,
+  "author_id" uuid not null,
+  "title" text,
+  "content" text not null,
+  "published" boolean default false,
+  "published_at" timestamptz default now ()
+)
 ```
 
 If everything looks good, execute the generated migrations:
@@ -128,6 +141,8 @@ If everything looks good, execute the generated migrations:
 $ kyrage apply
 ✔ Migration applied: 1754372124127
 ```
+
+**PROTIP**: You can also apply the changes immediately on generating migration: `kyrage generate --apply`
 
 ## 📚 API Reference
 

@@ -57,6 +57,7 @@ export const runGenerate = async (props: {
       client: props.client,
       options: {
         plan: props.options.plan,
+        pretty: false,
       },
     });
   }

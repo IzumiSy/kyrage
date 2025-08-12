@@ -2,11 +2,13 @@ import { Migrator } from "kysely";
 import { DBClient } from "../client";
 import { createMigrationProvider } from "../migration";
 import { logger } from "../logger";
+import { format } from "sql-formatter";
 
 export const runApply = async (props: {
   client: DBClient;
   options: {
     plan: boolean;
+    pretty: boolean;
   };
 }) => {
   await using db = props.client.getDB({
@@ -28,7 +30,7 @@ export const runApply = async (props: {
   const plannedQueries = props.client.getPlannedQueries();
   if (plannedQueries.length > 0) {
     plannedQueries.forEach((query) => {
-      console.log(query.sql);
+      console.log(props.options.pretty ? format(query.sql) : query.sql);
     });
     return;
   }
