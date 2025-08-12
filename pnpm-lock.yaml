@@ -24,8 +24,8 @@ importers:
         specifier: ^24.2.1
         version: 24.2.1
       kysely:
-        specifier: ^0.28.4
-        version: 0.28.4
+        specifier: ^0.28.5
+        version: 0.28.5
       typescript:
         specifier: ^5.9.2
         version: 5.9.2
@@ -45,11 +45,11 @@ importers:
         specifier: ^3.4.2
         version: 3.4.2
       kysely:
-        specifier: ^0.28.4
-        version: 0.28.4
+        specifier: ^0.28.5
+        version: 0.28.5
       kysely-codegen:
         specifier: ^0.18.5
-        version: 0.18.5(better-sqlite3@12.2.0)(kysely@0.28.4)(mysql2@3.14.3)(pg@8.16.3)(typescript@5.9.2)
+        version: 0.18.5(better-sqlite3@12.2.0)(kysely@0.28.5)(mysql2@3.14.3)(pg@8.16.3)(typescript@5.9.2)
       mysql2:
         specifier: ^3.14.3
         version: 3.14.3
@@ -1368,8 +1368,8 @@ packages:
       tedious:
         optional: true
 
-  kysely@0.28.4:
-    resolution: {integrity: sha512-pfQj8/Bo3KSzC1HIZB5MeeYRWcDmx1ZZv8H25LsyeygqXE+gfsbUAgPT1GSYZFctB1cdOVlv+OifuCls2mQSnw==}
+  kysely@0.28.5:
+    resolution: {integrity: sha512-rlB0I/c6FBDWPcQoDtkxi9zIvpmnV5xoIalfCMSMCa7nuA6VGA3F54TW9mEgX4DVf10sXAWCF5fDbamI/5ZpKA==}
     engines: {node: '>=20.0.0'}
 
   lazystream@1.0.1:
@@ -3477,14 +3477,14 @@ snapshots:
     optionalDependencies:
       graceful-fs: 4.2.11
 
-  kysely-codegen@0.18.5(better-sqlite3@12.2.0)(kysely@0.28.4)(mysql2@3.14.3)(pg@8.16.3)(typescript@5.9.2):
+  kysely-codegen@0.18.5(better-sqlite3@12.2.0)(kysely@0.28.5)(mysql2@3.14.3)(pg@8.16.3)(typescript@5.9.2):
     dependencies:
       chalk: 4.1.2
       cosmiconfig: 9.0.0(typescript@5.9.2)
       dotenv: 16.6.1
       dotenv-expand: 12.0.2
       git-diff: 2.0.6
-      kysely: 0.28.4
+      kysely: 0.28.5
       micromatch: 4.0.8
       minimist: 1.2.8
       pluralize: 8.0.0
@@ -3496,7 +3496,7 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  kysely@0.28.4: {}
+  kysely@0.28.5: {}
 
   lazystream@1.0.1:
     dependencies:
