@@ -67,7 +67,6 @@ type DBClientConstructorProps = {
 
 export class DBClient {
   private plannedQueries: CompiledQuery[] = [];
-
   constructor(private constructorProps: DBClientConstructorProps) {}
 
   getDB(options?: DBClientConstructorProps["options"]) {
@@ -89,5 +88,9 @@ export class DBClient {
 
   getPlannedQueries() {
     return this.plannedQueries;
+  }
+
+  getDialect() {
+    return this.constructorProps.databaseProps.dialect;
   }
 }
