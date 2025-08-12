@@ -1,5 +1,5 @@
 import { describe, beforeAll, expect, it, vi } from "vitest";
-import { defineTable, column } from "../dist";
+import { defineTable, column } from "../src/config/builder";
 import { setupTestDB } from "./helper";
 import { sql } from "kysely";
 import { runGenerate } from "../src/usecases/generate";
