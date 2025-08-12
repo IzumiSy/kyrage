@@ -93,6 +93,7 @@ export default defineConfig({
 Compare your schema with the database and generate a migration:
 
 ```bash
+$ kyrage generate
 -- create_table: members
    -> column: id ({"type":"uuid","primaryKey":true,"notNull":false "unique":false})
    -> column: email ({"type":"text","primaryKey":false,"notNull":true,"unique":true})
@@ -140,6 +141,8 @@ If everything looks good, execute the generated migrations:
 $ kyrage apply
 ✔ Migration applied: 1754372124127
 ```
+
+#### PROTIP: You can also apply the changes immediately on generating migration: `kyrage generate --apply`
 
 ## 📚 API Reference
 
