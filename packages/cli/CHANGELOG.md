@@ -1,5 +1,15 @@
 # @izumisy/kyrage
 
+## 0.5.0
+
+### Minor Changes
+
+- d221705: Implement custom SQL introspector to get extra column information that kysely's builtin one does not help.
+
+  To keep the initial implementation focused, decided to drop `checkSql` support and narrowed dialect support to PostgreSQL for now.
+
+- bba7eaa: Fix type error in defineConfig function
+
 ## 0.4.0
 
 ### Minor Changes
