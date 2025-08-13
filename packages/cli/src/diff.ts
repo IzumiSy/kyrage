@@ -101,13 +101,14 @@ export function diffTables(props: {
         }));
 
       // 型変更カラム: before/after型情報
-      // Changes on primaryKey and unique are not supported in current implementation
       const changedColumns = dbColNames
         .filter(
           (c) =>
             configColNames.includes(c) &&
             (dbCols[c].type !== configCols[c].type ||
-              dbCols[c].notNull !== configCols[c].notNull)
+              dbCols[c].notNull !== configCols[c].notNull ||
+              dbCols[c].primaryKey !== configCols[c].primaryKey ||
+              dbCols[c].unique !== configCols[c].unique)
         )
         .map((column) => ({
           column,

@@ -1,6 +1,7 @@
 import {
   ColumnDataType,
   DEFAULT_MIGRATION_TABLE,
+  CreateTableBuilder,
   isColumnDataType,
   Kysely,
   Migration,
@@ -94,19 +95,31 @@ export async function buildMigrationFromDiff(
 ): Promise<void> {
   // 1. 追加テーブル
   for (const added of diff.addedTables) {
-    let builder = db.schema.createTable(added.table);
+    let builder: CreateTableBuilder<string, any> = db.schema.createTable(
+      added.table
+    );
     for (const [colName, colDef] of Object.entries(added.columns)) {
       const dataType = colDef.type;
       assertDataType(dataType);
       builder = builder.addColumn(colName, dataType, (col) => {
         let c = col;
         if (colDef.notNull) c = c.notNull();
-        if (colDef.primaryKey) c = c.primaryKey();
-        if (colDef.unique) c = c.unique();
         if (colDef.defaultSql)
           c = c.defaultTo(sql.raw(colDef.defaultSql as string));
         return c;
       });
+      if (colDef.primaryKey) {
+        builder = builder.addPrimaryKeyConstraint(
+          `${added.table}_${colName}_primary_key`,
+          [colName]
+        );
+      }
+      if (colDef.unique) {
+        builder = builder.addUniqueConstraint(
+          `${added.table}_${colName}_unique`,
+          [colName]
+        );
+      }
     }
     await builder.execute();
   }
@@ -127,15 +140,31 @@ export async function buildMigrationFromDiff(
         .addColumn(addCol.column, dataType, (col) => {
           let c = col;
           if (addCol.attributes.notNull) c = c.notNull();
-          if (addCol.attributes.primaryKey) c = c.primaryKey();
-          if (addCol.attributes.unique) c = c.unique();
           if (addCol.attributes.defaultSql) {
             c = c.defaultTo(sql.raw(addCol.attributes.defaultSql as string));
           }
           return c;
         })
         .execute();
+      if (addCol.attributes.primaryKey) {
+        await db.schema
+          .alterTable(changed.table)
+          .addPrimaryKeyConstraint(
+            `${changed.table}_${addCol.column}_primary_key`,
+            [addCol.column]
+          )
+          .execute();
+      }
+      if (addCol.attributes.unique) {
+        await db.schema
+          .alterTable(changed.table)
+          .addUniqueConstraint(`${changed.table}_${addCol.column}_unique`, [
+            addCol.column,
+          ])
+          .execute();
+      }
     }
+
     // 削除カラム
     for (const remCol of changed.removedColumns) {
       await db.schema
@@ -143,9 +172,10 @@ export async function buildMigrationFromDiff(
         .dropColumn(remCol.column)
         .execute();
     }
+
     // 型変更カラム
     for (const chCol of changed.changedColumns) {
-      // dataTypeの変更
+      // dataType
       if (chCol.before.type !== chCol.after.type) {
         const dataType = chCol.after.type;
         assertDataType(dataType);
@@ -155,7 +185,7 @@ export async function buildMigrationFromDiff(
           .execute();
       }
 
-      // notNull/nullableの変更
+      // notNull
       if (chCol.after.notNull !== chCol.before.notNull) {
         if (chCol.after.notNull) {
           await db.schema
@@ -166,6 +196,41 @@ export async function buildMigrationFromDiff(
           await db.schema
             .alterTable(changed.table)
             .alterColumn(chCol.column, (col) => col.dropNotNull())
+            .execute();
+        }
+      }
+
+      // primaryKey
+      if (chCol.after.primaryKey !== chCol.before.primaryKey) {
+        if (chCol.after.primaryKey) {
+          await db.schema
+            .alterTable(changed.table)
+            .addPrimaryKeyConstraint(
+              `${changed.table}_${chCol.column}_primary_key`,
+              [chCol.column]
+            )
+            .execute();
+        } else {
+          await db.schema
+            .alterTable(changed.table)
+            .dropConstraint(`${changed.table}_${chCol.column}_primary_key`)
+            .execute();
+        }
+      }
+
+      // unique
+      if (chCol.after.unique !== chCol.before.unique) {
+        if (chCol.after.unique) {
+          await db.schema
+            .alterTable(changed.table)
+            .addUniqueConstraint(`${changed.table}_${chCol.column}_unique`, [
+              chCol.column,
+            ])
+            .execute();
+        } else {
+          await db.schema
+            .alterTable(changed.table)
+            .dropConstraint(`${changed.table}_${chCol.column}_unique`)
             .execute();
         }
       }

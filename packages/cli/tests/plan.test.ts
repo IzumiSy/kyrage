@@ -16,7 +16,12 @@ const config = defineConfigForTest({
   tables: [
     defineTable("members", {
       id: column("uuid", { primaryKey: true }),
-      name: column("text"),
+      name: column("text", { unique: true }),
+      email: column("text"),
+    }),
+    defineTable("category", {
+      id: column("uuid", { primaryKey: true }),
+      name: column("text", { unique: true }),
     }),
   ],
 });
@@ -38,11 +43,6 @@ describe("generate with planned apply", () => {
       },
     });
 
-    expect(loggerStdout).toHaveBeenNthCalledWith(
-      1,
-      `create table "members" ("id" uuid not null primary key, "name" text)`
-    );
-
     await runApply({
       client,
       logger: defaultConsolaLogger,
@@ -58,6 +58,11 @@ describe("generate with planned apply", () => {
       config: defineConfigForTest({
         database,
         tables: [
+          defineTable("members", {
+            id: column("uuid", { primaryKey: true }),
+            name: column("text"),
+            email: column("text", { unique: true }),
+          }),
           defineTable("posts", {
             id: column("uuid", { primaryKey: true }),
             content: column("text"),
@@ -71,11 +76,16 @@ describe("generate with planned apply", () => {
       },
     });
 
-    expect(loggerStdout).toHaveBeenNthCalledWith(
-      2,
-      `create table "posts" ("id" uuid not null primary key, "content" text)`
-    );
-    expect(loggerStdout).toHaveBeenNthCalledWith(3, `drop table "members"`);
+    [
+      `create table "members" ("id" uuid not null, "name" text, "email" text, constraint "members_id_primary_key" primary key ("id"), constraint "members_name_unique" unique ("name"))`,
+      `create table "category" ("id" uuid not null, "name" text, constraint "category_id_primary_key" primary key ("id"), constraint "category_name_unique" unique ("name"))`,
+      `create table "posts" ("id" uuid not null, "content" text, constraint "posts_id_primary_key" primary key ("id"))`,
+      `drop table "category"`,
+      `alter table "members" drop constraint "members_name_unique"`,
+      `alter table "members" add constraint "members_email_unique" unique ("email")`,
+    ].forEach((expectedCall, index) => {
+      expect(loggerStdout).toHaveBeenNthCalledWith(index + 1, expectedCall);
+    });
 
     loggerStdout.mockClear();
   });
