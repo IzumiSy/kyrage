@@ -8,18 +8,12 @@ import {
 import { TableDiff } from "./diff";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
-import { migrationSchema } from "./schema";
+import { migrationSchema, MigrationValue } from "./schema";
+import { DBClient } from "./client";
 
 export const migrationDirName = "migrations";
 
-type CreateMigrationProviderProps = {
-  db: Kysely<any>;
-  options: {
-    plan: boolean;
-  };
-};
-
-export const readMigrationFiles = async () => {
+const readMigrationFiles = async () => {
   try {
     const files = await readdir(migrationDirName);
     const migrationJSONFiles = files
@@ -39,12 +33,43 @@ export const readMigrationFiles = async () => {
   }
 };
 
+export const getPendingMigrations = async (client: DBClient) => {
+  await using db = client.getDB();
+  const executedMigrations = await db
+    .selectFrom("kysely_migration")
+    .select(["name", "timestamp"])
+    .$narrowType<{ name: string; timestamp: string }>()
+    .execute()
+    .catch(() => {
+      return [];
+    });
+
+  if (executedMigrations.length === 0) {
+    return [];
+  }
+
+  const migrationFiles = await readMigrationFiles();
+  const pendingMigrations = migrationFiles.filter(
+    (file) => !executedMigrations.some((m) => m.name === file.id)
+  );
+
+  return pendingMigrations;
+};
+
+type CreateMigrationProviderProps = {
+  db: Kysely<any>;
+  migrationsResolver: () => Promise<Array<MigrationValue>>;
+  options: {
+    plan: boolean;
+  };
+};
+
 export const createMigrationProvider = (
   props: CreateMigrationProviderProps
 ) => {
   return {
     getMigrations: async () => {
-      const migrationFiles = await readMigrationFiles();
+      const migrationFiles = await props.migrationsResolver();
       const migrations: Record<string, Migration> = {};
       migrationFiles.forEach((migration) => {
         migrations[migration.id] = {

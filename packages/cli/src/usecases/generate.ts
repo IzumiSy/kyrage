@@ -1,7 +1,6 @@
 import { mkdir, writeFile } from "fs/promises";
-import { Kysely } from "kysely";
 import { logger } from "../logger";
-import { readMigrationFiles, migrationDirName } from "../migration";
+import { migrationDirName, getPendingMigrations } from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
 import { Tables, diffTables, TableDiff } from "../diff";
@@ -17,11 +16,9 @@ export const runGenerate = async (props: {
     plan: boolean;
   };
 }) => {
-  await using db = props.client.getDB();
   const loadedConfig = props.config;
-
   if (!props.options.ignorePending) {
-    const pm = await getPendingMigrations(db);
+    const pm = await getPendingMigrations(props.client);
     if (pm.length > 0) {
       logger.warn(
         [
@@ -61,28 +58,6 @@ export const runGenerate = async (props: {
       },
     });
   }
-};
-
-const getPendingMigrations = async (db: Kysely<any>) => {
-  const executedMigrations = await db
-    .selectFrom("kysely_migration")
-    .select(["name", "timestamp"])
-    .$narrowType<{ name: string; timestamp: string }>()
-    .execute()
-    .catch(() => {
-      return [];
-    });
-
-  if (executedMigrations.length === 0) {
-    return [];
-  }
-
-  const migrationFiles = await readMigrationFiles();
-  const pendingMigrations = migrationFiles.filter(
-    (file) => !executedMigrations.some((m) => m.name === file.id)
-  );
-
-  return pendingMigrations;
 };
 
 const generateMigrationFromIntrospection = async (props: {

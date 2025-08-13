@@ -73,7 +73,7 @@ export class DBClient {
     const dialect = getDialect(this.constructorProps.databaseProps);
     const isPlan = options?.plan === true;
 
-    return new Kysely({
+    return new Kysely<any>({
       dialect: {
         createAdapter: () => dialect.createAdapter(),
         createDriver: () =>

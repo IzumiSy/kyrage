@@ -42,3 +42,5 @@ export const migrationSchema = z.object({
   version: z.string(),
   diff: z.any(), // Placeholder for TableDiff type
 });
+
+export type MigrationValue = z.infer<typeof migrationSchema>;

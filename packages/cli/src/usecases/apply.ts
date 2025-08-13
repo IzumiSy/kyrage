@@ -1,6 +1,6 @@
 import { Migrator } from "kysely";
 import { DBClient } from "../client";
-import { createMigrationProvider } from "../migration";
+import { createMigrationProvider, getPendingMigrations } from "../migration";
 import { logger } from "../logger";
 import { format } from "sql-formatter";
 
@@ -18,6 +18,7 @@ export const runApply = async (props: {
     db,
     provider: createMigrationProvider({
       db,
+      migrationsResolver: async () => await getPendingMigrations(props.client),
       options: {
         plan: props.options.plan,
       },
