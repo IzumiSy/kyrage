@@ -11,7 +11,6 @@ import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 import { migrationSchema, MigrationValue } from "./schema";
 import { DBClient } from "./client";
-import { exec } from "child_process";
 
 export const migrationDirName = "migrations";
 
