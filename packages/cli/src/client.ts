@@ -1,6 +1,8 @@
 import {
   CompiledQuery,
   Kysely,
+  KyselyConfig,
+  KyselyProps,
   MysqlDialect,
   PostgresDialect,
   SqliteDialect,
@@ -66,31 +68,59 @@ type DBClientConstructorProps = {
 };
 
 export class DBClient {
-  private plannedQueries: CompiledQuery[] = [];
   constructor(private constructorProps: DBClientConstructorProps) {}
 
   getDB(options?: DBClientConstructorProps["options"]) {
     const dialect = getDialect(this.constructorProps.databaseProps);
-    const isPlan = options?.plan === true;
 
-    return new Kysely<any>({
-      dialect: {
-        createAdapter: () => dialect.createAdapter(),
-        createDriver: () =>
-          isPlan
-            ? new SQLCollectingDriver(this.plannedQueries)
-            : dialect.createDriver(),
-        createIntrospector: (db) => dialect.createIntrospector(db),
-        createQueryCompiler: () => dialect.createQueryCompiler(),
+    return new PlannableKysely(
+      {
+        dialect: {
+          createAdapter: () => dialect.createAdapter(),
+          createDriver: () => dialect.createDriver(),
+          createIntrospector: (db) => dialect.createIntrospector(db),
+          createQueryCompiler: () => dialect.createQueryCompiler(),
+        },
       },
-    });
-  }
-
-  getPlannedQueries() {
-    return this.plannedQueries;
+      {
+        isPlan: options?.plan === true,
+      }
+    );
   }
 
   getDialect() {
     return this.constructorProps.databaseProps.dialect;
+  }
+}
+
+/**
+ * A Kysely instance that can be used to capture queries without executing them.
+ */
+class PlannableKysely extends Kysely<any> {
+  private plannedQueries: CompiledQuery[] = [];
+
+  constructor(
+    args: KyselyConfig | KyselyProps,
+    options: {
+      isPlan: boolean;
+    }
+  ) {
+    const plannedQueries: CompiledQuery[] = [];
+
+    super({
+      dialect: {
+        ...args.dialect,
+        createDriver: () =>
+          options.isPlan
+            ? new SQLCollectingDriver(plannedQueries)
+            : args.dialect.createDriver(),
+      },
+    });
+
+    this.plannedQueries = plannedQueries;
+  }
+
+  getPlannedQueries() {
+    return this.plannedQueries;
   }
 }

@@ -23,8 +23,9 @@ const config = defineConfigForTest({
 
 describe("generate with planned apply", () => {
   it("should not generate a new migration", async () => {
-    const loggerStdout = vi.spyOn(defaultConsolaLogger, "stdout");
-    // .mockImplementation(() => void 0);
+    const loggerStdout = vi
+      .spyOn(defaultConsolaLogger, "stdout")
+      .mockImplementation(() => void 0);
 
     await runGenerate({
       client,
@@ -51,20 +52,18 @@ describe("generate with planned apply", () => {
       },
     });
 
-    const updateConfig = defineConfigForTest({
-      database,
-      tables: [
-        defineTable("posts", {
-          id: column("uuid", { primaryKey: true }),
-          content: column("text"),
-        }),
-      ],
-    });
-
     await runGenerate({
       client,
       logger: defaultConsolaLogger,
-      config: updateConfig,
+      config: defineConfigForTest({
+        database,
+        tables: [
+          defineTable("posts", {
+            id: column("uuid", { primaryKey: true }),
+            content: column("text"),
+          }),
+        ],
+      }),
       options: {
         ignorePending: false,
         apply: true,

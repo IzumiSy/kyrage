@@ -1,22 +1,7 @@
-import { afterAll, beforeAll, describe, it, expect } from "vitest";
-import {
-  PostgreSqlContainer,
-  StartedPostgreSqlContainer,
-} from "@testcontainers/postgresql";
-import { DBClient, getClient } from "./client";
+import { describe, it, expect } from "vitest";
+import { setupTestDB } from "../tests/helper";
 
-let container: StartedPostgreSqlContainer;
-let client: DBClient;
-
-beforeAll(async () => {
-  container = await new PostgreSqlContainer("postgres:14").start();
-  client = getClient({
-    database: {
-      dialect: "postgres",
-      connectionString: container.getConnectionUri(),
-    },
-  });
-});
+const { client } = await setupTestDB();
 
 describe("DBClient", () => {
   describe("should be switchable to plan mode and able to be back", async () => {
@@ -44,8 +29,4 @@ describe("DBClient", () => {
       expect(tablesAfter[0].name).toBe("test_table");
     });
   });
-});
-
-afterAll(async () => {
-  await container.stop();
 });
