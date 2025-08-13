@@ -2,6 +2,8 @@ name: Test
 
 on: push
 
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
 jobs:
   type-check:
     runs-on: ubuntu-latest
