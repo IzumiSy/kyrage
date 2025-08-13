@@ -5,16 +5,18 @@ import {
   getAllMigrations,
   getPendingMigrations,
 } from "../migration";
-import { logger } from "../logger";
+import { Logger } from "../logger";
 import { format } from "sql-formatter";
 
 export const runApply = async (props: {
   client: DBClient;
+  logger: Logger;
   options: {
     plan: boolean;
     pretty: boolean;
   };
 }) => {
+  const { reporter } = props.logger;
   await using db = props.client.getDB({
     plan: props.options.plan,
   });
@@ -41,7 +43,7 @@ export const runApply = async (props: {
   const plannedQueries = props.client.getPlannedQueries();
   if (plannedQueries.length > 0) {
     plannedQueries.forEach((query) => {
-      console.log(props.options.pretty ? format(query.sql) : query.sql);
+      props.logger.stdout(props.options.pretty ? format(query.sql) : query.sql);
     });
     return;
   }
@@ -49,17 +51,17 @@ export const runApply = async (props: {
   if (migrationResults && migrationResults.length > 0) {
     migrationResults.forEach((result) => {
       if (result.status === "Error") {
-        logger.error(`Migration failed: ${result.migrationName}`);
+        reporter.error(`Migration failed: ${result.migrationName}`);
       } else if (result.status === "Success") {
-        logger.success(`Migration applied: ${result.migrationName}`);
+        reporter.success(`Migration applied: ${result.migrationName}`);
       }
     });
   } else {
-    logger.info("No migrations to run");
+    reporter.info("No migrations to run");
   }
 
   if (migrationError) {
-    logger.error(`Migration error: ${migrationError}`);
+    reporter.error(`Migration error: ${migrationError}`);
     process.exit(1);
   }
 };

@@ -4,6 +4,7 @@ import { defineConfigForTest, setupTestDB } from "./helper";
 import { sql } from "kysely";
 import { runGenerate } from "../src/usecases/generate";
 import { vol } from "memfs";
+import { defaultConsolaLogger } from "../src/logger";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");
@@ -40,6 +41,7 @@ describe("generate", () => {
 
     await runGenerate({
       client,
+      logger: defaultConsolaLogger,
       config,
       options: {
         ignorePending: false,

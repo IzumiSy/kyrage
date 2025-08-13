@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "fs/promises";
-import { logger } from "../logger";
+import { Logger } from "../logger";
 import { migrationDirName, getPendingMigrations } from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
@@ -9,6 +9,7 @@ import { getIntrospector } from "../introspection/introspector";
 
 export const runGenerate = async (props: {
   client: DBClient;
+  logger: Logger;
   config: ConfigValue;
   options: {
     ignorePending: boolean;
@@ -16,11 +17,12 @@ export const runGenerate = async (props: {
     plan: boolean;
   };
 }) => {
+  const { reporter } = props.logger;
   const loadedConfig = props.config;
   if (!props.options.ignorePending) {
     const pm = await getPendingMigrations(props.client);
     if (pm.length > 0) {
-      logger.warn(
+      reporter.warn(
         [
           `There are pending migrations: ${pm.map((m) => m.id).join(", ")}`,
           "Please apply them first before generating a new migration.",
@@ -37,21 +39,22 @@ export const runGenerate = async (props: {
   });
 
   if (!newMigration) {
-    logger.info("No changes detected, no migration needed.");
+    reporter.info("No changes detected, no migration needed.");
     return;
   }
 
-  printPrettyDiff(newMigration.diff);
+  printPrettyDiff(props.logger, newMigration.diff);
 
   const migrationFilePath = `${migrationDirName}/${newMigration.id}.json`;
   await mkdir(migrationDirName, { recursive: true });
   await writeFile(migrationFilePath, JSON.stringify(newMigration, null, 2));
 
-  logger.success(`Migration file generated: ${migrationFilePath}`);
+  reporter.success(`Migration file generated: ${migrationFilePath}`);
 
   if (props.options.apply) {
     await runApply({
       client: props.client,
+      logger: props.logger,
       options: {
         plan: props.options.plan,
         pretty: false,
@@ -122,25 +125,29 @@ const generateMigrationFromIntrospection = async (props: {
   };
 };
 
-const printPrettyDiff = (diff: TableDiff) => {
+const printPrettyDiff = (logger: Logger, diff: TableDiff) => {
+  const diffOutputs: string[] = [];
+
   // Show changes one by one like (added_table, changed_column, etc.)
   if (diff.addedTables.length > 0) {
     diff.addedTables.forEach((table) => {
-      logger.log(`-- create_table: ${table.table}`);
+      diffOutputs.push(`-- create_table: ${table.table}`);
       Object.entries(table.columns).forEach(([colName, colDef]) => {
-        logger.log(`   -> column: ${colName} (${JSON.stringify(colDef)})`);
+        diffOutputs.push(
+          `   -> column: ${colName} (${JSON.stringify(colDef)})`
+        );
       });
     });
   }
   if (diff.removedTables.length > 0) {
     diff.removedTables.forEach((table) => {
-      logger.log(`-- remove_table: ${table}`);
+      diffOutputs.push(`-- remove_table: ${table}`);
     });
   }
   if (diff.changedTables.length > 0) {
     diff.changedTables.forEach((table) => {
       table.addedColumns.forEach((col) => {
-        logger.log(
+        diffOutputs.push(
           [
             `-- add_column: ${table.table}.${col.column}`,
             `   -> to: ${JSON.stringify(col.attributes)}`,
@@ -148,10 +155,10 @@ const printPrettyDiff = (diff: TableDiff) => {
         );
       });
       table.removedColumns.forEach((col) => {
-        logger.log(`-- remove_column: ${table.table}.${col.column})`);
+        diffOutputs.push(`-- remove_column: ${table.table}.${col.column}`);
       });
       table.changedColumns.forEach((col) => {
-        logger.log(
+        diffOutputs.push(
           [
             `-- change_column: ${table.table}.${col.column}`,
             `   -> from: ${JSON.stringify(col.before)}`,
@@ -161,4 +168,6 @@ const printPrettyDiff = (diff: TableDiff) => {
       });
     });
   }
+
+  logger.reporter.log(diffOutputs.join("\n"));
 };

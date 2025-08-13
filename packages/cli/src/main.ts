@@ -3,7 +3,7 @@ import { getClient } from "./client";
 import * as pkg from "../package.json";
 import { configSchema, ConfigValue } from "./schema";
 import { runApply } from "./usecases/apply";
-import { logger } from "./logger";
+import { defaultConsolaLogger } from "./logger";
 import { runGenerate } from "./usecases/generate";
 import { loadConfig } from "c12";
 
@@ -13,6 +13,8 @@ const loadConfigFile = async () => {
   });
   return configSchema.parse(loadedConfig.config);
 };
+
+const logger = defaultConsolaLogger;
 
 const generateCmd = defineCommand({
   meta: {
@@ -45,6 +47,7 @@ const generateCmd = defineCommand({
 
       await runGenerate({
         client,
+        logger,
         config: loadedConfig,
         options: {
           ignorePending: ctx.args["ignore-pending"],
@@ -53,7 +56,7 @@ const generateCmd = defineCommand({
         },
       });
     } catch (error) {
-      logger.error(error);
+      logger.reporter.error(error as Error);
       process.exit(1);
     }
   },
@@ -85,13 +88,14 @@ const applyCmd = defineCommand({
 
       await runApply({
         client,
+        logger,
         options: {
           plan: ctx.args.plan,
           pretty: ctx.args.pretty,
         },
       });
     } catch (error) {
-      logger.error(error);
+      logger.reporter.error(error as Error);
       process.exit(1);
     }
   },

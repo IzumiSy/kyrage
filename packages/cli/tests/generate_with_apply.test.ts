@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { runGenerate } from "../src/usecases/generate";
 import { defineTable, column } from "../src/config/builder";
 import { defineConfigForTest, setupTestDB } from "./helper";
+import { defaultConsolaLogger } from "../src/logger";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");
@@ -22,6 +23,7 @@ describe("generate and apply", () => {
   it("should update DB immediately with generate command with apply option", async () => {
     await runGenerate({
       client,
+      logger: defaultConsolaLogger,
       config,
       options: {
         ignorePending: false,

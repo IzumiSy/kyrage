@@ -4,6 +4,7 @@ import { readdir } from "fs/promises";
 import { runApply } from "../src/usecases/apply";
 import { defineConfigForTest, setupTestDB } from "./helper";
 import { defineTable, column } from "../src/config/builder";
+import { defaultConsolaLogger } from "../src/logger";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");
@@ -24,6 +25,7 @@ describe("generate and apply", () => {
   it("should generate a migration file", async () => {
     await runGenerate({
       client,
+      logger: defaultConsolaLogger,
       config,
       options: {
         ignorePending: false,
@@ -40,6 +42,7 @@ describe("generate and apply", () => {
   it("should apply the migration", async () => {
     await runApply({
       client,
+      logger: defaultConsolaLogger,
       options: {
         plan: false,
         pretty: false,

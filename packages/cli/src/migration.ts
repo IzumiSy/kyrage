@@ -1,5 +1,6 @@
 import {
   ColumnDataType,
+  DEFAULT_MIGRATION_TABLE,
   isColumnDataType,
   Kysely,
   Migration,
@@ -10,6 +11,7 @@ import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 import { migrationSchema, MigrationValue } from "./schema";
 import { DBClient } from "./client";
+import { exec } from "child_process";
 
 export const migrationDirName = "migrations";
 
@@ -35,25 +37,28 @@ export const getAllMigrations = async () => {
 
 export const getPendingMigrations = async (client: DBClient) => {
   await using db = client.getDB();
-  const executedMigrations = await db
-    .selectFrom("kysely_migration")
-    .select(["name", "timestamp"])
-    .$narrowType<{ name: string; timestamp: string }>()
-    .execute()
-    .catch(() => {
-      return [];
-    });
+  const migrationFiles = await getAllMigrations();
 
-  if (executedMigrations.length === 0) {
-    return [];
+  // If no migration table exists, it should be the initial time to apply migrations
+  // All migrations are marked as pending
+  const tables = (
+    await db.introspection.getTables({
+      withInternalKyselyTables: true,
+    })
+  ).map((t) => t.name);
+  if (!tables.includes(DEFAULT_MIGRATION_TABLE)) {
+    return migrationFiles;
   }
 
-  const migrationFiles = await getAllMigrations();
-  const pendingMigrations = migrationFiles.filter(
+  const executedMigrations = await db
+    .selectFrom(DEFAULT_MIGRATION_TABLE)
+    .select(["name", "timestamp"])
+    .$narrowType<{ name: string; timestamp: string }>()
+    .execute();
+
+  return migrationFiles.filter(
     (file) => !executedMigrations.some((m) => m.name === file.id)
   );
-
-  return pendingMigrations;
 };
 
 type CreateMigrationProviderProps = {

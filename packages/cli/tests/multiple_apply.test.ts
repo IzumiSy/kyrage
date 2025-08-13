@@ -2,6 +2,7 @@ import { vi, it, describe, expect } from "vitest";
 import { defineTable, column } from "../src";
 import { setupTestDB, defineConfigForTest } from "./helper";
 import { runGenerate } from "../src/usecases/generate";
+import { defaultConsolaLogger } from "../src/logger";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");
@@ -25,6 +26,7 @@ describe("apply migrations in multiple times", () => {
 
     await runGenerate({
       client,
+      logger: defaultConsolaLogger,
       config,
       options: {
         ignorePending: false,
@@ -50,6 +52,7 @@ describe("apply migrations in multiple times", () => {
 
     await runGenerate({
       client,
+      logger: defaultConsolaLogger,
       config: updateConfig,
       options: {
         ignorePending: false,

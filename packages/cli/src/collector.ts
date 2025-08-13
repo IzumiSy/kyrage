@@ -27,8 +27,8 @@ class CollectorConnection implements DatabaseConnection {
       queryKind === "AlterTableNode"
     ) {
       const tableName = query.query.table.table.identifier.name;
-      if (tableName.startsWith("kysely_migration")) {
-        // Skip modification queries for migration tables
+      if (tableName.startsWith("kysely_")) {
+        // Skip modification queries for internal migration tables
         return { rows: [] };
       }
 
