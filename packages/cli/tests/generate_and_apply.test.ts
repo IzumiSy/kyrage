@@ -2,7 +2,7 @@ import { describe, it, vi, expect } from "vitest";
 import { runGenerate } from "../src/usecases/generate";
 import { readdir } from "fs/promises";
 import { runApply } from "../src/usecases/apply";
-import { setupTestDB } from "./helper";
+import { defineConfigForTest, setupTestDB } from "./helper";
 import { defineTable, column } from "../src/config/builder";
 
 vi.mock("fs/promises", async () => {
@@ -10,7 +10,9 @@ vi.mock("fs/promises", async () => {
   return memfs.fs.promises;
 });
 
-const { config, client } = await setupTestDB({
+const { database, client } = await setupTestDB();
+const config = defineConfigForTest({
+  database,
   tables: [
     defineTable("members", {
       id: column("uuid", { primaryKey: true }),

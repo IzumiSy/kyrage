@@ -27,7 +27,9 @@ export const defineTable = <T extends Record<string, DefinedColumn>>(
 export type DefinedTable = ReturnType<typeof defineTable>;
 export type DefinedTables = Array<DefinedTable>;
 
-export const defineConfig = (config: {
+export type DefineConfigProp = {
   database: DatabaseValue;
-  tables: DefinedTable[];
-}) => config;
+  tables: DefinedTables;
+};
+
+export const defineConfig = (config: DefineConfigProp) => config;

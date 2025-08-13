@@ -1,6 +1,6 @@
 import { describe, beforeAll, expect, it, vi } from "vitest";
 import { defineTable, column } from "../src/config/builder";
-import { setupTestDB } from "./helper";
+import { defineConfigForTest, setupTestDB } from "./helper";
 import { sql } from "kysely";
 import { runGenerate } from "../src/usecases/generate";
 import { vol } from "memfs";
@@ -10,7 +10,9 @@ vi.mock("fs/promises", async () => {
   return memfs.fs.promises;
 });
 
-const { config, client } = await setupTestDB({
+const { database, client } = await setupTestDB();
+const config = defineConfigForTest({
+  database,
   tables: [
     defineTable("members", {
       id: column("uuid", { primaryKey: true }),
