@@ -17,6 +17,7 @@ const config = defineConfigForTest({
     defineTable("members", {
       id: column("uuid", { primaryKey: true }),
       name: column("text", { unique: true }),
+      email: column("text"),
     }),
     defineTable("category", {
       id: column("uuid", { primaryKey: true }),
@@ -60,6 +61,7 @@ describe("generate with planned apply", () => {
           defineTable("members", {
             id: column("uuid", { primaryKey: true }),
             name: column("text"),
+            email: column("text", { unique: true }),
           }),
           defineTable("posts", {
             id: column("uuid", { primaryKey: true }),
@@ -74,13 +76,13 @@ describe("generate with planned apply", () => {
       },
     });
 
-    // Expected calls
     [
-      `create table "members" ("id" uuid not null, "name" text, constraint "members_id_primary_key" primary key ("id"), constraint "members_name_unique" unique ("name"))`,
+      `create table "members" ("id" uuid not null, "name" text, "email" text, constraint "members_id_primary_key" primary key ("id"), constraint "members_name_unique" unique ("name"))`,
       `create table "category" ("id" uuid not null, "name" text, constraint "category_id_primary_key" primary key ("id"), constraint "category_name_unique" unique ("name"))`,
       `create table "posts" ("id" uuid not null, "content" text, constraint "posts_id_primary_key" primary key ("id"))`,
       `drop table "category"`,
       `alter table "members" drop constraint "members_name_unique"`,
+      `alter table "members" add constraint "members_email_unique" unique ("email")`,
     ].forEach((expectedCall, index) => {
       expect(loggerStdout).toHaveBeenNthCalledWith(index + 1, expectedCall);
     });
