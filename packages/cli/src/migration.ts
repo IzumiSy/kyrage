@@ -1,5 +1,6 @@
 import {
   ColumnDataType,
+  DEFAULT_MIGRATION_TABLE,
   isColumnDataType,
   Kysely,
   Migration,
@@ -8,18 +9,12 @@ import {
 import { TableDiff } from "./diff";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
-import { migrationSchema } from "./schema";
+import { migrationSchema, MigrationValue } from "./schema";
+import { DBClient } from "./client";
 
 export const migrationDirName = "migrations";
 
-type CreateMigrationProviderProps = {
-  db: Kysely<any>;
-  options: {
-    plan: boolean;
-  };
-};
-
-export const readMigrationFiles = async () => {
+export const getAllMigrations = async () => {
   try {
     const files = await readdir(migrationDirName);
     const migrationJSONFiles = files
@@ -39,12 +34,46 @@ export const readMigrationFiles = async () => {
   }
 };
 
+export const getPendingMigrations = async (client: DBClient) => {
+  await using db = client.getDB();
+  const migrationFiles = await getAllMigrations();
+
+  // If no migration table exists, it should be the initial time to apply migrations
+  // All migrations are marked as pending
+  const tables = (
+    await db.introspection.getTables({
+      withInternalKyselyTables: true,
+    })
+  ).map((t) => t.name);
+  if (!tables.includes(DEFAULT_MIGRATION_TABLE)) {
+    return migrationFiles;
+  }
+
+  const executedMigrations = await db
+    .selectFrom(DEFAULT_MIGRATION_TABLE)
+    .select(["name", "timestamp"])
+    .$narrowType<{ name: string; timestamp: string }>()
+    .execute();
+
+  return migrationFiles.filter(
+    (file) => !executedMigrations.some((m) => m.name === file.id)
+  );
+};
+
+type CreateMigrationProviderProps = {
+  db: Kysely<any>;
+  migrationsResolver: () => Promise<Array<MigrationValue>>;
+  options: {
+    plan: boolean;
+  };
+};
+
 export const createMigrationProvider = (
   props: CreateMigrationProviderProps
 ) => {
   return {
     getMigrations: async () => {
-      const migrationFiles = await readMigrationFiles();
+      const migrationFiles = await props.migrationsResolver();
       const migrations: Record<string, Migration> = {};
       migrationFiles.forEach((migration) => {
         migrations[migration.id] = {

@@ -2,15 +2,18 @@ import { describe, it, vi, expect } from "vitest";
 import { runGenerate } from "../src/usecases/generate";
 import { readdir } from "fs/promises";
 import { runApply } from "../src/usecases/apply";
-import { setupTestDB } from "./helper";
+import { defineConfigForTest, setupTestDB } from "./helper";
 import { defineTable, column } from "../src/config/builder";
+import { defaultConsolaLogger } from "../src/logger";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");
   return memfs.fs.promises;
 });
 
-const { config, client } = await setupTestDB({
+const { database, client } = await setupTestDB();
+const config = defineConfigForTest({
+  database,
   tables: [
     defineTable("members", {
       id: column("uuid", { primaryKey: true }),
@@ -22,6 +25,7 @@ describe("generate and apply", () => {
   it("should generate a migration file", async () => {
     await runGenerate({
       client,
+      logger: defaultConsolaLogger,
       config,
       options: {
         ignorePending: false,
@@ -38,6 +42,7 @@ describe("generate and apply", () => {
   it("should apply the migration", async () => {
     await runApply({
       client,
+      logger: defaultConsolaLogger,
       options: {
         plan: false,
         pretty: false,

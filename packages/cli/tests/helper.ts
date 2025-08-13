@@ -2,8 +2,8 @@ import { afterAll } from "vitest";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { CockroachDbContainer } from "@testcontainers/cockroachdb";
 import { configSchema, DialectEnum } from "../src/schema";
-import { defineConfig, DefinedTables } from "../src/config/builder";
 import { getClient } from "../src/client";
+import { defineConfig, DefineConfigProp } from "../src/config/builder";
 
 const getContainer = (dialect: string) => {
   switch (dialect) {
@@ -18,26 +18,29 @@ const getContainer = (dialect: string) => {
 
 const targetDialect = (process.env.TEST_DIALECT as DialectEnum) || "postgres";
 
-export const setupTestDB = async (props: { tables: DefinedTables }) => {
+export const setupTestDB = async () => {
   const container = await getContainer(targetDialect).start();
-  const config = configSchema.parse(
-    defineConfig({
-      database: {
-        dialect: targetDialect as DialectEnum,
-        connectionString: container.getConnectionUri(),
-      },
-      tables: props.tables,
-    })
-  );
+  const database = {
+    dialect: targetDialect as DialectEnum,
+    connectionString: container.getConnectionUri(),
+  } as const;
 
   afterAll(async () => {
     await container.stop();
   });
 
   return {
-    config,
+    database,
     client: getClient({
-      database: config.database,
+      database,
     }),
   };
 };
+
+export const defineConfigForTest = (config: DefineConfigProp) =>
+  configSchema.parse(
+    defineConfig({
+      database: config.database,
+      tables: config.tables,
+    })
+  );
