@@ -13,7 +13,7 @@ import { DBClient } from "./client";
 
 export const migrationDirName = "migrations";
 
-const readMigrationFiles = async () => {
+export const getAllMigrations = async () => {
   try {
     const files = await readdir(migrationDirName);
     const migrationJSONFiles = files
@@ -48,7 +48,7 @@ export const getPendingMigrations = async (client: DBClient) => {
     return [];
   }
 
-  const migrationFiles = await readMigrationFiles();
+  const migrationFiles = await getAllMigrations();
   const pendingMigrations = migrationFiles.filter(
     (file) => !executedMigrations.some((m) => m.name === file.id)
   );
