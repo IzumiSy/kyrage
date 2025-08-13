@@ -1,5 +1,15 @@
 # @izumisy/kyrage
 
+## 0.7.0
+
+### Minor Changes
+
+- [#25](https://github.com/IzumiSy/kyrage/pull/25) [`2755a84`](https://github.com/IzumiSy/kyrage/commit/2755a848f5214e9e4e3864228731c1d7f9753d9a) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Support dropping primary key and unique constraint
+
+### Patch Changes
+
+- [#31](https://github.com/IzumiSy/kyrage/pull/31) [`6081b45`](https://github.com/IzumiSy/kyrage/commit/6081b45ada19c7aadb8d83c8d1a4718342671faa) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Fix #26
+
 ## 0.6.0
 
 ### Minor Changes
