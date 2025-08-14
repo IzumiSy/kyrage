@@ -78,13 +78,27 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
     `
       .$castTo<PostgresIndexInfo>()
       .execute(db);
-    return rows.map((r) => ({
-      table: r.table_name,
-      name: r.index_name,
-      columns: r.column_names,
-      unique: r.is_unique,
-      systemGenerated: r.is_system_generated,
-    }));
+    return rows.map((r) => {
+      // PostgreSQLの配列形式（{name,email}）をJavaScript配列に変換
+      let columns: string[];
+      if (Array.isArray(r.column_names)) {
+        columns = r.column_names;
+      } else {
+        const colStr = r.column_names as string;
+        // "{name,email}" 形式を ["name", "email"] に変換
+        columns = colStr.startsWith('{') && colStr.endsWith('}')
+          ? colStr.slice(1, -1).split(',')
+          : [colStr];
+      }
+
+      return {
+        table: r.table_name,
+        name: r.index_name,
+        columns,
+        unique: r.is_unique,
+        systemGenerated: r.is_system_generated,
+      };
+    });
   };
 
   return {
