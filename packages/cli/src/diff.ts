@@ -64,16 +64,13 @@ const hasColumnChanges = (changes: {
     changes.changedColumns,
   ]);
 
-const columnsEqual = R.curry(
-  (col1: TableColumnAttributes, col2: TableColumnAttributes): boolean => {
-    return (
-      col1.type === col2.type &&
-      (col1.notNull ?? false) === (col2.notNull ?? false) &&
-      (col1.primaryKey ?? false) === (col2.primaryKey ?? false) &&
-      (col1.unique ?? false) === (col2.unique ?? false)
-    );
-  }
-);
+// カラム属性を比較用の配列に変換
+const columnsEqual = R.eqBy((col: TableColumnAttributes) => [
+  col.type,
+  col.notNull ?? false,
+  col.primaryKey ?? false,
+  col.unique ?? false,
+]);
 
 // カラム差分計算のヘルパー関数
 function computeTableColumnDiffs(
