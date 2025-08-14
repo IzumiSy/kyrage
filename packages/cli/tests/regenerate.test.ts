@@ -38,7 +38,7 @@ beforeAll(async () => {
       email TEXT UNIQUE NOT NULL,
       age INT4
     );
-    CREATE INDEX "idx_members_name_email" ON "members" ("name", "email");
+    CREATE UNIQUE INDEX "idx_members_name_email" ON "members" ("name", "email");
   `.execute(db);
 });
 
