@@ -1,15 +1,16 @@
 {
   "version": "1",
-  "id": "1754999651421",
+  "id": "1755184693593",
   "diff": {
-    "addedTables": [
+    "operations": [
       {
+        "type": "create_table",
         "table": "members",
         "columns": {
           "id": {
             "type": "uuid",
             "primaryKey": true,
-            "notNull": false,
+            "notNull": true,
             "unique": false
           },
           "email": {
@@ -25,7 +26,7 @@
             "unique": true
           },
           "age": {
-            "type": "int4",
+            "type": "integer",
             "primaryKey": false,
             "notNull": false,
             "unique": false
@@ -40,12 +41,13 @@
         }
       },
       {
+        "type": "create_table",
         "table": "posts",
         "columns": {
           "id": {
             "type": "uuid",
             "primaryKey": true,
-            "notNull": false,
+            "notNull": true,
             "unique": false
           },
           "author_id": {
@@ -81,9 +83,17 @@
             "defaultSql": "now()"
           }
         }
+      },
+      {
+        "type": "create_index",
+        "table": "members",
+        "name": "idx_members_name_email",
+        "columns": [
+          "name",
+          "email"
+        ],
+        "unique": true
       }
-    ],
-    "removedTables": [],
-    "changedTables": []
+    ]
   }
 }
