@@ -116,6 +116,7 @@ const generateMigrationFromIntrospection = async (props: {
       name: i.name,
       columns: i.columns,
       unique: i.unique,
+      systemGenerated: false,
     })),
   };
   const diff = diffSchema({

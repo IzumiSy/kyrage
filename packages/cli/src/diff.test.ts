@@ -193,6 +193,7 @@ describe("diffSchema", () => {
           name: "idx_users_a_b",
           columns: ["a", "b"],
           unique: false,
+          systemGenerated: false,
         },
       ],
     };
@@ -204,6 +205,7 @@ describe("diffSchema", () => {
           name: "idx_users_a_b",
           columns: ["b", "a"],
           unique: false,
+          systemGenerated: false,
         },
       ],
     };
@@ -222,6 +224,7 @@ describe("diffSchema", () => {
           name: "idx_users_id",
           columns: ["id"],
           unique: false,
+          systemGenerated: false,
         },
       ],
     };
@@ -240,6 +243,7 @@ describe("diffSchema", () => {
           name: "idx_users_email",
           columns: ["email"],
           unique: false,
+          systemGenerated: false,
         },
       ],
     };
@@ -251,6 +255,7 @@ describe("diffSchema", () => {
           name: "idx_users_email",
           columns: ["email"],
           unique: true,
+          systemGenerated: false,
         },
       ],
     };

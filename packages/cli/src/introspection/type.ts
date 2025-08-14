@@ -20,6 +20,7 @@ type IndexAttribute = {
   name: string;
   columns: string[];
   unique: boolean;
+  systemGenerated: boolean;
 };
 
 export type ExtraIntrospector = {
