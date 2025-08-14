@@ -1,164 +1,195 @@
 import { describe, it, expect } from "vitest";
-import { diffTables, Tables } from "./diff";
+import { diffTables, diffIndexes } from "./diff";
+import { SchemaSnapshot, ops } from "./operation";
 
 describe("diffTables", () => {
-  it("should detect added and removed tables", () => {
-    const dbTables: Tables = [
-      {
-        name: "users",
-        columns: {
-          id: { type: "integer" },
-        },
-      },
-    ];
-    const configTables: Tables = [
-      {
-        name: "users",
-        columns: {
-          id: { type: "integer" },
-        },
-      },
-      {
-        name: "posts",
-        columns: {
-          id: { type: "integer" },
-        },
-      },
-    ];
+  it("should detect added and removed tables only", () => {
+    const current: SchemaSnapshot = {
+      tables: [
+        { name: "users", columns: { id: { type: "integer" } } },
+        { name: "old_table", columns: { id: { type: "integer" } } },
+      ],
+      indexes: [],
+    };
+    const ideal: SchemaSnapshot = {
+      tables: [
+        { name: "users", columns: { id: { type: "integer" } } },
+        { name: "new_table", columns: { id: { type: "integer" } } },
+      ],
+      indexes: [],
+    };
 
-    const diff = diffTables({
-      current: dbTables,
-      ideal: configTables,
-    });
+    const operations = diffTables({ current, ideal });
 
-    expect(diff.addedTables).toEqual([
-      {
-        table: "posts",
-        columns: {
-          id: { type: "integer" },
-        },
-      },
-    ]);
-    expect(diff.removedTables).toEqual([]);
-    expect(diff.changedTables).toEqual([]);
-  });
-
-  it("should detect removed tables", () => {
-    const dbTables: Tables = [
-      {
-        name: "users",
-        columns: {
-          id: { type: "integer" },
-        },
-      },
-      {
-        name: "posts",
-        columns: {
-          id: { type: "integer" },
-        },
-      },
-    ];
-    const configTables: Tables = [
-      {
-        name: "users",
-        columns: {
-          id: { type: "integer" },
-        },
-      },
-    ];
-
-    const diff = diffTables({
-      current: dbTables,
-      ideal: configTables,
-    });
-
-    expect(diff.addedTables).toEqual([]);
-    expect(diff.removedTables).toEqual(["posts"]);
-    expect(diff.changedTables).toEqual([]);
-  });
-
-  it("should detect added, removed, and changed columns", () => {
-    const dbTables: Tables = [
-      {
-        name: "users",
-        columns: {
-          id: { type: "integer" },
-          name: { type: "varchar" },
-          age: { type: "integer" },
-        },
-      },
-    ];
-    const configTables: Tables = [
-      {
-        name: "users",
-        columns: {
-          id: { type: "integer" },
-          name: { type: "text" }, // type changed
-          email: { type: "varchar" }, // added
-        },
-      },
-    ];
-
-    const diff = diffTables({
-      current: dbTables,
-      ideal: configTables,
-    });
-
-    expect(diff.addedTables).toEqual([]);
-    expect(diff.removedTables).toEqual([]);
-    expect(diff.changedTables).toEqual([
-      {
-        table: "users",
-        addedColumns: [
-          {
-            column: "email",
-            attributes: { type: "varchar" },
-          },
-        ],
-        removedColumns: [
-          {
-            column: "age",
-            attributes: { type: "integer" },
-          },
-        ],
-        changedColumns: [
-          {
-            column: "name",
-            before: { type: "varchar" },
-            after: { type: "text" },
-          },
-        ],
-      },
+    expect(operations).toEqual([
+      ops.createTable("new_table", { id: { type: "integer" } }),
+      ops.dropTable("old_table"),
     ]);
   });
 
-  it("should return empty diff for identical tables", () => {
-    const dbTables: Tables = [
-      {
-        name: "users",
-        columns: {
-          id: { type: "integer" },
-          name: { type: "varchar" },
+  it("should detect column changes in existing tables", () => {
+    const current: SchemaSnapshot = {
+      tables: [
+        {
+          name: "users",
+          columns: {
+            id: { type: "integer" },
+            name: { type: "varchar" },
+            age: { type: "integer" },
+          },
         },
-      },
-    ];
-    const configTables: Tables = [
-      {
-        name: "users",
-        columns: {
-          id: { type: "integer" },
-          name: { type: "varchar" },
+      ],
+      indexes: [],
+    };
+    const ideal: SchemaSnapshot = {
+      tables: [
+        {
+          name: "users",
+          columns: {
+            id: { type: "integer" },
+            name: { type: "text" }, // changed
+            email: { type: "varchar" }, // added
+            // age removed
+          },
         },
-      },
-    ];
+      ],
+      indexes: [],
+    };
 
-    const diff = diffTables({
-      current: dbTables,
-      ideal: configTables,
-    });
+    const operations = diffTables({ current, ideal });
 
-    expect(diff.addedTables).toEqual([]);
-    expect(diff.removedTables).toEqual([]);
-    expect(diff.changedTables).toEqual([]);
+    expect(operations).toEqual([
+      ops.addColumn("users", "email", { type: "varchar" }),
+      ops.dropColumn("users", "age", { type: "integer" }),
+      ops.alterColumn("users", "name", { type: "varchar" }, { type: "text" }),
+    ]);
+  });
+});
+
+describe("diffIndexes", () => {
+  it("should detect added and removed indexes", () => {
+    const current: SchemaSnapshot = {
+      tables: [],
+      indexes: [
+        {
+          table: "users",
+          name: "idx_old",
+          columns: ["id"],
+          unique: false,
+          systemGenerated: false,
+        },
+      ],
+    };
+    const ideal: SchemaSnapshot = {
+      tables: [],
+      indexes: [
+        {
+          table: "users",
+          name: "idx_new",
+          columns: ["email"],
+          unique: false,
+          systemGenerated: false,
+        },
+      ],
+    };
+
+    const operations = diffIndexes({ current, ideal });
+
+    expect(operations).toEqual([
+      ops.createIndex("users", "idx_new", ["email"], false),
+      ops.dropIndex("users", "idx_old"),
+    ]);
+  });
+
+  it("should detect changed indexes (creates drop + create operations)", () => {
+    const current: SchemaSnapshot = {
+      tables: [],
+      indexes: [
+        {
+          table: "users",
+          name: "idx_test",
+          columns: ["id"],
+          unique: false,
+          systemGenerated: false,
+        },
+      ],
+    };
+    const ideal: SchemaSnapshot = {
+      tables: [],
+      indexes: [
+        {
+          table: "users",
+          name: "idx_test",
+          columns: ["id"],
+          unique: true, // unique flag changed
+          systemGenerated: false,
+        },
+      ],
+    };
+
+    const operations = diffIndexes({ current, ideal });
+
+    expect(operations).toEqual([
+      ops.dropIndex("users", "idx_test"),
+      ops.createIndex("users", "idx_test", ["id"], true),
+    ]);
+  });
+
+  it("should detect changed indexes (columns order)", () => {
+    const current: SchemaSnapshot = {
+      tables: [],
+      indexes: [
+        {
+          table: "users",
+          name: "idx_users_a_b",
+          columns: ["a", "b"],
+          unique: false,
+          systemGenerated: false,
+        },
+      ],
+    };
+    const ideal: SchemaSnapshot = {
+      tables: [],
+      indexes: [
+        {
+          table: "users",
+          name: "idx_users_a_b",
+          columns: ["b", "a"], // column order changed
+          unique: false,
+          systemGenerated: false,
+        },
+      ],
+    };
+
+    const operations = diffIndexes({ current, ideal });
+
+    expect(operations).toEqual([
+      ops.dropIndex("users", "idx_users_a_b"),
+      ops.createIndex("users", "idx_users_a_b", ["b", "a"], false),
+    ]);
+  });
+
+  it("should ignore system generated indexes", () => {
+    const current: SchemaSnapshot = {
+      tables: [],
+      indexes: [
+        {
+          table: "users",
+          name: "system_idx",
+          columns: ["id"],
+          unique: false,
+          systemGenerated: true,
+        },
+      ],
+    };
+    const ideal: SchemaSnapshot = {
+      tables: [],
+      indexes: [],
+    };
+
+    const operations = diffIndexes({ current, ideal });
+
+    // System generated indexes should be ignored
+    expect(operations).toHaveLength(0);
   });
 });

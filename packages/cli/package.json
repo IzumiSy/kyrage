@@ -44,6 +44,7 @@
     "kysely-codegen": "^0.18.5",
     "mysql2": "^3.14.3",
     "pg": "^8.16.3",
+    "ramda": "^0.31.3",
     "sql-formatter": "^15.6.6",
     "zod": "^4.0.17"
   },
@@ -54,6 +55,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.2.1",
     "@types/pg": "^8.15.5",
+    "@types/ramda": "^0.31.0",
     "memfs": "^4.36.0",
     "prettier": "^3.6.2",
     "testcontainers": "^11.5.1",

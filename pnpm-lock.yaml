@@ -59,6 +59,9 @@ importers:
       pg:
         specifier: ^8.16.3
         version: 8.16.3
+      ramda:
+        specifier: ^0.31.3
+        version: 0.31.3
       sql-formatter:
         specifier: ^15.6.6
         version: 15.6.6
@@ -84,6 +87,9 @@ importers:
       '@types/pg':
         specifier: ^8.15.5
         version: 8.15.5
+      '@types/ramda':
+        specifier: ^0.31.0
+        version: 0.31.0
       memfs:
         specifier: ^4.36.0
         version: 4.36.0
@@ -664,6 +670,9 @@ packages:
 
   '@types/pg@8.15.5':
     resolution: {integrity: sha512-LF7lF6zWEKxuT3/OR8wAZGzkg4ENGXFNyiV/JeOt9z5B+0ZVwbql9McqX5c/WStFq1GaGso7H1AzP/qSzmlCKQ==}
+
+  '@types/ramda@0.31.0':
+    resolution: {integrity: sha512-1lWWZ/2YiNttGcIUxQwnvMuh55GIEbn/zlpzzEojAsbxquI/TXQZCRaXsfxG1CHjlqGoqxWePkvaM/5qYHNuvQ==}
 
   '@types/ssh2-streams@0.1.12':
     resolution: {integrity: sha512-Sy8tpEmCce4Tq0oSOYdfqaBpA3hDM8SoxoFh5vzFsu2oL+znzGz8oVWW7xb4K920yYMUY+PIG31qZnFMfPWNCg==}
@@ -1798,6 +1807,9 @@ packages:
   railroad-diagrams@1.0.0:
     resolution: {integrity: sha512-cz93DjNeLY0idrCNOH6PviZGRN9GJhsdm9hpn1YCS879fj4W+x5IFJhhkRZcwVgMmFF7R82UA/7Oh+R8lLZg6A==}
 
+  ramda@0.31.3:
+    resolution: {integrity: sha512-xKADKRNnqmDdX59PPKLm3gGmk1ZgNnj3k7DryqWwkamp4TJ6B36DdpyKEQ0EoEYmH2R62bV4Q+S0ym2z8N2f3Q==}
+
   randexp@0.4.6:
     resolution: {integrity: sha512-80WNmd9DA0tmZrw9qQa62GPPWfuXJknrmVmLcxvq4uZBdYqb1wYoKTmnlGUchvVWe0XiLupYkBoXVOxz3C8DYQ==}
     engines: {node: '>=0.12'}
@@ -2114,6 +2126,9 @@ packages:
   ts-interface-checker@0.1.13:
     resolution: {integrity: sha512-Y/arvbn+rrz3JCKl9C4kVNfTfSm2/mEp5FSz5EsZSANGPSlQrpRI5M4PKF+mJnE52jOO90PnPSc3Ur3bTQw0gA==}
 
+  ts-toolbelt@9.6.0:
+    resolution: {integrity: sha512-nsZd8ZeNUzukXPlJmTBwUAuABDe/9qtVDelJeT/qW0ow3ZS3BsQJtNkan1802aM9Uf68/Y8ljw86Hu0h5IUW3w==}
+
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
@@ -2175,6 +2190,9 @@ packages:
 
   tweetnacl@0.14.5:
     resolution: {integrity: sha512-KXXFFdAbFXY4geFIwoyNK+f5Z1b7swfXABfL7HXCmoIWMKU3dmS26672A4EeQtDzLKy7SXmfBu51JolvEKwtGA==}
+
+  types-ramda@0.31.0:
+    resolution: {integrity: sha512-vaoC35CRC3xvL8Z6HkshDbi6KWM1ezK0LHN0YyxXWUn9HKzBNg/T3xSGlJZjCYspnOD3jE7bcizsp0bUXZDxnQ==}
 
   typescript@5.9.2:
     resolution: {integrity: sha512-CWBzXQrc/qOkhidw1OzBTQuYRbfyxDXJMVJ1XNwUHGROVmuaeiEm3OslpZ1RV96d7SKKjZKrSJu3+t/xlw3R9A==}
@@ -2880,6 +2898,10 @@ snapshots:
       '@types/node': 24.2.1
       pg-protocol: 1.10.3
       pg-types: 2.2.0
+
+  '@types/ramda@0.31.0':
+    dependencies:
+      types-ramda: 0.31.0
 
   '@types/ssh2-streams@0.1.12':
     dependencies:
@@ -3952,6 +3974,8 @@ snapshots:
 
   railroad-diagrams@1.0.0: {}
 
+  ramda@0.31.3: {}
+
   randexp@0.4.6:
     dependencies:
       discontinuous-range: 1.0.0
@@ -4313,6 +4337,8 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
+  ts-toolbelt@9.6.0: {}
+
   tslib@2.8.1: {}
 
   tsup@8.5.0(@swc/core@1.13.3)(jiti@2.5.1)(postcss@8.5.6)(typescript@5.9.2)(yaml@2.8.1):
@@ -4376,6 +4402,10 @@ snapshots:
       turbo-windows-arm64: 2.5.5
 
   tweetnacl@0.14.5: {}
+
+  types-ramda@0.31.0:
+    dependencies:
+      ts-toolbelt: 9.6.0
 
   typescript@5.9.2: {}
 

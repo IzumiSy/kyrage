@@ -14,11 +14,15 @@ const { database, client } = await setupTestDB();
 const config = defineConfigForTest({
   database,
   tables: [
-    defineTable("members", {
-      id: column("uuid", { primaryKey: true }),
-      name: column("text", { unique: true }),
-      email: column("text"),
-    }),
+    defineTable(
+      "members",
+      {
+        id: column("uuid", { primaryKey: true }),
+        name: column("text", { unique: true }),
+        email: column("text"),
+      },
+      (t) => [t.index(["name", "email"])]
+    ),
     defineTable("category", {
       id: column("uuid", { primaryKey: true }),
       name: column("text", { unique: true }),
@@ -58,11 +62,15 @@ describe("generate with planned apply", () => {
       config: defineConfigForTest({
         database,
         tables: [
-          defineTable("members", {
-            id: column("uuid", { primaryKey: true }),
-            name: column("text"),
-            email: column("text", { unique: true }),
-          }),
+          defineTable(
+            "members",
+            {
+              id: column("uuid", { primaryKey: true }),
+              name: column("text"),
+              email: column("text", { unique: true }),
+            },
+            (t) => [t.index(["id", "email"], { unique: true })]
+          ),
           defineTable("posts", {
             id: column("uuid", { primaryKey: true }),
             content: column("text"),
@@ -77,12 +85,18 @@ describe("generate with planned apply", () => {
     });
 
     [
+      // 1st time
       `create table "members" ("id" uuid not null, "name" text, "email" text, constraint "members_id_primary_key" primary key ("id"), constraint "members_name_unique" unique ("name"))`,
       `create table "category" ("id" uuid not null, "name" text, constraint "category_id_primary_key" primary key ("id"), constraint "category_name_unique" unique ("name"))`,
+      `create index "idx_members_name_email" on "members" ("name", "email")`,
+
+      // 2nd time
       `create table "posts" ("id" uuid not null, "content" text, constraint "posts_id_primary_key" primary key ("id"))`,
       `drop table "category"`,
       `alter table "members" drop constraint "members_name_unique"`,
       `alter table "members" add constraint "members_email_unique" unique ("email")`,
+      `create unique index "idx_members_id_email" on "members" ("id", "email")`,
+      `drop index "idx_members_name_email" on "members"`,
     ].forEach((expectedCall, index) => {
       expect(loggerStdout).toHaveBeenNthCalledWith(index + 1, expectedCall);
     });

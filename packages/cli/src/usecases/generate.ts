@@ -3,7 +3,8 @@ import { Logger } from "../logger";
 import { migrationDirName, getPendingMigrations } from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
-import { Tables, diffTables, TableDiff } from "../diff";
+import { diffSchema } from "../diff";
+import { SchemaDiff, SchemaSnapshot, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
 
@@ -70,6 +71,7 @@ const generateMigrationFromIntrospection = async (props: {
   const { client, config } = props;
   const introspector = getIntrospector(client);
   const tables = await introspector.getTables();
+  const indexes = await introspector.getIndexes();
 
   const dbTables: Tables = tables.map((table) => ({
     name: table.name,
@@ -104,16 +106,26 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const diff = diffTables({
-    current: dbTables,
-    ideal: configTables,
+  const currentSnapshot: SchemaSnapshot = {
+    tables: dbTables,
+    indexes,
+  };
+  const idealSnapshot: SchemaSnapshot = {
+    tables: configTables,
+    indexes: config.indexes.map((i) => ({
+      table: i.table,
+      name: i.name,
+      columns: i.columns,
+      unique: i.unique,
+      systemGenerated: false,
+    })),
+  };
+  const diff = diffSchema({
+    current: currentSnapshot,
+    ideal: idealSnapshot,
   });
 
-  if (
-    diff.addedTables.length === 0 &&
-    diff.removedTables.length === 0 &&
-    diff.changedTables.length === 0
-  ) {
+  if (diff.operations.length === 0) {
     return null;
   }
 
@@ -125,49 +137,63 @@ const generateMigrationFromIntrospection = async (props: {
   };
 };
 
-const printPrettyDiff = (logger: Logger, diff: TableDiff) => {
+const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
   const diffOutputs: string[] = [];
 
-  // Show changes one by one like (added_table, changed_column, etc.)
-  if (diff.addedTables.length > 0) {
-    diff.addedTables.forEach((table) => {
-      diffOutputs.push(`-- create_table: ${table.table}`);
-      Object.entries(table.columns).forEach(([colName, colDef]) => {
-        diffOutputs.push(
-          `   -> column: ${colName} (${JSON.stringify(colDef)})`
-        );
-      });
-    });
-  }
-  if (diff.removedTables.length > 0) {
-    diff.removedTables.forEach((table) => {
-      diffOutputs.push(`-- remove_table: ${table}`);
-    });
-  }
-  if (diff.changedTables.length > 0) {
-    diff.changedTables.forEach((table) => {
-      table.addedColumns.forEach((col) => {
+  diff.operations.forEach((operation: Operation) => {
+    switch (operation.type) {
+      case "create_table":
+        diffOutputs.push(`-- create_table: ${operation.table}`);
+        Object.entries(operation.columns).forEach(([colName, colDef]) => {
+          diffOutputs.push(
+            `   -> column: ${colName} (${JSON.stringify(colDef)})`
+          );
+        });
+        break;
+
+      case "drop_table":
+        diffOutputs.push(`-- remove_table: ${operation.table}`);
+        break;
+
+      case "add_column":
         diffOutputs.push(
           [
-            `-- add_column: ${table.table}.${col.column}`,
-            `   -> to: ${JSON.stringify(col.attributes)}`,
+            `-- add_column: ${operation.table}.${operation.column}`,
+            `   -> to: ${JSON.stringify(operation.attributes)}`,
           ].join("\n")
         );
-      });
-      table.removedColumns.forEach((col) => {
-        diffOutputs.push(`-- remove_column: ${table.table}.${col.column}`);
-      });
-      table.changedColumns.forEach((col) => {
+        break;
+
+      case "drop_column":
+        diffOutputs.push(
+          `-- remove_column: ${operation.table}.${operation.column}`
+        );
+        break;
+
+      case "alter_column":
         diffOutputs.push(
           [
-            `-- change_column: ${table.table}.${col.column}`,
-            `   -> from: ${JSON.stringify(col.before)}`,
-            `   -> to:   ${JSON.stringify(col.after)}`,
+            `-- change_column: ${operation.table}.${operation.column}`,
+            `   -> from: ${JSON.stringify(operation.before)}`,
+            `   -> to:   ${JSON.stringify(operation.after)}`,
           ].join("\n")
         );
-      });
-    });
-  }
+        break;
+
+      case "create_index":
+        diffOutputs.push(
+          `-- create_index: ${operation.table}.${operation.name} (${operation.columns.join(", ")})${operation.unique ? " [unique]" : ""}`
+        );
+        break;
+
+      case "drop_index":
+        diffOutputs.push(`-- drop_index: ${operation.table}.${operation.name}`);
+        break;
+
+      default:
+        break;
+    }
+  });
 
   logger.reporter.log(diffOutputs.join("\n"));
 };

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { schemaDiffSchema } from "./operation";
 
 const columnSchema = z.object({
   type: z.string(),
@@ -16,8 +17,9 @@ const tableSchema = z.object({
 
 const indexSchema = z.object({
   table: z.string(),
+  name: z.string(),
   columns: z.array(z.string()),
-  unique: z.boolean().optional(),
+  unique: z.boolean().default(false),
 });
 export type IndexValue = z.infer<typeof indexSchema>;
 
@@ -33,14 +35,14 @@ export type DatabaseValue = z.infer<typeof databaseSchema>;
 export const configSchema = z.object({
   database: databaseSchema,
   tables: z.array(tableSchema),
-  indexes: z.array(indexSchema).optional(),
+  indexes: z.array(indexSchema),
 });
 export type ConfigValue = z.infer<typeof configSchema>;
 
 export const migrationSchema = z.object({
   id: z.string(),
   version: z.string(),
-  diff: z.any(), // Placeholder for TableDiff type
+  diff: schemaDiffSchema,
 });
 
 export type MigrationValue = z.infer<typeof migrationSchema>;

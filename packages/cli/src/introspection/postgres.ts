@@ -1,10 +1,18 @@
 import { sql } from "kysely";
 import { DBClient } from "../client";
 
-export const postgresColumnExtraIntrospector = (props: {
-  client: DBClient;
-}) => {
-  const introspect = async () => {
+const nameDict = {
+  bool: "boolean",
+  int2: "smallint",
+  int4: "integer",
+  int8: "bigint",
+};
+
+const convertTypeName = (typeName: string) =>
+  nameDict[typeName as keyof typeof nameDict] ?? typeName;
+
+export const postgresExtraIntrospector = (props: { client: DBClient }) => {
+  const introspectTables = async () => {
     const client = props.client;
     await using db = client.getDB();
     const { rows } = await sql`
@@ -44,17 +52,44 @@ export const postgresColumnExtraIntrospector = (props: {
     }));
   };
 
-  const nameDict = {
-    bool: "boolean",
-    int2: "smallint",
-    int4: "integer",
-    int8: "bigint",
+  const introspectIndexes = async () => {
+    const client = props.client;
+    await using db = client.getDB();
+
+    const { rows } = await sql`
+      SELECT
+        t.relname AS table_name,
+        i.relname AS index_name,
+        pg_index.indisunique AS is_unique,
+        array_agg(a.attname ORDER BY array_position(pg_index.indkey, a.attnum)) AS column_names,
+        (pg_index.indisprimary OR EXISTS (
+          SELECT 1 FROM pg_constraint con
+          WHERE con.conindid = i.oid
+          AND con.contype IN ('p', 'u')
+        )) AS is_system_generated
+      FROM pg_class t
+      JOIN pg_namespace n ON n.oid = t.relnamespace
+      JOIN pg_index ON pg_index.indrelid = t.oid
+      JOIN pg_class i ON i.oid = pg_index.indexrelid
+      JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY (pg_index.indkey)
+      WHERE t.relkind = 'r'
+        AND n.nspname = 'public'
+      GROUP BY t.relname, i.relname, pg_index.indisunique, pg_index.indisprimary, i.oid;
+    `
+      .$castTo<PostgresIndexInfo>()
+      .execute(db);
+    return rows.map((r) => ({
+      table: r.table_name,
+      name: r.index_name,
+      columns: r.column_names,
+      unique: r.is_unique,
+      systemGenerated: r.is_system_generated,
+    }));
   };
-  const convertTypeName = (typeName: string) =>
-    nameDict[typeName as keyof typeof nameDict] ?? typeName;
 
   return {
-    introspect,
+    introspectTables,
+    introspectIndexes,
     convertTypeName,
   };
 };
@@ -67,4 +102,12 @@ export type PostgresColumnConstraintInfo = {
   character_maximum_length: number | null;
   constraint_name: string;
   constraint_type: "UNIQUE" | "PRIMARY KEY";
+};
+
+type PostgresIndexInfo = {
+  table_name: string;
+  index_name: string;
+  is_unique: boolean;
+  column_names: string[];
+  is_system_generated: boolean;
 };
