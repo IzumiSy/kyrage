@@ -1,5 +1,11 @@
 # @izumisy/kyrage
 
+## 0.8.0
+
+### Minor Changes
+
+- [#13](https://github.com/IzumiSy/kyrage/pull/13) [`b6f7b25`](https://github.com/IzumiSy/kyrage/commit/b6f7b258d78d20d8b669719cd62a0cfac097b010) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Support index #17
+
 ## 0.7.0
 
 ### Minor Changes
