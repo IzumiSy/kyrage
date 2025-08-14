@@ -160,6 +160,7 @@ describe("diffSchema", () => {
     expect(diff.removedTables).toEqual([]);
     expect(diff.changedTables).toEqual([]);
   });
+
   it("should detect added index", () => {
     const snap = (tables: Tables, indexes: any[]): SchemaSnapshot => ({
       tables,
@@ -228,5 +229,34 @@ describe("diffSchema", () => {
     const diff = diffSchema({ current, ideal });
     expect(diff.removedIndexes).toHaveLength(1);
     expect(diff.removedIndexes[0].name).toBe("idx_users_id");
+  });
+
+  it("should detect changed index (unique flag)", () => {
+    const current: SchemaSnapshot = {
+      tables: [{ name: "users", columns: { email: { type: "text" } } }],
+      indexes: [
+        {
+          table: "users",
+          name: "idx_users_email",
+          columns: ["email"],
+          unique: false,
+        },
+      ],
+    };
+    const ideal: SchemaSnapshot = {
+      tables: current.tables,
+      indexes: [
+        {
+          table: "users",
+          name: "idx_users_email",
+          columns: ["email"],
+          unique: true,
+        },
+      ],
+    };
+    const diff = diffSchema({ current, ideal });
+    expect(diff.changedIndexes).toHaveLength(1);
+    expect(diff.changedIndexes[0].before.unique).toBe(false);
+    expect(diff.changedIndexes[0].after.unique).toBe(true);
   });
 });
