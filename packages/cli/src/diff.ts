@@ -105,12 +105,21 @@ export function diffSchema(props: {
     []
   );
 
-  // Index diff
+  // Index diff - system-generatedなindexを除外
+  const userDefinedCurrentIndexes = current.indexes.filter(
+    (i) => !i.systemGenerated
+  );
+  const userDefinedIdealIndexes = ideal.indexes.filter(
+    (i) => !i.systemGenerated
+  );
+
   const key = (i: IndexDef) => `${i.table}:${i.name}`;
   const currentIndexMap = new Map(
-    current.indexes.map((i) => [key(i), i] as const)
+    userDefinedCurrentIndexes.map((i) => [key(i), i] as const)
   );
-  const idealIndexMap = new Map(ideal.indexes.map((i) => [key(i), i] as const));
+  const idealIndexMap = new Map(
+    userDefinedIdealIndexes.map((i) => [key(i), i] as const)
+  );
 
   const addedIndexes: IndexDef[] = [];
   const removedIndexes: SchemaDiff["removedIndexes"] = [];

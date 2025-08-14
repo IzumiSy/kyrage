@@ -55,13 +55,18 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
   const introspectIndexes = async () => {
     const client = props.client;
     await using db = client.getDB();
-    // NOTE: Exclude primary key physical indexes; keep unique ones.
+
     const { rows } = await sql`
       SELECT
         t.relname AS table_name,
         i.relname AS index_name,
         pg_index.indisunique AS is_unique,
-        array_agg(a.attname ORDER BY array_position(pg_index.indkey, a.attnum)) AS column_names
+        array_agg(a.attname ORDER BY array_position(pg_index.indkey, a.attnum)) AS column_names,
+        (pg_index.indisprimary OR EXISTS (
+          SELECT 1 FROM pg_constraint con
+          WHERE con.conindid = i.oid
+          AND con.contype IN ('p', 'u')
+        )) AS is_system_generated
       FROM pg_class t
       JOIN pg_namespace n ON n.oid = t.relnamespace
       JOIN pg_index ON pg_index.indrelid = t.oid
@@ -69,8 +74,7 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY (pg_index.indkey)
       WHERE t.relkind = 'r'
         AND n.nspname = 'public'
-        AND NOT i.relname LIKE '%_pkey'
-      GROUP BY t.relname, i.relname, pg_index.indisunique;
+      GROUP BY t.relname, i.relname, pg_index.indisunique, pg_index.indisprimary, i.oid;
     `
       .$castTo<PostgresIndexInfo>()
       .execute(db);
@@ -79,6 +83,7 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       name: r.index_name,
       columns: r.column_names,
       unique: r.is_unique,
+      systemGenerated: r.is_system_generated,
     }));
   };
 
@@ -104,4 +109,5 @@ type PostgresIndexInfo = {
   index_name: string;
   is_unique: boolean;
   column_names: string[];
+  is_system_generated: boolean;
 };

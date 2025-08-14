@@ -79,6 +79,7 @@ const indexDefSchema = z.object({
   name: z.string(),
   columns: z.array(z.string()),
   unique: z.boolean(),
+  systemGenerated: z.boolean().default(false),
 });
 const changedIndexSchema = z.object({
   table: z.string(),
