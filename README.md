@@ -112,9 +112,9 @@ $ kyrage generate
 
 `generate` command will fail if there is a pending migration. Use `--ignore-pending` option in that case.
 
-### 4. Apply Migration
+### 4. Plan Changes
 
-You can use `--plan` option beforehand to check SQL queries that will be executed in the next time:
+You can use `apply --plan` beforehand to check SQL queries that will be executed in the next time:
 
 ```bash
 $ kyrage apply --plan --pretty
@@ -134,6 +134,8 @@ create table "posts" (
   "published_at" timestamptz default now ()
 )
 ```
+
+### 5. Apply
 
 If everything looks good, execute the generated migrations:
 
