@@ -36,10 +36,10 @@ type SchemaDiff = {
 
 ### Benefits
 
-1. **Unified Processing**: Single loop handles all operations consistently
+1. **Unified Processing**: Single `for...of` loop handles all operations consistently
 2. **Order Control**: Operations execute in array order, enabling dependency management
-3. **Testability**: Complete diff can be asserted as a single data structure
-4. **Extensibility**: New operation types integrate seamlessly
+3. **Testability**: Complete diff can be asserted as a single data structure using `toEqual()`
+4. **Extensibility**: New operation types integrate seamlessly, making it easy to add support for new databases and features
 5. **Maintainability**: No code duplication between console output, SQL generation, and testing
 
 ---
@@ -48,16 +48,18 @@ type SchemaDiff = {
 
 ### 1. Schema Definition (`schema.ts`)
 
-Handles table and column definitions with strong typing.
+Handles table and column definitions with strong typing using the `defineTable` and `column` functions.
 
 ```typescript
-const schema = {
-  users: {
-    id: { type: "serial", primary: true },
-    name: { type: "varchar", length: 255, notNull: true },
-    email: { type: "varchar", length: 255, unique: true }
-  }
-};
+import { column as c, defineTable as t } from "@izumisy/kyrage";
+
+export const members = t("members", {
+  id: c("uuid", { primaryKey: true }),
+  email: c("text", { unique: true, notNull: true }),
+  name: c("text", { unique: true }),
+  age: c("integer"),
+  createdAt: c("timestamptz", { defaultSql: "now()" }),
+});
 ```
 
 ### 2. Schema Introspection (`introspection/`)
@@ -69,7 +71,11 @@ const schema = {
 - `postgres.ts`: PostgreSQL-specific implementation  
 - `type.ts`: Schema representation types
 
-**Key Function**: `introspectSchema()` returns standardized schema structure regardless of database dialect.
+**Key Function**: `getIntrospector(client)` returns an introspector object with methods to extract database schema:
+- `getTables()`: Returns table and column information
+- `getIndexes()`: Returns index information
+
+The introspector provides a standardized interface regardless of database dialect.
 
 ### 3. Diff Calculation (`diff.ts`)
 
@@ -77,15 +83,18 @@ const schema = {
 
 **Core Function**:
 ```typescript
-function diffSchema(expected: Schema, actual: Schema): SchemaDiff {
-  const operations: Operation[] = [];
-  // Generate operations for table/column/index differences
-  return { operations };
+function diffSchema(props: {
+  current: SchemaSnapshot;
+  ideal: SchemaSnapshot;
+}): SchemaDiff {
+  const tableOperations = diffTables(props);
+  const indexOperations = diffIndexes(props);
+  return { operations: [...tableOperations, ...indexOperations] };
 }
 ```
 
 **Strategy**:
-- Compare expected vs actual schemas using functional utilities (Ramda `eqBy`)
+- Compare current vs ideal schema snapshots using functional utilities (Ramda)
 - Generate operations in dependency-safe order
 - Return unified operation array for consistent processing
 
@@ -100,17 +109,23 @@ function diffSchema(expected: Schema, actual: Schema): SchemaDiff {
 
 **Architecture**:
 ```typescript
-function buildMigrationFromDiff(diff: SchemaDiff, db: Kysely<any>): Promise<void> {
+async function buildMigrationFromDiff(
+  db: Kysely<any>, 
+  diff: SchemaDiff
+): Promise<void> {
   for (const operation of diff.operations) {
-    await executeOperation(operation, db);
+    await executeOperation(db, operation);
   }
 }
 
-function executeOperation(operation: Operation, db: Kysely<any>): Promise<void> {
+async function executeOperation(
+  db: Kysely<any>, 
+  operation: Operation
+): Promise<void> {
   switch (operation.type) {
-    case "create_table": return executeCreateTable(operation, db);
-    case "drop_table": return executeDropTable(operation, db);
-    case "add_column": return executeAddColumn(operation, db);
+    case "create_table": return executeCreateTable(db, operation);
+    case "drop_table": return executeDropTable(db, operation);
+    case "add_column": return executeAddColumn(db, operation);
     // ... handle all operation types
   }
 }
@@ -126,20 +141,21 @@ function executeOperation(operation: Operation, db: Kysely<any>): Promise<void> 
 **Purpose**: Human-readable diff presentation
 
 **Implementation**:
+The `printPrettyDiff` function in `generate.ts` formats Operation arrays for console output:
+
 ```typescript
-function printPrettyDiff(diff: SchemaDiff): void {
-  for (const operation of diff.operations) {
-    switch (operation.type) {
-      case "create_table":
-        console.log(`+ CREATE TABLE ${operation.table}`);
-        break;
-      case "add_column":
-        console.log(`+ ADD COLUMN ${operation.table}.${operation.column}`);
-        break;
-      // ... format all operation types
-    }
+diff.operations.forEach((operation: Operation) => {
+  switch (operation.type) {
+    case "create_table":
+      logger.log(`-- create_table: ${operation.table}`);
+      // ... format table columns
+      break;
+    case "add_column":
+      logger.log(`-- add_column: ${operation.table}.${operation.column}`);
+      break;
+    // ... format all operation types
   }
-}
+});
 ```
 
 **Benefits**:
@@ -178,7 +194,7 @@ function printPrettyDiff(diff: SchemaDiff): void {
    Connects to the target database and introspects the current schema.
 
 3. **Diff Calculation**  
-   Uses `diffSchema` to compute Operation arrays representing differences between current and desired schema.
+   Uses `diffSchema` to compute Operation arrays representing differences between current and ideal schema snapshots.
 
 4. **Migration Planning & Execution**  
    - Generates migration files as JSON containing Operation arrays in the `migrations/` directory.
@@ -194,27 +210,9 @@ function printPrettyDiff(diff: SchemaDiff): void {
 ## Design Considerations
 
 - **Declarative Schema**: Users define the desired schema in TypeScript, enabling type safety and flexibility.
-- **Operation-based Architecture**: All schema changes represented as unified Operation arrays for better maintainability.
 - **Functional Programming**: Uses Ramda utilities like `eqBy` for immutable schema comparison.
 - **Diff-based Migration**: Only the necessary changes are applied, minimizing risk and manual intervention.
-- **Dry-run Support**: The `--dry-run` option for `apply` allows users to preview SQL before execution.
-- **Extensibility**: The modular Operation-based architecture makes it easy to add support for new databases and features.
-
-### Operation-based Architecture Benefits
-
-The core design uses a unified Operation array approach:
-
-```typescript
-type Operation = CreateTable | DropTable | AddColumn | DropColumn | AlterColumn | CreateIndex | DropIndex;
-type SchemaDiff = { operations: Operation[] };
-```
-
-**Key Advantages**:
-- **Unified Processing**: Single `for...of` loop handles all operations consistently
-- **Order Control**: Operations execute in array order for dependency management
-- **Testability**: Complete diff assertable as single data structure using `toEqual()`
-- **Maintainability**: No code duplication between console output, SQL generation, and testing
-- **Extensibility**: New operation types integrate seamlessly
+- **Dry-run Support**: The `--dry-run` option for `apply` allows users to preview SQL without execution.
 
 ---
 
