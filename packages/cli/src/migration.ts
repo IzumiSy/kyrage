@@ -237,72 +237,37 @@ export async function buildMigrationFromDiff(
       }
     }
   }
-  // 4. Index operations (drop/create based on diff)
-  await applyIndexDiff(db, diff);
-}
 
-// Index actions expansion (drop/create for changed, etc.)
-type IndexAction =
-  | { kind: "drop"; table: string; name: string }
-  | {
-      kind: "create";
-      table: string;
-      name: string;
-      columns: string[];
-      unique: boolean;
-    };
-
-function expandIndexActions(diff: SchemaDiff): IndexAction[] {
-  const actions: IndexAction[] = [];
-  // changed => drop then create
-  for (const ch of diff.changedIndexes) {
-    actions.push({ kind: "drop", table: ch.table, name: ch.name });
-    actions.push({
-      kind: "create",
-      table: ch.table,
-      name: ch.name,
-      columns: ch.after.columns,
-      unique: ch.after.unique,
-    });
-  }
-  // removed (exclude ones already dropped by changed)
-  const changedKey = new Set(
-    diff.changedIndexes.map((c) => `${c.table}:${c.name}`)
-  );
-  for (const r of diff.removedIndexes) {
-    const key = `${r.table}:${r.name}`;
-    if (!changedKey.has(key))
-      actions.push({ kind: "drop", table: r.table, name: r.name });
-  }
-  // added (exclude ones already added by changed)
-  for (const a of diff.addedIndexes) {
-    const key = `${a.table}:${a.name}`;
-    if (!changedKey.has(key)) {
-      actions.push({
-        kind: "create",
-        table: a.table,
-        name: a.name,
-        columns: a.columns,
-        unique: a.unique,
-      });
+  // 4. 追加インデックス
+  for (const added of diff.addedIndexes) {
+    let builder = db.schema.createIndex(added.name).on(added.table);
+    for (const column of added.columns) {
+      builder = builder.column(column);
     }
-  }
-  return actions;
-}
-
-export async function applyIndexDiff(db: Kysely<any>, diff: SchemaDiff) {
-  const actions = expandIndexActions(diff);
-  for (const action of actions) {
-    if (action.kind === "drop") {
-      await db.schema.dropIndex(action.name).on(action.table).execute();
-    } else {
-      let b = db.schema.createIndex(action.name).on(action.table);
-      action.columns.forEach((c) => {
-        b = b.column(c);
-      });
-      if (action.unique) b = b.unique();
-      await b.execute();
+    if (added.unique) {
+      builder = builder.unique();
     }
+    await builder.execute();
+  }
+
+  // 5. 削除インデックス
+  for (const removed of diff.removedIndexes) {
+    await db.schema.dropIndex(removed.name).on(removed.table).execute();
+  }
+
+  // 6. 変更インデックス
+  for (const changed of diff.changedIndexes) {
+    // インデックスを変更する場合は、削除してから再作成
+    await db.schema.dropIndex(changed.name).on(changed.table).execute();
+
+    let builder = db.schema.createIndex(changed.name).on(changed.table);
+    for (const column of changed.after.columns) {
+      builder = builder.column(column);
+    }
+    if (changed.after.unique) {
+      builder = builder.unique();
+    }
+    await builder.execute();
   }
 }
 

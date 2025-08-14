@@ -95,8 +95,8 @@ describe("generate with planned apply", () => {
       `drop table "category"`,
       `alter table "members" drop constraint "members_name_unique"`,
       `alter table "members" add constraint "members_email_unique" unique ("email")`,
-      `drop index "idx_members_name_email" on "members"`,
       `create unique index "idx_members_id_email" on "members" ("id", "email")`,
+      `drop index "idx_members_name_email" on "members"`,
     ].forEach((expectedCall, index) => {
       expect(loggerStdout).toHaveBeenNthCalledWith(index + 1, expectedCall);
     });
