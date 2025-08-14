@@ -113,7 +113,7 @@ export function diffSchema(props: {
   const idealIndexMap = new Map(ideal.indexes.map((i) => [key(i), i] as const));
 
   const addedIndexes: IndexDef[] = [];
-  const removedIndexes: IndexDef[] = [];
+  const removedIndexes: SchemaDiff["removedIndexes"] = [];
   const changedIndexes: ChangedIndex[] = [];
 
   // Determine added & changed
@@ -138,7 +138,7 @@ export function diffSchema(props: {
   // Determine removed
   for (const [k, cur] of currentIndexMap.entries()) {
     if (!idealIndexMap.has(k)) {
-      removedIndexes.push(cur);
+      removedIndexes.push({ table: cur.table, name: cur.name });
     }
   }
 

@@ -271,9 +271,8 @@ function expandIndexActions(diff: SchemaDiff): IndexAction[] {
   );
   for (const r of diff.removedIndexes) {
     const key = `${r.table}:${r.name}`;
-    if (!changedKey.has(key)) {
+    if (!changedKey.has(key))
       actions.push({ kind: "drop", table: r.table, name: r.name });
-    }
   }
   // added (exclude ones already added by changed)
   for (const a of diff.addedIndexes) {

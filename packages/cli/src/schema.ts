@@ -87,12 +87,15 @@ const changedIndexSchema = z.object({
   after: indexDefSchema,
 });
 
+// Removed indexes keep table + name for safe dropping
+const removedIndexSchema = z.object({ table: z.string(), name: z.string() });
+
 export const schemaDiffSchema = z.object({
   addedTables: z.array(addedTableSchema),
   removedTables: z.array(removedTableSchema),
   changedTables: z.array(changedTableSchema),
   addedIndexes: z.array(indexDefSchema),
-  removedIndexes: z.array(indexDefSchema),
+  removedIndexes: z.array(removedIndexSchema),
   changedIndexes: z.array(changedIndexSchema),
 });
 export type SchemaDiffValue = z.infer<typeof schemaDiffSchema>;
