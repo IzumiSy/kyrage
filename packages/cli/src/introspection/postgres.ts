@@ -1,10 +1,18 @@
 import { sql } from "kysely";
 import { DBClient } from "../client";
 
-export const postgresColumnExtraIntrospector = (props: {
-  client: DBClient;
-}) => {
-  const introspect = async () => {
+const nameDict = {
+  bool: "boolean",
+  int2: "smallint",
+  int4: "integer",
+  int8: "bigint",
+};
+
+const convertTypeName = (typeName: string) =>
+  nameDict[typeName as keyof typeof nameDict] ?? typeName;
+
+export const postgresExtraIntrospector = (props: { client: DBClient }) => {
+  const introspectTables = async () => {
     const client = props.client;
     await using db = client.getDB();
     const { rows } = await sql`
@@ -44,25 +52,11 @@ export const postgresColumnExtraIntrospector = (props: {
     }));
   };
 
-  const nameDict = {
-    bool: "boolean",
-    int2: "smallint",
-    int4: "integer",
-    int8: "bigint",
-  };
-  const convertTypeName = (typeName: string) =>
-    nameDict[typeName as keyof typeof nameDict] ?? typeName;
-
   const introspectIndexes = async () => {
     const client = props.client;
     await using db = client.getDB();
     // NOTE: Exclude primary key physical indexes; keep unique ones.
-    const { rows } = await sql<{
-      table_name: string;
-      index_name: string;
-      is_unique: boolean;
-      column_names: string[];
-    }>`
+    const { rows } = await sql`
       SELECT
         t.relname AS table_name,
         i.relname AS index_name,
@@ -77,7 +71,9 @@ export const postgresColumnExtraIntrospector = (props: {
         AND n.nspname = 'public'
         AND NOT i.relname LIKE '%_pkey'
       GROUP BY t.relname, i.relname, pg_index.indisunique;
-    `.execute(db);
+    `
+      .$castTo<PostgresIndexInfo>()
+      .execute(db);
     return rows.map((r) => ({
       table: r.table_name,
       name: r.index_name,
@@ -87,9 +83,9 @@ export const postgresColumnExtraIntrospector = (props: {
   };
 
   return {
-    introspect,
-    convertTypeName,
+    introspectTables,
     introspectIndexes,
+    convertTypeName,
   };
 };
 
@@ -101,4 +97,11 @@ export type PostgresColumnConstraintInfo = {
   character_maximum_length: number | null;
   constraint_name: string;
   constraint_type: "UNIQUE" | "PRIMARY KEY";
+};
+
+type PostgresIndexInfo = {
+  table_name: string;
+  index_name: string;
+  is_unique: boolean;
+  column_names: string[];
 };

@@ -1,9 +1,4 @@
 export type ColumnExtraAttributes = Array<ColumnExtraAttribute>;
-export type ColumnConstraint = {
-  name: string;
-  type: string;
-};
-
 type ColumnExtraAttribute = {
   schema?: string;
   table: string;
@@ -13,8 +8,23 @@ type ColumnExtraAttribute = {
   constraint: ColumnConstraint;
 };
 
-export type ColumnExtraIntrospector = {
-  introspect: () => Promise<ColumnExtraAttributes>;
+export type ColumnConstraint = {
+  name: string;
+  type: string;
+};
+
+export type IndexAttributes = Array<IndexAttribute>;
+type IndexAttribute = {
+  schema?: string;
+  table: string;
+  name: string;
+  columns: string[];
+  unique: boolean;
+};
+
+export type ExtraIntrospector = {
+  introspectTables: () => Promise<ColumnExtraAttributes>;
+  introspectIndexes: () => Promise<IndexAttributes>;
   convertTypeName: (type: string) => string;
 };
 
@@ -28,13 +38,3 @@ export type IndexIntrospector = {
     }>
   >;
 };
-
-export type ColumnAndIndexExtraIntrospector = ColumnExtraIntrospector &
-  IndexIntrospector;
-
-export const hasIndexIntrospection = (
-  i: ColumnExtraIntrospector
-): i is ColumnAndIndexExtraIntrospector =>
-  "introspectIndexes" in i &&
-  typeof (i as ColumnAndIndexExtraIntrospector).introspectIndexes ===
-    "function";
