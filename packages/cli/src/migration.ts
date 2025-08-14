@@ -7,7 +7,7 @@ import {
   Migration,
   sql,
 } from "kysely";
-import { TableDiff } from "./diff";
+import { SchemaDiff } from "./diff";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 import { migrationSchema, MigrationValue } from "./schema";
@@ -91,7 +91,7 @@ export const createMigrationProvider = (
 
 export async function buildMigrationFromDiff(
   db: Kysely<any>,
-  diff: TableDiff
+  diff: SchemaDiff
 ): Promise<void> {
   // 1. 追加テーブル
   for (const added of diff.addedTables) {
@@ -104,8 +104,9 @@ export async function buildMigrationFromDiff(
       builder = builder.addColumn(colName, dataType, (col) => {
         let c = col;
         if (colDef.notNull) c = c.notNull();
-        if (colDef.defaultSql)
-          c = c.defaultTo(sql.raw(colDef.defaultSql as string));
+        if (typeof colDef.defaultSql === "string") {
+          c = c.defaultTo(sql.raw(colDef.defaultSql));
+        }
         return c;
       });
       if (colDef.primaryKey) {
@@ -140,8 +141,8 @@ export async function buildMigrationFromDiff(
         .addColumn(addCol.column, dataType, (col) => {
           let c = col;
           if (addCol.attributes.notNull) c = c.notNull();
-          if (addCol.attributes.defaultSql) {
-            c = c.defaultTo(sql.raw(addCol.attributes.defaultSql as string));
+          if (typeof addCol.attributes.defaultSql === "string") {
+            c = c.defaultTo(sql.raw(addCol.attributes.defaultSql));
           }
           return c;
         })
@@ -234,6 +235,74 @@ export async function buildMigrationFromDiff(
             .execute();
         }
       }
+    }
+  }
+  // 4. Index operations (drop/create based on diff)
+  await applyIndexDiff(db, diff);
+}
+
+// Index actions expansion (drop/create for changed, etc.)
+type IndexAction =
+  | { kind: "drop"; table: string; name: string }
+  | {
+      kind: "create";
+      table: string;
+      name: string;
+      columns: string[];
+      unique: boolean;
+    };
+
+function expandIndexActions(diff: SchemaDiff): IndexAction[] {
+  const actions: IndexAction[] = [];
+  // changed => drop then create
+  for (const ch of diff.changedIndexes) {
+    actions.push({ kind: "drop", table: ch.table, name: ch.name });
+    actions.push({
+      kind: "create",
+      table: ch.table,
+      name: ch.name,
+      columns: ch.after.columns,
+      unique: ch.after.unique,
+    });
+  }
+  // removed (exclude ones already dropped by changed)
+  const changedKey = new Set(
+    diff.changedIndexes.map((c) => `${c.table}:${c.name}`)
+  );
+  for (const r of diff.removedIndexes) {
+    const key = `${r.table}:${r.name}`;
+    if (!changedKey.has(key)) {
+      actions.push({ kind: "drop", table: r.table, name: r.name });
+    }
+  }
+  // added (exclude ones already added by changed)
+  for (const a of diff.addedIndexes) {
+    const key = `${a.table}:${a.name}`;
+    if (!changedKey.has(key)) {
+      actions.push({
+        kind: "create",
+        table: a.table,
+        name: a.name,
+        columns: a.columns,
+        unique: a.unique,
+      });
+    }
+  }
+  return actions;
+}
+
+export async function applyIndexDiff(db: Kysely<any>, diff: SchemaDiff) {
+  const actions = expandIndexActions(diff);
+  for (const action of actions) {
+    if (action.kind === "drop") {
+      await db.schema.dropIndex(action.name).on(action.table).execute();
+    } else {
+      let b = db.schema.createIndex(action.name).on(action.table);
+      action.columns.forEach((c) => {
+        b = b.column(c);
+      });
+      if (action.unique) b = b.unique();
+      await b.execute();
     }
   }
 }

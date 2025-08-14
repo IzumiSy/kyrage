@@ -3,7 +3,7 @@ import { Logger } from "../logger";
 import { migrationDirName, getPendingMigrations } from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
-import { Tables, diffTables, TableDiff } from "../diff";
+import { Tables, diffSchema, SchemaDiff, SchemaSnapshot } from "../diff";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
 
@@ -70,6 +70,7 @@ const generateMigrationFromIntrospection = async (props: {
   const { client, config } = props;
   const introspector = getIntrospector(client);
   const tables = await introspector.getTables();
+  const indexes = await introspector.getIndexes();
 
   const dbTables: Tables = tables.map((table) => ({
     name: table.name,
@@ -104,15 +105,31 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const diff = diffTables({
-    current: dbTables,
-    ideal: configTables,
+  const currentSnapshot: SchemaSnapshot = {
+    tables: dbTables,
+    indexes,
+  };
+  const idealSnapshot: SchemaSnapshot = {
+    tables: configTables,
+    indexes: config.indexes.map((i) => ({
+      table: i.table,
+      name: i.name,
+      columns: i.columns,
+      unique: i.unique,
+    })),
+  };
+  const diff = diffSchema({
+    current: currentSnapshot,
+    ideal: idealSnapshot,
   });
 
   if (
     diff.addedTables.length === 0 &&
     diff.removedTables.length === 0 &&
-    diff.changedTables.length === 0
+    diff.changedTables.length === 0 &&
+    diff.addedIndexes.length === 0 &&
+    diff.removedIndexes.length === 0 &&
+    diff.changedIndexes.length === 0
   ) {
     return null;
   }
@@ -125,7 +142,7 @@ const generateMigrationFromIntrospection = async (props: {
   };
 };
 
-const printPrettyDiff = (logger: Logger, diff: TableDiff) => {
+const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
   const diffOutputs: string[] = [];
 
   // Show changes one by one like (added_table, changed_column, etc.)
@@ -166,6 +183,31 @@ const printPrettyDiff = (logger: Logger, diff: TableDiff) => {
           ].join("\n")
         );
       });
+    });
+  }
+
+  if (diff.changedIndexes.length > 0) {
+    diff.changedIndexes.forEach((ix) => {
+      diffOutputs.push(
+        [
+          `-- change_index: ${ix.table}.${ix.name}`,
+          `   -> from: ${ix.before.columns.join(", ")}${ix.before.unique ? " [unique]" : ""}`,
+          `   -> to:   ${ix.after.columns.join(", ")}${ix.after.unique ? " [unique]" : ""}`,
+          `   -> actions: drop_index + create_index`,
+        ].join("\n")
+      );
+    });
+  }
+  if (diff.addedIndexes.length > 0) {
+    diff.addedIndexes.forEach((ix) => {
+      diffOutputs.push(
+        `-- create_index: ${ix.table}.${ix.name} (${ix.columns.join(", ")})${ix.unique ? " [unique]" : ""}`
+      );
+    });
+  }
+  if (diff.removedIndexes.length > 0) {
+    diff.removedIndexes.forEach((ix) => {
+      diffOutputs.push(`-- drop_index: ${ix.table}.${ix.name}`);
     });
   }
 

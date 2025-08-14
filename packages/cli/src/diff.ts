@@ -1,62 +1,34 @@
-export type TableColumnAttributes = {
-  type: string;
-  [key: string]: unknown;
-};
+import { schemaDiffSchema } from "./schema";
+import { z } from "zod";
 
+// Derive diff-related types from the zod schema (SchemaDiffValue)
+export type SchemaDiff = z.infer<typeof schemaDiffSchema>;
+export type AddedTable = SchemaDiff["addedTables"][number];
+export type RemovedTable = SchemaDiff["removedTables"][number];
+export type ChangedTable = SchemaDiff["changedTables"][number];
+export type IndexDef = SchemaDiff["addedIndexes"][number];
+export type ChangedIndex = SchemaDiff["changedIndexes"][number];
+export type TableColumnAttributes = AddedTable["columns"][string];
+
+// Local types still needed for diff input (introspection snapshot) -----------------
 export type TableDef = {
   name: string;
   columns: Record<string, TableColumnAttributes>;
 };
 export type Tables = Array<TableDef>;
 
-// 追加テーブル
-export type AddedTable = {
-  table: string;
-  columns: Record<string, TableColumnAttributes>;
+export type SchemaSnapshot = {
+  tables: Tables;
+  indexes: IndexDef[];
 };
 
-// 削除テーブル（テーブル名のみでOK）
-export type RemovedTable = string;
-
-// 追加カラム
-export type AddedColumn = {
-  column: string;
-  attributes: TableColumnAttributes;
-};
-
-// 削除カラム
-export type RemovedColumn = {
-  column: string;
-  attributes: TableColumnAttributes;
-};
-
-// 型変更カラム
-export type ChangedColumn = {
-  column: string;
-  before: TableColumnAttributes;
-  after: TableColumnAttributes;
-};
-
-// テーブルごとの変更
-export type ChangedTable = {
-  table: string;
-  addedColumns: AddedColumn[];
-  removedColumns: RemovedColumn[];
-  changedColumns: ChangedColumn[];
-};
-
-// 全体のdiff
-export type TableDiff = {
-  addedTables: AddedTable[];
-  removedTables: RemovedTable[];
-  changedTables: ChangedTable[];
-};
-
-export function diffTables(props: {
-  current: Tables;
-  ideal: Tables;
-}): TableDiff {
-  const { current: currentTables, ideal: idealTables } = props;
+export function diffSchema(props: {
+  current: SchemaSnapshot;
+  ideal: SchemaSnapshot;
+}): SchemaDiff {
+  const { current, ideal } = props;
+  const currentTables = current.tables;
+  const idealTables = ideal.tables;
   const dbTableNames = currentTables.map((t) => t.name);
   const configTableNames = idealTables.map((t) => t.name);
 
@@ -133,9 +105,49 @@ export function diffTables(props: {
     []
   );
 
+  // Index diff
+  const key = (i: IndexDef) => `${i.table}:${i.name}`;
+  const currentIndexMap = new Map(
+    current.indexes.map((i) => [key(i), i] as const)
+  );
+  const idealIndexMap = new Map(ideal.indexes.map((i) => [key(i), i] as const));
+
+  const addedIndexes: IndexDef[] = [];
+  const removedIndexes: IndexDef[] = [];
+  const changedIndexes: ChangedIndex[] = [];
+
+  // Determine added & changed
+  for (const [k, idealIndex] of idealIndexMap.entries()) {
+    const cur = currentIndexMap.get(k);
+    if (!cur) {
+      addedIndexes.push(idealIndex);
+      continue;
+    }
+    const sameColumns =
+      cur.columns.length === idealIndex.columns.length &&
+      cur.columns.every((c, idx) => c === idealIndex.columns[idx]);
+    if (!sameColumns || cur.unique !== idealIndex.unique) {
+      changedIndexes.push({
+        table: idealIndex.table,
+        name: idealIndex.name,
+        before: cur,
+        after: idealIndex,
+      });
+    }
+  }
+  // Determine removed
+  for (const [k, cur] of currentIndexMap.entries()) {
+    if (!idealIndexMap.has(k)) {
+      removedIndexes.push(cur);
+    }
+  }
+
   return {
     addedTables,
     removedTables,
     changedTables,
+    addedIndexes,
+    removedIndexes,
+    changedIndexes,
   };
 }

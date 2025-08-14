@@ -17,3 +17,24 @@ export type ColumnExtraIntrospector = {
   introspect: () => Promise<ColumnExtraAttributes>;
   convertTypeName: (type: string) => string;
 };
+
+export type IndexIntrospector = {
+  introspectIndexes: () => Promise<
+    Array<{
+      table: string;
+      name: string;
+      columns: string[];
+      unique: boolean;
+    }>
+  >;
+};
+
+export type ColumnAndIndexExtraIntrospector = ColumnExtraIntrospector &
+  IndexIntrospector;
+
+export const hasIndexIntrospection = (
+  i: ColumnExtraIntrospector
+): i is ColumnAndIndexExtraIntrospector =>
+  "introspectIndexes" in i &&
+  typeof (i as ColumnAndIndexExtraIntrospector).introspectIndexes ===
+    "function";

@@ -1,6 +1,10 @@
 import { DBClient } from "../client";
 import { postgresColumnExtraIntrospector } from "./postgres";
-import { ColumnConstraint, ColumnExtraIntrospector } from "./type";
+import {
+  ColumnConstraint,
+  ColumnExtraIntrospector,
+  hasIndexIntrospection,
+} from "./type";
 
 const getColumnExtraIntrospector = (
   client: DBClient
@@ -57,8 +61,21 @@ export const getIntrospector = (client: DBClient) => {
     });
   };
 
+  const getIndexes = async () => {
+    if (hasIndexIntrospection(columnExtraIntrospector)) {
+      return columnExtraIntrospector.introspectIndexes();
+    }
+    return [] as Array<{
+      table: string;
+      name: string;
+      columns: string[];
+      unique: boolean;
+    }>;
+  };
+
   return {
     getTables,
+    getIndexes,
   };
 };
 
