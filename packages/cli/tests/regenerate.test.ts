@@ -30,8 +30,10 @@ beforeAll(async () => {
     CREATE TABLE members (
       id UUID PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
+      email TEXT UNIQUE NOT NULL,
       age INT4
     );
+    CREATE INDEX "idx_members_name_email" ON "members" ("name", "email");
   `.execute(db);
 });
 
