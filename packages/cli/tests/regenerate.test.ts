@@ -15,11 +15,16 @@ const { database, client } = await setupTestDB();
 const config = defineConfigForTest({
   database,
   tables: [
-    defineTable("members", {
-      id: column("uuid", { primaryKey: true }),
-      name: column("text", { unique: true, notNull: true }),
-      age: column("integer"),
-    }),
+    defineTable(
+      "members",
+      {
+        id: column("uuid", { primaryKey: true }),
+        name: column("text", { unique: true, notNull: true }),
+        email: column("text", { unique: true, notNull: true }),
+        age: column("integer"),
+      },
+      (t) => [t.index(["name", "email"], { unique: true })]
+    ),
   ],
 });
 
