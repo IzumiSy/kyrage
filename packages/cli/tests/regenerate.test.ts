@@ -15,11 +15,16 @@ const { database, client } = await setupTestDB();
 const config = defineConfigForTest({
   database,
   tables: [
-    defineTable("members", {
-      id: column("uuid", { primaryKey: true }),
-      name: column("text", { unique: true, notNull: true }),
-      age: column("integer"),
-    }),
+    defineTable(
+      "members",
+      {
+        id: column("uuid", { primaryKey: true }),
+        name: column("text", { unique: true, notNull: true }),
+        email: column("text", { unique: true, notNull: true }),
+        age: column("integer"),
+      },
+      (t) => [t.index(["name", "email"], { unique: true })]
+    ),
   ],
 });
 
@@ -30,8 +35,10 @@ beforeAll(async () => {
     CREATE TABLE members (
       id UUID PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
+      email TEXT UNIQUE NOT NULL,
       age INT4
     );
+    CREATE UNIQUE INDEX "idx_members_name_email" ON "members" ("name", "email");
   `.execute(db);
 });
 

@@ -61,7 +61,7 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
         t.relname AS table_name,
         i.relname AS index_name,
         pg_index.indisunique AS is_unique,
-        array_agg(a.attname ORDER BY array_position(pg_index.indkey, a.attnum)) AS column_names,
+        jsonb_agg(a.attname ORDER BY array_position(pg_index.indkey, a.attnum)) AS column_names,
         (pg_index.indisprimary OR EXISTS (
           SELECT 1 FROM pg_constraint con
           WHERE con.conindid = i.oid
