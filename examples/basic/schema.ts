@@ -1,12 +1,20 @@
 import { column as c, defineTable as t } from "@izumisy/kyrage";
 
-export const members = t("members", {
-  id: c("uuid", { primaryKey: true }),
-  email: c("text", { unique: true, notNull: true }),
-  name: c("text", { unique: true }),
-  age: c("integer"),
-  createdAt: c("timestamptz", { defaultSql: "now()" }),
-});
+export const members = t(
+  "members",
+  {
+    id: c("uuid", { primaryKey: true }),
+    email: c("text", { unique: true, notNull: true }),
+    name: c("text", { unique: true }),
+    age: c("integer"),
+    createdAt: c("timestamptz", { defaultSql: "now()" }),
+  },
+  (t) => [
+    t.index(["name", "email"], {
+      unique: true,
+    }),
+  ]
+);
 
 export const posts = t("posts", {
   id: c("uuid", { primaryKey: true }),
