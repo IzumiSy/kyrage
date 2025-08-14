@@ -1,80 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { diffSchema, SchemaSnapshot } from "./diff";
+import { diffTables, diffIndexes } from "./diff";
+import { SchemaSnapshot, ops } from "./operation";
 
-describe("diffSchema", () => {
-  it("should integrate diffTables and diffIndexes correctly", () => {
-    const current: SchemaSnapshot = {
-      tables: [
-        { name: "users", columns: { id: { type: "integer" } } },
-        { name: "old_table", columns: { id: { type: "integer" } } },
-      ],
-      indexes: [
-        {
-          table: "users",
-          name: "idx_old",
-          columns: ["id"],
-          unique: false,
-          systemGenerated: false,
-        },
-      ],
-    };
-    const ideal: SchemaSnapshot = {
-      tables: [
-        {
-          name: "users",
-          columns: { id: { type: "integer" }, email: { type: "varchar" } },
-        },
-        { name: "new_table", columns: { id: { type: "integer" } } },
-      ],
-      indexes: [
-        {
-          table: "users",
-          name: "idx_new",
-          columns: ["email"],
-          unique: true,
-          systemGenerated: false,
-        },
-      ],
-    };
-
-    const diff = diffSchema({ current, ideal });
-
-    expect(diff.operations).toEqual([
-      // Table operations
-      {
-        type: "create_table",
-        table: "new_table",
-        columns: { id: { type: "integer" } },
-      },
-      {
-        type: "drop_table",
-        table: "old_table",
-      },
-      // Column operations
-      {
-        type: "add_column",
-        table: "users",
-        column: "email",
-        attributes: { type: "varchar" },
-      },
-      // Index operations
-      {
-        type: "create_index",
-        table: "users",
-        name: "idx_new",
-        columns: ["email"],
-        unique: true,
-      },
-      {
-        type: "drop_index",
-        table: "users",
-        name: "idx_old",
-      },
-    ]);
-  });
-});
-
-describe("Table Operations", () => {
+describe("diffTables", () => {
   it("should detect added and removed tables only", () => {
     const current: SchemaSnapshot = {
       tables: [
@@ -91,18 +19,11 @@ describe("Table Operations", () => {
       indexes: [],
     };
 
-    const diff = diffSchema({ current, ideal });
+    const operations = diffTables({ current, ideal });
 
-    expect(diff.operations).toEqual([
-      {
-        type: "create_table",
-        table: "new_table",
-        columns: { id: { type: "integer" } },
-      },
-      {
-        type: "drop_table",
-        table: "old_table",
-      },
+    expect(operations).toEqual([
+      ops.createTable("new_table", { id: { type: "integer" } }),
+      ops.dropTable("old_table"),
     ]);
   });
 
@@ -135,33 +56,17 @@ describe("Table Operations", () => {
       indexes: [],
     };
 
-    const diff = diffSchema({ current, ideal });
+    const operations = diffTables({ current, ideal });
 
-    expect(diff.operations).toEqual([
-      {
-        type: "add_column",
-        table: "users",
-        column: "email",
-        attributes: { type: "varchar" },
-      },
-      {
-        type: "drop_column",
-        table: "users",
-        column: "age",
-        attributes: { type: "integer" },
-      },
-      {
-        type: "alter_column",
-        table: "users",
-        column: "name",
-        before: { type: "varchar" },
-        after: { type: "text" },
-      },
+    expect(operations).toEqual([
+      ops.addColumn("users", "email", { type: "varchar" }),
+      ops.dropColumn("users", "age", { type: "integer" }),
+      ops.alterColumn("users", "name", { type: "varchar" }, { type: "text" }),
     ]);
   });
 });
 
-describe("Index Operations", () => {
+describe("diffIndexes", () => {
   it("should detect added and removed indexes", () => {
     const current: SchemaSnapshot = {
       tables: [],
@@ -188,21 +93,11 @@ describe("Index Operations", () => {
       ],
     };
 
-    const diff = diffSchema({ current, ideal });
+    const operations = diffIndexes({ current, ideal });
 
-    expect(diff.operations).toEqual([
-      {
-        type: "create_index",
-        table: "users",
-        name: "idx_new",
-        columns: ["email"],
-        unique: false,
-      },
-      {
-        type: "drop_index",
-        table: "users",
-        name: "idx_old",
-      },
+    expect(operations).toEqual([
+      ops.createIndex("users", "idx_new", ["email"], false),
+      ops.dropIndex("users", "idx_old"),
     ]);
   });
 
@@ -232,21 +127,11 @@ describe("Index Operations", () => {
       ],
     };
 
-    const diff = diffSchema({ current, ideal });
+    const operations = diffIndexes({ current, ideal });
 
-    expect(diff.operations).toEqual([
-      {
-        type: "drop_index",
-        table: "users",
-        name: "idx_test",
-      },
-      {
-        type: "create_index",
-        table: "users",
-        name: "idx_test",
-        columns: ["id"],
-        unique: true,
-      },
+    expect(operations).toEqual([
+      ops.dropIndex("users", "idx_test"),
+      ops.createIndex("users", "idx_test", ["id"], true),
     ]);
   });
 
@@ -276,21 +161,11 @@ describe("Index Operations", () => {
       ],
     };
 
-    const diff = diffSchema({ current, ideal });
+    const operations = diffIndexes({ current, ideal });
 
-    expect(diff.operations).toEqual([
-      {
-        type: "drop_index",
-        table: "users",
-        name: "idx_users_a_b",
-      },
-      {
-        type: "create_index",
-        table: "users",
-        name: "idx_users_a_b",
-        columns: ["b", "a"],
-        unique: false,
-      },
+    expect(operations).toEqual([
+      ops.dropIndex("users", "idx_users_a_b"),
+      ops.createIndex("users", "idx_users_a_b", ["b", "a"], false),
     ]);
   });
 
@@ -312,9 +187,9 @@ describe("Index Operations", () => {
       indexes: [],
     };
 
-    const diff = diffSchema({ current, ideal });
+    const operations = diffIndexes({ current, ideal });
 
     // System generated indexes should be ignored
-    expect(diff.operations).toHaveLength(0);
+    expect(operations).toHaveLength(0);
   });
 });

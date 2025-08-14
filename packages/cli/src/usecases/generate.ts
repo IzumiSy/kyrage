@@ -3,7 +3,8 @@ import { Logger } from "../logger";
 import { migrationDirName, getPendingMigrations } from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
-import { Tables, diffSchema, SchemaDiff, SchemaSnapshot } from "../diff";
+import { diffSchema } from "../diff";
+import { SchemaDiff, SchemaSnapshot, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
 
@@ -139,7 +140,7 @@ const generateMigrationFromIntrospection = async (props: {
 const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
   const diffOutputs: string[] = [];
 
-  diff.operations.forEach((operation) => {
+  diff.operations.forEach((operation: Operation) => {
     switch (operation.type) {
       case "create_table":
         diffOutputs.push(`-- create_table: ${operation.table}`);

@@ -88,3 +88,74 @@ export type SchemaSnapshot = {
   tables: Tables;
   indexes: IndexDef[];
 };
+
+// Operation creation helpers namespace
+export const ops = {
+  createTable: (
+    table: string,
+    columns: Record<string, TableColumnAttributes>
+  ) => ({
+    type: "create_table" as const,
+    table,
+    columns,
+  }),
+
+  dropTable: (table: string) => ({
+    type: "drop_table" as const,
+    table,
+  }),
+
+  addColumn: (
+    table: string,
+    column: string,
+    attributes: TableColumnAttributes
+  ) => ({
+    type: "add_column" as const,
+    table,
+    column,
+    attributes,
+  }),
+
+  dropColumn: (
+    table: string,
+    column: string,
+    attributes: TableColumnAttributes
+  ) => ({
+    type: "drop_column" as const,
+    table,
+    column,
+    attributes,
+  }),
+
+  alterColumn: (
+    table: string,
+    column: string,
+    before: TableColumnAttributes,
+    after: TableColumnAttributes
+  ) => ({
+    type: "alter_column" as const,
+    table,
+    column,
+    before,
+    after,
+  }),
+
+  createIndex: (
+    table: string,
+    name: string,
+    columns: string[],
+    unique: boolean
+  ) => ({
+    type: "create_index" as const,
+    table,
+    name,
+    columns,
+    unique,
+  }),
+
+  dropIndex: (table: string, name: string) => ({
+    type: "drop_index" as const,
+    table,
+    name,
+  }),
+};
