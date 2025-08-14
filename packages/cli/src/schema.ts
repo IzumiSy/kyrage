@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { schemaDiffSchema } from "./operation";
 
 const columnSchema = z.object({
   type: z.string(),
@@ -37,69 +38,6 @@ export const configSchema = z.object({
   indexes: z.array(indexSchema),
 });
 export type ConfigValue = z.infer<typeof configSchema>;
-
-// ---- Migration diff (SchemaDiff) zod schema ----
-// Column attributes inside diff (open for future extension)
-const tableColumnAttributesSchema = z
-  .object({
-    type: z.string(),
-  })
-  .catchall(z.any());
-
-// Added/Removed/Changed tables
-const addedTableSchema = z.object({
-  table: z.string(),
-  columns: z.record(z.string(), tableColumnAttributesSchema),
-});
-const removedTableSchema = z.string();
-
-const addedColumnSchema = z.object({
-  column: z.string(),
-  attributes: tableColumnAttributesSchema,
-});
-const removedColumnSchema = z.object({
-  column: z.string(),
-  attributes: tableColumnAttributesSchema,
-});
-const changedColumnSchema = z.object({
-  column: z.string(),
-  before: tableColumnAttributesSchema,
-  after: tableColumnAttributesSchema,
-});
-const changedTableSchema = z.object({
-  table: z.string(),
-  addedColumns: z.array(addedColumnSchema),
-  removedColumns: z.array(removedColumnSchema),
-  changedColumns: z.array(changedColumnSchema),
-});
-
-// Index diff schemas
-const indexDefSchema = z.object({
-  table: z.string(),
-  name: z.string(),
-  columns: z.array(z.string()),
-  unique: z.boolean(),
-  systemGenerated: z.boolean().default(false),
-});
-const changedIndexSchema = z.object({
-  table: z.string(),
-  name: z.string(),
-  before: indexDefSchema,
-  after: indexDefSchema,
-});
-
-// Removed indexes keep table + name for safe dropping
-const removedIndexSchema = z.object({ table: z.string(), name: z.string() });
-
-export const schemaDiffSchema = z.object({
-  addedTables: z.array(addedTableSchema),
-  removedTables: z.array(removedTableSchema),
-  changedTables: z.array(changedTableSchema),
-  addedIndexes: z.array(indexDefSchema),
-  removedIndexes: z.array(removedIndexSchema),
-  changedIndexes: z.array(changedIndexSchema),
-});
-export type SchemaDiffValue = z.infer<typeof schemaDiffSchema>;
 
 export const migrationSchema = z.object({
   id: z.string(),

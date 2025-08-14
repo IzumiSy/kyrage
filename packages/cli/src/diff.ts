@@ -1,36 +1,20 @@
-import { schemaDiffSchema } from "./schema";
-import { z } from "zod";
+import {
+  Operation,
+  SchemaDiff,
+  TableColumnAttributes,
+  Tables,
+  SchemaSnapshot,
+  IndexDef,
+} from "./operation";
 import * as R from "ramda";
 
-// Derive diff-related types from the zod schema (SchemaDiffValue)
-export type SchemaDiff = z.infer<typeof schemaDiffSchema>;
-type AddedTable = SchemaDiff["addedTables"][number];
-type RemovedTable = SchemaDiff["removedTables"][number];
-type ChangedTable = SchemaDiff["changedTables"][number];
-type IndexDef = SchemaDiff["addedIndexes"][number];
-type ChangedIndex = SchemaDiff["changedIndexes"][number];
-type TableColumnAttributes = AddedTable["columns"][string];
-
-export type Tables = Array<{
-  name: string;
-  columns: Record<string, TableColumnAttributes>;
-}>;
-
-export type SchemaSnapshot = {
-  tables: Tables;
-  indexes: IndexDef[];
-};
-
-export type TableDiff = {
-  addedTables: AddedTable[];
-  removedTables: RemovedTable[];
-  changedTables: ChangedTable[];
-};
-
-export type IndexDiff = {
-  addedIndexes: IndexDef[];
-  removedIndexes: { table: string; name: string }[];
-  changedIndexes: ChangedIndex[];
+// Re-export for backward compatibility during migration
+export type {
+  SchemaDiff,
+  Tables,
+  SchemaSnapshot,
+  TableColumnAttributes,
+  IndexDef,
 };
 
 // 汎用的なdiff演算子
@@ -53,16 +37,6 @@ const createDiffOperations = <K>() => ({
 });
 
 const getName = R.prop("name");
-const hasColumnChanges = (changes: {
-  addedColumns: unknown[];
-  removedColumns: unknown[];
-  changedColumns: unknown[];
-}) =>
-  R.any(R.pipe(R.length, R.gt(R.__, 0)), [
-    changes.addedColumns,
-    changes.removedColumns,
-    changes.changedColumns,
-  ]);
 
 // カラム属性を比較用の配列に変換
 const columnsEqual = R.eqBy((col: TableColumnAttributes) => [
@@ -73,28 +47,50 @@ const columnsEqual = R.eqBy((col: TableColumnAttributes) => [
 ]);
 
 // カラム差分計算のヘルパー関数
-function computeTableColumnDiffs(
+function computeTableColumnOperations(
   currentTable: Tables[0],
   idealTable: Tables[0]
-): ChangedTable | null {
+): Operation[] {
+  const operations: Operation[] = [];
   const diffOps = createDiffOperations<string>();
   const dbCols = currentTable.columns;
   const configCols = idealTable.columns;
   const dbColNames = Object.keys(dbCols);
   const configColNames = Object.keys(configCols);
 
+  // 追加カラム
   const addedColumns = diffOps.added(
     dbColNames,
     configColNames,
     (column: string) => ({ column, attributes: configCols[column] })
   );
 
+  addedColumns.forEach((col) => {
+    operations.push({
+      type: "add_column",
+      table: currentTable.name,
+      column: col.column,
+      attributes: col.attributes,
+    });
+  });
+
+  // 削除カラム
   const removedColumns = diffOps.removed(
     dbColNames,
     configColNames,
     (column: string) => ({ column, attributes: dbCols[column] })
   );
 
+  removedColumns.forEach((col) => {
+    operations.push({
+      type: "drop_column",
+      table: currentTable.name,
+      column: col.column,
+      attributes: col.attributes,
+    });
+  });
+
+  // 変更カラム
   const changedColumns = diffOps.changed(
     dbColNames,
     configColNames,
@@ -106,90 +102,17 @@ function computeTableColumnDiffs(
     })
   );
 
-  if (hasColumnChanges({ addedColumns, removedColumns, changedColumns })) {
-    return {
+  changedColumns.forEach((col) => {
+    operations.push({
+      type: "alter_column",
       table: currentTable.name,
-      addedColumns,
-      removedColumns,
-      changedColumns,
-    };
-  }
-  return null;
-}
+      column: col.column,
+      before: col.before,
+      after: col.after,
+    });
+  });
 
-export function diffTables(current: Tables, ideal: Tables): TableDiff {
-  const diffOps = createDiffOperations<string>();
-  const currentNames = R.map(getName, current);
-  const idealNames = R.map(getName, ideal);
-
-  return {
-    addedTables: diffOps.added(currentNames, idealNames, (name: string) => {
-      const table = ideal.find((t) => t.name === name)!;
-      return { table: table.name, columns: table.columns };
-    }),
-    removedTables: diffOps.removed(currentNames, idealNames, R.identity),
-    changedTables: R.pipe(
-      R.filter((currentTable: Tables[0]) =>
-        ideal.some((t) => t.name === currentTable.name)
-      ),
-      R.map((currentTable: Tables[0]) => {
-        const idealTable = ideal.find((t) => t.name === currentTable.name)!;
-        return computeTableColumnDiffs(currentTable, idealTable);
-      }),
-      R.filter(
-        (result: ChangedTable | null): result is ChangedTable => result !== null
-      )
-    )(current),
-  };
-}
-
-export function diffIndexes(current: IndexDef[], ideal: IndexDef[]): IndexDiff {
-  const diffOps = createDiffOperations<string>();
-  const indexKey = (i: IndexDef) => `${i.table}:${i.name}`;
-
-  // システム生成でないインデックスのみを対象
-  const nonSystemGenerated = (i: IndexDef) => !i.systemGenerated;
-  const currentIndexMap = new Map(
-    current.filter(nonSystemGenerated).map((i) => [indexKey(i), i])
-  );
-  const idealIndexMap = new Map(
-    ideal.filter(nonSystemGenerated).map((i) => [indexKey(i), i])
-  );
-
-  const currentKeys = Array.from(currentIndexMap.keys());
-  const idealKeys = Array.from(idealIndexMap.keys());
-
-  return {
-    addedIndexes: diffOps.added(
-      currentKeys,
-      idealKeys,
-      (key: string) => idealIndexMap.get(key)!
-    ),
-    removedIndexes: diffOps.removed(currentKeys, idealKeys, (key: string) => {
-      const index = currentIndexMap.get(key)!;
-      return { table: index.table, name: index.name };
-    }),
-    changedIndexes: diffOps.changed(
-      currentKeys,
-      idealKeys,
-      (key: string) => {
-        const current = currentIndexMap.get(key)!;
-        const ideal = idealIndexMap.get(key)!;
-        const sameColumns = R.equals(current.columns, ideal.columns);
-        return !sameColumns || current.unique !== ideal.unique;
-      },
-      (key: string) => {
-        const current = currentIndexMap.get(key)!;
-        const ideal = idealIndexMap.get(key)!;
-        return {
-          table: ideal.table,
-          name: ideal.name,
-          before: current,
-          after: ideal,
-        };
-      }
-    ),
-  };
+  return operations;
 }
 
 export function diffSchema(props: {
@@ -197,12 +120,137 @@ export function diffSchema(props: {
   ideal: SchemaSnapshot;
 }): SchemaDiff {
   const { current, ideal } = props;
+  const operations: Operation[] = [];
 
-  const tableDiff = diffTables(current.tables, ideal.tables);
-  const indexDiff = diffIndexes(current.indexes, ideal.indexes);
+  // 1. テーブル操作
+  const diffOps = createDiffOperations<string>();
+  const currentNames = R.map(getName, current.tables);
+  const idealNames = R.map(getName, ideal.tables);
 
-  return {
-    ...tableDiff,
-    ...indexDiff,
-  };
+  // 追加テーブル
+  const addedTables = diffOps.added(
+    currentNames,
+    idealNames,
+    (name: string) => {
+      const table = ideal.tables.find((t) => t.name === name)!;
+      return table;
+    }
+  );
+
+  addedTables.forEach((table) => {
+    operations.push({
+      type: "create_table",
+      table: table.name,
+      columns: table.columns,
+    });
+  });
+
+  // 削除テーブル
+  const removedTables = diffOps.removed(currentNames, idealNames, R.identity);
+
+  removedTables.forEach((tableName) => {
+    operations.push({
+      type: "drop_table",
+      table: tableName,
+    });
+  });
+
+  // 変更テーブル（カラム操作）
+  const tablesForColumnCheck = R.filter((currentTable: Tables[0]) =>
+    ideal.tables.some((t) => t.name === currentTable.name)
+  )(current.tables);
+
+  tablesForColumnCheck.forEach((currentTable: Tables[0]) => {
+    const idealTable = ideal.tables.find((t) => t.name === currentTable.name)!;
+    const columnOperations = computeTableColumnOperations(
+      currentTable,
+      idealTable
+    );
+    operations.push(...columnOperations);
+  });
+
+  // 2. インデックス操作
+  const indexKey = (i: IndexDef) => `${i.table}:${i.name}`;
+
+  // システム生成でないインデックスのみを対象
+  const nonSystemGenerated = (i: IndexDef) => !i.systemGenerated;
+  const currentIndexMap = new Map(
+    current.indexes.filter(nonSystemGenerated).map((i) => [indexKey(i), i])
+  );
+  const idealIndexMap = new Map(
+    ideal.indexes.filter(nonSystemGenerated).map((i) => [indexKey(i), i])
+  );
+
+  const currentKeys = Array.from(currentIndexMap.keys());
+  const idealKeys = Array.from(idealIndexMap.keys());
+
+  // 追加インデックス
+  const addedIndexes = diffOps.added(
+    currentKeys,
+    idealKeys,
+    (key: string) => idealIndexMap.get(key)!
+  );
+
+  addedIndexes.forEach((index) => {
+    operations.push({
+      type: "create_index",
+      table: index.table,
+      name: index.name,
+      columns: index.columns,
+      unique: index.unique,
+    });
+  });
+
+  // 削除インデックス
+  const removedIndexes = diffOps.removed(
+    currentKeys,
+    idealKeys,
+    (key: string) => {
+      const index = currentIndexMap.get(key)!;
+      return { table: index.table, name: index.name };
+    }
+  );
+
+  removedIndexes.forEach((index) => {
+    operations.push({
+      type: "drop_index",
+      table: index.table,
+      name: index.name,
+    });
+  });
+
+  // 変更インデックス（削除→再作成）
+  const changedIndexes = diffOps.changed(
+    currentKeys,
+    idealKeys,
+    (key: string) => {
+      const current = currentIndexMap.get(key)!;
+      const ideal = idealIndexMap.get(key)!;
+      const sameColumns = R.equals(current.columns, ideal.columns);
+      return !sameColumns || current.unique !== ideal.unique;
+    },
+    (key: string) => {
+      const current = currentIndexMap.get(key)!;
+      const ideal = idealIndexMap.get(key)!;
+      return { current, ideal };
+    }
+  );
+
+  changedIndexes.forEach(({ current: currentIndex, ideal: idealIndex }) => {
+    // 削除してから再作成
+    operations.push({
+      type: "drop_index",
+      table: currentIndex.table,
+      name: currentIndex.name,
+    });
+    operations.push({
+      type: "create_index",
+      table: idealIndex.table,
+      name: idealIndex.name,
+      columns: idealIndex.columns,
+      unique: idealIndex.unique,
+    });
+  });
+
+  return { operations };
 }

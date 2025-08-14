@@ -124,14 +124,7 @@ const generateMigrationFromIntrospection = async (props: {
     ideal: idealSnapshot,
   });
 
-  if (
-    diff.addedTables.length === 0 &&
-    diff.removedTables.length === 0 &&
-    diff.changedTables.length === 0 &&
-    diff.addedIndexes.length === 0 &&
-    diff.removedIndexes.length === 0 &&
-    diff.changedIndexes.length === 0
-  ) {
+  if (diff.operations.length === 0) {
     return null;
   }
 
@@ -146,71 +139,60 @@ const generateMigrationFromIntrospection = async (props: {
 const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
   const diffOutputs: string[] = [];
 
-  // Show changes one by one like (added_table, changed_column, etc.)
-  if (diff.addedTables.length > 0) {
-    diff.addedTables.forEach((table) => {
-      diffOutputs.push(`-- create_table: ${table.table}`);
-      Object.entries(table.columns).forEach(([colName, colDef]) => {
-        diffOutputs.push(
-          `   -> column: ${colName} (${JSON.stringify(colDef)})`
-        );
-      });
-    });
-  }
-  if (diff.removedTables.length > 0) {
-    diff.removedTables.forEach((table) => {
-      diffOutputs.push(`-- remove_table: ${table}`);
-    });
-  }
-  if (diff.changedTables.length > 0) {
-    diff.changedTables.forEach((table) => {
-      table.addedColumns.forEach((col) => {
-        diffOutputs.push(
-          [
-            `-- add_column: ${table.table}.${col.column}`,
-            `   -> to: ${JSON.stringify(col.attributes)}`,
-          ].join("\n")
-        );
-      });
-      table.removedColumns.forEach((col) => {
-        diffOutputs.push(`-- remove_column: ${table.table}.${col.column}`);
-      });
-      table.changedColumns.forEach((col) => {
-        diffOutputs.push(
-          [
-            `-- change_column: ${table.table}.${col.column}`,
-            `   -> from: ${JSON.stringify(col.before)}`,
-            `   -> to:   ${JSON.stringify(col.after)}`,
-          ].join("\n")
-        );
-      });
-    });
-  }
+  diff.operations.forEach((operation) => {
+    switch (operation.type) {
+      case "create_table":
+        diffOutputs.push(`-- create_table: ${operation.table}`);
+        Object.entries(operation.columns).forEach(([colName, colDef]) => {
+          diffOutputs.push(
+            `   -> column: ${colName} (${JSON.stringify(colDef)})`
+          );
+        });
+        break;
 
-  if (diff.changedIndexes.length > 0) {
-    diff.changedIndexes.forEach((ix) => {
-      diffOutputs.push(
-        [
-          `-- change_index: ${ix.table}.${ix.name}`,
-          `   -> from: ${ix.before.columns.join(", ")}${ix.before.unique ? " [unique]" : ""}`,
-          `   -> to:   ${ix.after.columns.join(", ")}${ix.after.unique ? " [unique]" : ""}`,
-          `   -> actions: drop_index + create_index`,
-        ].join("\n")
-      );
-    });
-  }
-  if (diff.addedIndexes.length > 0) {
-    diff.addedIndexes.forEach((ix) => {
-      diffOutputs.push(
-        `-- create_index: ${ix.table}.${ix.name} (${ix.columns.join(", ")})${ix.unique ? " [unique]" : ""}`
-      );
-    });
-  }
-  if (diff.removedIndexes.length > 0) {
-    diff.removedIndexes.forEach((ix) => {
-      diffOutputs.push(`-- drop_index: ${ix.table}.${ix.name}`);
-    });
-  }
+      case "drop_table":
+        diffOutputs.push(`-- remove_table: ${operation.table}`);
+        break;
+
+      case "add_column":
+        diffOutputs.push(
+          [
+            `-- add_column: ${operation.table}.${operation.column}`,
+            `   -> to: ${JSON.stringify(operation.attributes)}`,
+          ].join("\n")
+        );
+        break;
+
+      case "drop_column":
+        diffOutputs.push(
+          `-- remove_column: ${operation.table}.${operation.column}`
+        );
+        break;
+
+      case "alter_column":
+        diffOutputs.push(
+          [
+            `-- change_column: ${operation.table}.${operation.column}`,
+            `   -> from: ${JSON.stringify(operation.before)}`,
+            `   -> to:   ${JSON.stringify(operation.after)}`,
+          ].join("\n")
+        );
+        break;
+
+      case "create_index":
+        diffOutputs.push(
+          `-- create_index: ${operation.table}.${operation.name} (${operation.columns.join(", ")})${operation.unique ? " [unique]" : ""}`
+        );
+        break;
+
+      case "drop_index":
+        diffOutputs.push(`-- drop_index: ${operation.table}.${operation.name}`);
+        break;
+
+      default:
+        break;
+    }
+  });
 
   logger.reporter.log(diffOutputs.join("\n"));
 };

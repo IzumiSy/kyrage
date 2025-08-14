@@ -7,7 +7,7 @@ import {
   Migration,
   sql,
 } from "kysely";
-import { SchemaDiff } from "./diff";
+import { SchemaDiff, Operation } from "./operation";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 import { migrationSchema, MigrationValue } from "./schema";
@@ -93,182 +93,213 @@ export async function buildMigrationFromDiff(
   db: Kysely<any>,
   diff: SchemaDiff
 ): Promise<void> {
-  // 1. 追加テーブル
-  for (const added of diff.addedTables) {
-    let builder: CreateTableBuilder<string, any> = db.schema.createTable(
-      added.table
-    );
-    for (const [colName, colDef] of Object.entries(added.columns)) {
-      const dataType = colDef.type;
-      assertDataType(dataType);
-      builder = builder.addColumn(colName, dataType, (col) => {
-        let c = col;
-        if (colDef.notNull) c = c.notNull();
-        if (typeof colDef.defaultSql === "string") {
-          c = c.defaultTo(sql.raw(colDef.defaultSql));
-        }
-        return c;
-      });
-      if (colDef.primaryKey) {
-        builder = builder.addPrimaryKeyConstraint(
-          `${added.table}_${colName}_primary_key`,
-          [colName]
-        );
+  for (const operation of diff.operations) {
+    await executeOperation(db, operation);
+  }
+}
+
+async function executeOperation(
+  db: Kysely<any>,
+  operation: Operation
+): Promise<void> {
+  switch (operation.type) {
+    case "create_table":
+      return executeCreateTable(db, operation);
+    case "drop_table":
+      return executeDropTable(db, operation);
+    case "add_column":
+      return executeAddColumn(db, operation);
+    case "drop_column":
+      return executeDropColumn(db, operation);
+    case "alter_column":
+      return executeAlterColumn(db, operation);
+    case "create_index":
+      return executeCreateIndex(db, operation);
+    case "drop_index":
+      return executeDropIndex(db, operation);
+    default:
+      throw new Error(`Unknown operation type: ${(operation as any).type}`);
+  }
+}
+
+async function executeCreateTable(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "create_table" }>
+): Promise<void> {
+  let builder: CreateTableBuilder<string, any> = db.schema.createTable(
+    operation.table
+  );
+
+  for (const [colName, colDef] of Object.entries(operation.columns)) {
+    const dataType = colDef.type;
+    assertDataType(dataType);
+    builder = builder.addColumn(colName, dataType, (col) => {
+      let c = col;
+      if (colDef.notNull) c = c.notNull();
+      if (typeof colDef.defaultSql === "string") {
+        c = c.defaultTo(sql.raw(colDef.defaultSql));
       }
-      if (colDef.unique) {
-        builder = builder.addUniqueConstraint(
-          `${added.table}_${colName}_unique`,
-          [colName]
-        );
-      }
+      return c;
+    });
+
+    if (colDef.primaryKey) {
+      builder = builder.addPrimaryKeyConstraint(
+        `${operation.table}_${colName}_primary_key`,
+        [colName]
+      );
     }
-    await builder.execute();
+
+    if (colDef.unique) {
+      builder = builder.addUniqueConstraint(
+        `${operation.table}_${colName}_unique`,
+        [colName]
+      );
+    }
   }
 
-  // 2. 削除テーブル
-  for (const removed of diff.removedTables) {
-    await db.schema.dropTable(removed).execute();
+  await builder.execute();
+}
+
+async function executeDropTable(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "drop_table" }>
+): Promise<void> {
+  await db.schema.dropTable(operation.table).execute();
+}
+
+async function executeAddColumn(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "add_column" }>
+): Promise<void> {
+  const dataType = operation.attributes.type;
+  assertDataType(dataType);
+
+  await db.schema
+    .alterTable(operation.table)
+    .addColumn(operation.column, dataType, (col) => {
+      let c = col;
+      if (operation.attributes.notNull) c = c.notNull();
+      if (typeof operation.attributes.defaultSql === "string") {
+        c = c.defaultTo(sql.raw(operation.attributes.defaultSql));
+      }
+      return c;
+    })
+    .execute();
+
+  if (operation.attributes.primaryKey) {
+    await db.schema
+      .alterTable(operation.table)
+      .addPrimaryKeyConstraint(
+        `${operation.table}_${operation.column}_primary_key`,
+        [operation.column]
+      )
+      .execute();
   }
 
-  // 3. 変更テーブル
-  for (const changed of diff.changedTables) {
-    // 追加カラム
-    for (const addCol of changed.addedColumns) {
-      const dataType = addCol.attributes.type;
-      assertDataType(dataType);
+  if (operation.attributes.unique) {
+    await db.schema
+      .alterTable(operation.table)
+      .addUniqueConstraint(`${operation.table}_${operation.column}_unique`, [
+        operation.column,
+      ])
+      .execute();
+  }
+}
+
+async function executeDropColumn(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "drop_column" }>
+): Promise<void> {
+  await db.schema
+    .alterTable(operation.table)
+    .dropColumn(operation.column)
+    .execute();
+}
+
+async function executeAlterColumn(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "alter_column" }>
+): Promise<void> {
+  const { table, column, before, after } = operation;
+
+  // dataType
+  if (before.type !== after.type) {
+    const dataType = after.type;
+    assertDataType(dataType);
+    await db.schema
+      .alterTable(table)
+      .alterColumn(column, (col) => col.setDataType(dataType))
+      .execute();
+  }
+
+  // notNull
+  if (after.notNull !== before.notNull) {
+    if (after.notNull) {
       await db.schema
-        .alterTable(changed.table)
-        .addColumn(addCol.column, dataType, (col) => {
-          let c = col;
-          if (addCol.attributes.notNull) c = c.notNull();
-          if (typeof addCol.attributes.defaultSql === "string") {
-            c = c.defaultTo(sql.raw(addCol.attributes.defaultSql));
-          }
-          return c;
-        })
+        .alterTable(table)
+        .alterColumn(column, (col) => col.setNotNull())
         .execute();
-      if (addCol.attributes.primaryKey) {
-        await db.schema
-          .alterTable(changed.table)
-          .addPrimaryKeyConstraint(
-            `${changed.table}_${addCol.column}_primary_key`,
-            [addCol.column]
-          )
-          .execute();
-      }
-      if (addCol.attributes.unique) {
-        await db.schema
-          .alterTable(changed.table)
-          .addUniqueConstraint(`${changed.table}_${addCol.column}_unique`, [
-            addCol.column,
-          ])
-          .execute();
-      }
-    }
-
-    // 削除カラム
-    for (const remCol of changed.removedColumns) {
+    } else {
       await db.schema
-        .alterTable(changed.table)
-        .dropColumn(remCol.column)
+        .alterTable(table)
+        .alterColumn(column, (col) => col.dropNotNull())
         .execute();
     }
+  }
 
-    // 型変更カラム
-    for (const chCol of changed.changedColumns) {
-      // dataType
-      if (chCol.before.type !== chCol.after.type) {
-        const dataType = chCol.after.type;
-        assertDataType(dataType);
-        await db.schema
-          .alterTable(changed.table)
-          .alterColumn(chCol.column, (col) => col.setDataType(dataType))
-          .execute();
-      }
-
-      // notNull
-      if (chCol.after.notNull !== chCol.before.notNull) {
-        if (chCol.after.notNull) {
-          await db.schema
-            .alterTable(changed.table)
-            .alterColumn(chCol.column, (col) => col.setNotNull())
-            .execute();
-        } else {
-          await db.schema
-            .alterTable(changed.table)
-            .alterColumn(chCol.column, (col) => col.dropNotNull())
-            .execute();
-        }
-      }
-
-      // primaryKey
-      if (chCol.after.primaryKey !== chCol.before.primaryKey) {
-        if (chCol.after.primaryKey) {
-          await db.schema
-            .alterTable(changed.table)
-            .addPrimaryKeyConstraint(
-              `${changed.table}_${chCol.column}_primary_key`,
-              [chCol.column]
-            )
-            .execute();
-        } else {
-          await db.schema
-            .alterTable(changed.table)
-            .dropConstraint(`${changed.table}_${chCol.column}_primary_key`)
-            .execute();
-        }
-      }
-
-      // unique
-      if (chCol.after.unique !== chCol.before.unique) {
-        if (chCol.after.unique) {
-          await db.schema
-            .alterTable(changed.table)
-            .addUniqueConstraint(`${changed.table}_${chCol.column}_unique`, [
-              chCol.column,
-            ])
-            .execute();
-        } else {
-          await db.schema
-            .alterTable(changed.table)
-            .dropConstraint(`${changed.table}_${chCol.column}_unique`)
-            .execute();
-        }
-      }
+  // primaryKey
+  if (after.primaryKey !== before.primaryKey) {
+    if (after.primaryKey) {
+      await db.schema
+        .alterTable(table)
+        .addPrimaryKeyConstraint(`${table}_${column}_primary_key`, [column])
+        .execute();
+    } else {
+      await db.schema
+        .alterTable(table)
+        .dropConstraint(`${table}_${column}_primary_key`)
+        .execute();
     }
   }
 
-  // 4. 追加インデックス
-  for (const added of diff.addedIndexes) {
-    let builder = db.schema.createIndex(added.name).on(added.table);
-    for (const column of added.columns) {
-      builder = builder.column(column);
+  // unique
+  if (after.unique !== before.unique) {
+    if (after.unique) {
+      await db.schema
+        .alterTable(table)
+        .addUniqueConstraint(`${table}_${column}_unique`, [column])
+        .execute();
+    } else {
+      await db.schema
+        .alterTable(table)
+        .dropConstraint(`${table}_${column}_unique`)
+        .execute();
     }
-    if (added.unique) {
-      builder = builder.unique();
-    }
-    await builder.execute();
+  }
+}
+
+async function executeCreateIndex(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "create_index" }>
+): Promise<void> {
+  let builder = db.schema.createIndex(operation.name).on(operation.table);
+
+  for (const column of operation.columns) {
+    builder = builder.column(column);
   }
 
-  // 5. 削除インデックス
-  for (const removed of diff.removedIndexes) {
-    await db.schema.dropIndex(removed.name).on(removed.table).execute();
+  if (operation.unique) {
+    builder = builder.unique();
   }
 
-  // 6. 変更インデックス
-  for (const changed of diff.changedIndexes) {
-    // インデックスを変更する場合は、削除してから再作成
-    await db.schema.dropIndex(changed.name).on(changed.table).execute();
+  await builder.execute();
+}
 
-    let builder = db.schema.createIndex(changed.name).on(changed.table);
-    for (const column of changed.after.columns) {
-      builder = builder.column(column);
-    }
-    if (changed.after.unique) {
-      builder = builder.unique();
-    }
-    await builder.execute();
-  }
+async function executeDropIndex(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "drop_index" }>
+): Promise<void> {
+  await db.schema.dropIndex(operation.name).on(operation.table).execute();
 }
 
 const assertDataType: (
