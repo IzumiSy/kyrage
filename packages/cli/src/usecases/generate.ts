@@ -4,9 +4,10 @@ import { migrationDirName, getPendingMigrations } from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
 import { diffSchema } from "../diff";
-import { SchemaDiff, SchemaSnapshot, Tables, Operation } from "../operation";
+import { SchemaDiff, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
+import { postgresExtraIntrospector } from "../introspection/postgres";
 
 export const runGenerate = async (props: {
   client: DBClient;
@@ -70,8 +71,8 @@ const generateMigrationFromIntrospection = async (props: {
 }) => {
   const { client, config } = props;
   const introspector = getIntrospector(client);
+  const extraIntrospector = postgresExtraIntrospector({ client });
   const tables = await introspector.getTables();
-  const indexes = await introspector.getIndexes();
 
   const dbTables: Tables = tables.map((table) => ({
     name: table.name,
@@ -106,23 +107,27 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const currentSnapshot: SchemaSnapshot = {
-    tables: dbTables,
-    indexes,
-  };
-  const idealSnapshot: SchemaSnapshot = {
-    tables: configTables,
-    indexes: config.indexes.map((i) => ({
-      table: i.table,
-      name: i.name,
-      columns: i.columns,
-      unique: i.unique,
-      systemGenerated: false,
-    })),
-  };
+  const constraintAttributes = await extraIntrospector.introspectConstraints();
+  const indexes = await introspector.getIndexes();
+
   const diff = diffSchema({
-    current: currentSnapshot,
-    ideal: idealSnapshot,
+    current: {
+      tables: dbTables,
+      indexes,
+      primaryKeyConstraints: constraintAttributes.primaryKey,
+      uniqueConstraints: constraintAttributes.unique,
+    },
+    ideal: {
+      tables: configTables,
+      indexes: config.indexes.map((i) => ({
+        table: i.table,
+        name: i.name,
+        columns: i.columns,
+        unique: i.unique,
+      })),
+      primaryKeyConstraints: config.primaryKeyConstraints || [],
+      uniqueConstraints: config.uniqueConstraints || [],
+    },
   });
 
   if (diff.operations.length === 0) {

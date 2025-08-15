@@ -5,6 +5,8 @@ import {
   Tables,
   SchemaSnapshot,
   IndexDef,
+  PrimaryKeyConstraint,
+  UniqueConstraint,
   ops,
 } from "./operation";
 import * as R from "ramda";
@@ -96,19 +98,19 @@ function computeTableColumnOperations(
 }
 
 export function diffTables(props: {
-  current: SchemaSnapshot;
-  ideal: SchemaSnapshot;
+  current: Tables;
+  ideal: Tables;
 }): Operation[] {
   const { current, ideal } = props;
   const operations: Operation[] = [];
   const diffOps = createDiffOperations<string>();
-  const currentNames = R.map(getName, current.tables);
-  const idealNames = R.map(getName, ideal.tables);
+  const currentNames = R.map(getName, current);
+  const idealNames = R.map(getName, ideal);
 
   // 追加テーブル
   diffOps
     .added(currentNames, idealNames, (name: string) => {
-      const table = ideal.tables.find((t) => t.name === name)!;
+      const table = ideal.find((t) => t.name === name)!;
       return table;
     })
     .forEach((table) => {
@@ -122,9 +124,9 @@ export function diffTables(props: {
 
   // 変更テーブル（カラム操作）
   R.filter((currentTable: Tables[0]) =>
-    ideal.tables.some((t) => t.name === currentTable.name)
-  )(current.tables).forEach((currentTable: Tables[0]) => {
-    const idealTable = ideal.tables.find((t) => t.name === currentTable.name)!;
+    ideal.some((t) => t.name === currentTable.name)
+  )(current).forEach((currentTable: Tables[0]) => {
+    const idealTable = ideal.find((t) => t.name === currentTable.name)!;
     operations.push(...computeTableColumnOperations(currentTable, idealTable));
   });
 
@@ -132,22 +134,17 @@ export function diffTables(props: {
 }
 
 export function diffIndexes(props: {
-  current: SchemaSnapshot;
-  ideal: SchemaSnapshot;
+  current: IndexDef[];
+  ideal: IndexDef[];
 }): Operation[] {
   const { current, ideal } = props;
   const operations: Operation[] = [];
   const diffOps = createDiffOperations<string>();
   const indexKey = (i: IndexDef) => `${i.table}:${i.name}`;
 
-  // システム生成でないインデックスのみを対象
-  const nonSystemGenerated = (i: IndexDef) => !i.systemGenerated;
-  const currentIndexMap = new Map(
-    current.indexes.filter(nonSystemGenerated).map((i) => [indexKey(i), i])
-  );
-  const idealIndexMap = new Map(
-    ideal.indexes.filter(nonSystemGenerated).map((i) => [indexKey(i), i])
-  );
+  // SQLレベルでシステム生成のインデックスは除外済みなので、すべてを対象とする
+  const currentIndexMap = new Map(current.map((i) => [indexKey(i), i]));
+  const idealIndexMap = new Map(ideal.map((i) => [indexKey(i), i]));
 
   const currentKeys = Array.from(currentIndexMap.keys());
   const idealKeys = Array.from(idealIndexMap.keys());
@@ -204,14 +201,185 @@ export function diffIndexes(props: {
   return operations;
 }
 
+export function diffPrimaryKeyConstraints(props: {
+  current: PrimaryKeyConstraint[];
+  ideal: PrimaryKeyConstraint[];
+}): Operation[] {
+  const { current, ideal } = props;
+  const operations: Operation[] = [];
+  const diffOps = createDiffOperations<string>();
+  const constraintKey = (pk: PrimaryKeyConstraint) => `${pk.table}:${pk.name}`;
+
+  const currentPKMap = new Map(current.map((pk) => [constraintKey(pk), pk]));
+  const idealPKMap = new Map(ideal.map((pk) => [constraintKey(pk), pk]));
+
+  const currentKeys = Array.from(currentPKMap.keys());
+  const idealKeys = Array.from(idealPKMap.keys());
+
+  // 追加制約
+  diffOps
+    .added(currentKeys, idealKeys, (key: string) => idealPKMap.get(key)!)
+    .forEach((constraint) => {
+      operations.push(
+        ops.createPrimaryKeyConstraint(
+          constraint.table,
+          constraint.name,
+          constraint.columns
+        )
+      );
+    });
+
+  // 削除制約
+  diffOps
+    .removed(currentKeys, idealKeys, (key: string) => {
+      const constraint = currentPKMap.get(key)!;
+      return { table: constraint.table, name: constraint.name };
+    })
+    .forEach((constraint) => {
+      operations.push(
+        ops.dropPrimaryKeyConstraint(constraint.table, constraint.name)
+      );
+    });
+
+  // 変更制約（カラムが変更された場合は削除→再作成）
+  diffOps
+    .changed(
+      currentKeys,
+      idealKeys,
+      (key: string) => {
+        const current = currentPKMap.get(key)!;
+        const ideal = idealPKMap.get(key)!;
+        return !R.equals(current.columns, ideal.columns);
+      },
+      (key: string) => {
+        const current = currentPKMap.get(key)!;
+        const ideal = idealPKMap.get(key)!;
+        return { current, ideal };
+      }
+    )
+    .forEach(({ current: currentConstraint, ideal: idealConstraint }) => {
+      // 削除してから再作成
+      operations.push(
+        ops.dropPrimaryKeyConstraint(
+          currentConstraint.table,
+          currentConstraint.name
+        )
+      );
+      operations.push(
+        ops.createPrimaryKeyConstraint(
+          idealConstraint.table,
+          idealConstraint.name,
+          idealConstraint.columns
+        )
+      );
+    });
+
+  return operations;
+}
+
+export function diffUniqueConstraints(props: {
+  current: UniqueConstraint[];
+  ideal: UniqueConstraint[];
+}): Operation[] {
+  const { current, ideal } = props;
+  const operations: Operation[] = [];
+  const diffOps = createDiffOperations<string>();
+  const constraintKey = (uq: UniqueConstraint) => `${uq.table}:${uq.name}`;
+
+  const currentUQMap = new Map(current.map((uq) => [constraintKey(uq), uq]));
+  const idealUQMap = new Map(ideal.map((uq) => [constraintKey(uq), uq]));
+
+  const currentKeys = Array.from(currentUQMap.keys());
+  const idealKeys = Array.from(idealUQMap.keys());
+
+  // 追加制約
+  diffOps
+    .added(currentKeys, idealKeys, (key: string) => idealUQMap.get(key)!)
+    .forEach((constraint) => {
+      operations.push(
+        ops.createUniqueConstraint(
+          constraint.table,
+          constraint.name,
+          constraint.columns
+        )
+      );
+    });
+
+  // 削除制約
+  diffOps
+    .removed(currentKeys, idealKeys, (key: string) => {
+      const constraint = currentUQMap.get(key)!;
+      return { table: constraint.table, name: constraint.name };
+    })
+    .forEach((constraint) => {
+      operations.push(
+        ops.dropUniqueConstraint(constraint.table, constraint.name)
+      );
+    });
+
+  // 変更制約（カラムが変更された場合は削除→再作成）
+  diffOps
+    .changed(
+      currentKeys,
+      idealKeys,
+      (key: string) => {
+        const current = currentUQMap.get(key)!;
+        const ideal = idealUQMap.get(key)!;
+        return !R.equals(current.columns, ideal.columns);
+      },
+      (key: string) => {
+        const current = currentUQMap.get(key)!;
+        const ideal = idealUQMap.get(key)!;
+        return { current, ideal };
+      }
+    )
+    .forEach(({ current: currentConstraint, ideal: idealConstraint }) => {
+      // 削除してから再作成
+      operations.push(
+        ops.dropUniqueConstraint(
+          currentConstraint.table,
+          currentConstraint.name
+        )
+      );
+      operations.push(
+        ops.createUniqueConstraint(
+          idealConstraint.table,
+          idealConstraint.name,
+          idealConstraint.columns
+        )
+      );
+    });
+
+  return operations;
+}
+
 export function diffSchema(props: {
   current: SchemaSnapshot;
   ideal: SchemaSnapshot;
 }): SchemaDiff {
-  const tableOperations = diffTables(props);
-  const indexOperations = diffIndexes(props);
+  const tableOperations = diffTables({
+    current: props.current.tables,
+    ideal: props.ideal.tables,
+  });
+  const indexOperations = diffIndexes({
+    current: props.current.indexes,
+    ideal: props.ideal.indexes,
+  });
+  const primaryKeyOperations = diffPrimaryKeyConstraints({
+    current: props.current.primaryKeyConstraints,
+    ideal: props.ideal.primaryKeyConstraints,
+  });
+  const uniqueOperations = diffUniqueConstraints({
+    current: props.current.uniqueConstraints,
+    ideal: props.ideal.uniqueConstraints,
+  });
 
   return {
-    operations: [...tableOperations, ...indexOperations],
+    operations: [
+      ...tableOperations,
+      ...indexOperations,
+      ...primaryKeyOperations,
+      ...uniqueOperations,
+    ],
   };
 }

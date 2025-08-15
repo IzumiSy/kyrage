@@ -56,6 +56,32 @@ export const operationSchema = z.discriminatedUnion("type", [
     table: z.string(),
     name: z.string(),
   }),
+
+  // Primary key constraint operations
+  z.object({
+    type: z.literal("create_primary_key_constraint"),
+    table: z.string(),
+    name: z.string(),
+    columns: z.array(z.string()),
+  }),
+  z.object({
+    type: z.literal("drop_primary_key_constraint"),
+    table: z.string(),
+    name: z.string(),
+  }),
+
+  // Unique constraint operations
+  z.object({
+    type: z.literal("create_unique_constraint"),
+    table: z.string(),
+    name: z.string(),
+    columns: z.array(z.string()),
+  }),
+  z.object({
+    type: z.literal("drop_unique_constraint"),
+    table: z.string(),
+    name: z.string(),
+  }),
 ]);
 
 export type Operation = z.infer<typeof operationSchema>;
@@ -73,10 +99,23 @@ export const indexDefSchema = z.object({
   name: z.string(),
   columns: z.array(z.string()),
   unique: z.boolean(),
-  systemGenerated: z.boolean().default(false),
 });
 
 export type IndexDef = z.infer<typeof indexDefSchema>;
+
+// Primary key constraint definition type
+export type PrimaryKeyConstraint = {
+  table: string;
+  name: string;
+  columns: string[];
+};
+
+// Unique constraint definition type
+export type UniqueConstraint = {
+  table: string;
+  name: string;
+  columns: string[];
+};
 
 // Tables型定義
 export type Tables = Array<{
@@ -87,6 +126,8 @@ export type Tables = Array<{
 export type SchemaSnapshot = {
   tables: Tables;
   indexes: IndexDef[];
+  primaryKeyConstraints: PrimaryKeyConstraint[];
+  uniqueConstraints: UniqueConstraint[];
 };
 
 // Operation creation helpers namespace
@@ -155,6 +196,36 @@ export const ops = {
 
   dropIndex: (table: string, name: string) => ({
     type: "drop_index" as const,
+    table,
+    name,
+  }),
+
+  createPrimaryKeyConstraint: (
+    table: string,
+    name: string,
+    columns: string[]
+  ) => ({
+    type: "create_primary_key_constraint" as const,
+    table,
+    name,
+    columns,
+  }),
+
+  dropPrimaryKeyConstraint: (table: string, name: string) => ({
+    type: "drop_primary_key_constraint" as const,
+    table,
+    name,
+  }),
+
+  createUniqueConstraint: (table: string, name: string, columns: string[]) => ({
+    type: "create_unique_constraint" as const,
+    table,
+    name,
+    columns,
+  }),
+
+  dropUniqueConstraint: (table: string, name: string) => ({
+    type: "drop_unique_constraint" as const,
     table,
     name,
   }),

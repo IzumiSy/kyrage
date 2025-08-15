@@ -95,7 +95,7 @@ it("generate with planned apply", async () => {
     `alter table "members" drop constraint "members_name_unique"`,
     `alter table "members" add constraint "members_email_unique" unique ("email")`,
     `create unique index "idx_members_id_email" on "members" ("id", "email")`,
-    `drop index "idx_members_name_email" on "members"`,
+    `drop index "idx_members_name_email"`,
   ].forEach((expectedCall, index) => {
     expect(loggerStdout).toHaveBeenNthCalledWith(index + 1, expectedCall);
   });

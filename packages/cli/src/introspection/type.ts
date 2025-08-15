@@ -1,31 +1,42 @@
-export type ColumnExtraAttributes = Array<ColumnExtraAttribute>;
-type ColumnExtraAttribute = {
+type ColumnExtraAttributes = Array<{
   schema?: string;
   table: string;
   name: string;
   default: string | null;
   characterMaximumLength: number | null;
-  constraint: ColumnConstraint;
-};
+  constraint: ColumnConstraint | null;
+}>;
 
 export type ColumnConstraint = {
   name: string;
   type: string;
 };
 
-export type IndexAttributes = Array<IndexAttribute>;
-type IndexAttribute = {
+type IndexAttributes = Array<{
   schema?: string;
   table: string;
   name: string;
   columns: string[];
   unique: boolean;
-  systemGenerated: boolean;
+}>;
+
+type ConstraintAttributes = {
+  primaryKey: Array<ConstraintAttribute>;
+  unique: Array<ConstraintAttribute>;
+};
+
+type ConstraintAttribute = {
+  schema?: string;
+  table: string;
+  name: string;
+  type: "PRIMARY KEY" | "UNIQUE";
+  columns: string[];
 };
 
 export type ExtraIntrospector = {
   introspectTables: () => Promise<ColumnExtraAttributes>;
   introspectIndexes: () => Promise<IndexAttributes>;
+  introspectConstraints: () => Promise<ConstraintAttributes>;
   convertTypeName: (type: string) => string;
 };
 
