@@ -22,7 +22,10 @@ const config = defineConfigForTest({
         name: column("text", { unique: true, notNull: true }),
         email: column("text", { unique: true, notNull: true }),
       },
-      (t) => [t.index(["name", "email"], { unique: true })]
+      (t) => [
+        t.index(["name", "email"], { unique: true }),
+        t.unique(["email"], { name: "uq_members_email" }),
+      ]
     ),
     defineTable(
       "orders",
@@ -50,7 +53,8 @@ beforeAll(async () => {
     CREATE TABLE members (
       id UUID PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
-      email TEXT UNIQUE NOT NULL
+      email TEXT NOT NULL,
+      CONSTRAINT uq_members_email UNIQUE (email)
     );
     CREATE UNIQUE INDEX "idx_members_name_email" ON "members" ("name", "email");
 
