@@ -113,7 +113,7 @@ const generateMigrationFromIntrospection = async (props: {
     await extraIntrospector.introspectConstraints();
 
   const primaryKeyConstraints = constraintAttributes
-    .filter((c) => c.type === "PRIMARY KEY" && !c.systemGenerated)
+    .filter((c) => c.type === "PRIMARY KEY")
     .map((c) => ({
       table: c.table,
       name: c.name,
@@ -121,7 +121,7 @@ const generateMigrationFromIntrospection = async (props: {
     }));
 
   const uniqueConstraints = constraintAttributes
-    .filter((c) => c.type === "UNIQUE" && !c.systemGenerated)
+    .filter((c) => c.type === "UNIQUE")
     .map((c) => ({
       table: c.table,
       name: c.name,
@@ -141,7 +141,6 @@ const generateMigrationFromIntrospection = async (props: {
       name: i.name,
       columns: i.columns,
       unique: i.unique,
-      systemGenerated: false,
     })),
     primaryKeyConstraints: config.primaryKeyConstraints || [],
     uniqueConstraints: config.uniqueConstraints || [],

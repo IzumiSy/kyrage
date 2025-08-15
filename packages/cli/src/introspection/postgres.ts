@@ -61,12 +61,7 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
         t.relname AS table_name,
         i.relname AS index_name,
         pg_index.indisunique AS is_unique,
-        jsonb_agg(a.attname ORDER BY array_position(pg_index.indkey, a.attnum)) AS column_names,
-        (pg_index.indisprimary OR EXISTS (
-          SELECT 1 FROM pg_constraint con
-          WHERE con.conindid = i.oid
-          AND con.contype IN ('p', 'u')
-        )) AS is_system_generated
+        jsonb_agg(a.attname ORDER BY array_position(pg_index.indkey, a.attnum)) AS column_names
       FROM pg_class t
       JOIN pg_namespace n ON n.oid = t.relnamespace
       JOIN pg_index ON pg_index.indrelid = t.oid
@@ -74,6 +69,12 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY (pg_index.indkey)
       WHERE t.relkind = 'r'
         AND n.nspname = 'public'
+        AND NOT pg_index.indisprimary
+        AND NOT EXISTS (
+          SELECT 1 FROM pg_constraint con
+          WHERE con.conindid = i.oid
+          AND con.contype IN ('p', 'u')
+        )
       GROUP BY t.relname, i.relname, pg_index.indisunique, pg_index.indisprimary, i.oid;
     `
       .$castTo<PostgresIndexInfo>()
@@ -83,7 +84,6 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       name: r.index_name,
       columns: r.column_names,
       unique: r.is_unique,
-      systemGenerated: r.is_system_generated,
     }));
   };
 
@@ -99,20 +99,7 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
               WHEN 'p' THEN 'PRIMARY KEY'
               WHEN 'u' THEN 'UNIQUE'
           END AS constraint_type,
-          array_agg(a.attname ORDER BY array_position(c.conkey, a.attnum)) AS columns,
-                    -- Determine if constraint is system-generated (from column definitions)
-          -- Check if constraint has automatic dependency in pg_depend
-          CASE 
-              WHEN EXISTS (
-                  SELECT 1 FROM pg_depend d
-                  WHERE d.objid = c.oid 
-                  AND d.deptype = 'a'  -- automatic dependency
-                  AND d.classid = 'pg_constraint'::regclass
-                  AND d.refclassid = 'pg_class'::regclass
-                  AND d.refobjid = t.oid
-              ) THEN TRUE
-              ELSE FALSE
-          END AS is_system_generated
+          array_agg(a.attname ORDER BY array_position(c.conkey, a.attnum)) AS columns
       FROM pg_constraint c
       JOIN pg_class t ON c.conrelid = t.oid
       JOIN pg_namespace n ON t.relnamespace = n.oid
@@ -120,6 +107,14 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       WHERE c.contype IN ('p', 'u')  -- primary key and unique constraints
           AND n.nspname = 'public'
           AND NOT a.attisdropped
+          AND NOT EXISTS (
+              SELECT 1 FROM pg_depend d
+              WHERE d.objid = c.oid 
+              AND d.deptype = 'a'  -- automatic dependency
+              AND d.classid = 'pg_constraint'::regclass
+              AND d.refclassid = 'pg_class'::regclass
+              AND d.refobjid = t.oid
+          )
       GROUP BY n.nspname, t.relname, c.conname, c.contype, c.oid, c.conkey, t.oid
       ORDER BY t.relname, c.conname;
     `
@@ -129,7 +124,6 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
         constraint_name: string;
         constraint_type: "PRIMARY KEY" | "UNIQUE";
         columns: string[];
-        is_system_generated: boolean;
       }>()
       .execute(db);
 
@@ -139,7 +133,6 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       name: row.constraint_name,
       type: row.constraint_type,
       columns: row.columns,
-      systemGenerated: row.is_system_generated,
     }));
   };
 
@@ -166,5 +159,4 @@ type PostgresIndexInfo = {
   index_name: string;
   is_unique: boolean;
   column_names: string[];
-  is_system_generated: boolean;
 };

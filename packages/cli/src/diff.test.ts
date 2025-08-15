@@ -88,7 +88,6 @@ describe("diffIndexes", () => {
           name: "idx_old",
           columns: ["id"],
           unique: false,
-          systemGenerated: false,
         },
       ],
       primaryKeyConstraints: [],
@@ -102,7 +101,6 @@ describe("diffIndexes", () => {
           name: "idx_new",
           columns: ["email"],
           unique: false,
-          systemGenerated: false,
         },
       ],
       primaryKeyConstraints: [],
@@ -126,7 +124,6 @@ describe("diffIndexes", () => {
           name: "idx_test",
           columns: ["id"],
           unique: false,
-          systemGenerated: false,
         },
       ],
       primaryKeyConstraints: [],
@@ -140,7 +137,6 @@ describe("diffIndexes", () => {
           name: "idx_test",
           columns: ["id"],
           unique: true, // unique flag changed
-          systemGenerated: false,
         },
       ],
       primaryKeyConstraints: [],
@@ -164,7 +160,6 @@ describe("diffIndexes", () => {
           name: "idx_users_a_b",
           columns: ["a", "b"],
           unique: false,
-          systemGenerated: false,
         },
       ],
       primaryKeyConstraints: [],
@@ -178,7 +173,6 @@ describe("diffIndexes", () => {
           name: "idx_users_a_b",
           columns: ["b", "a"], // column order changed
           unique: false,
-          systemGenerated: false,
         },
       ],
       primaryKeyConstraints: [],
@@ -191,33 +185,5 @@ describe("diffIndexes", () => {
       ops.dropIndex("users", "idx_users_a_b"),
       ops.createIndex("users", "idx_users_a_b", ["b", "a"], false),
     ]);
-  });
-
-  it("should ignore system generated indexes", () => {
-    const current: SchemaSnapshot = {
-      tables: [],
-      indexes: [
-        {
-          table: "users",
-          name: "system_idx",
-          columns: ["id"],
-          unique: false,
-          systemGenerated: true,
-        },
-      ],
-      primaryKeyConstraints: [],
-      uniqueConstraints: [],
-    };
-    const ideal: SchemaSnapshot = {
-      tables: [],
-      indexes: [],
-      primaryKeyConstraints: [],
-      uniqueConstraints: [],
-    };
-
-    const operations = diffIndexes({ current, ideal });
-
-    // System generated indexes should be ignored
-    expect(operations).toHaveLength(0);
   });
 });

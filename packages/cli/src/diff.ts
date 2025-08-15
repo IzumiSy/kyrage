@@ -142,13 +142,12 @@ export function diffIndexes(props: {
   const diffOps = createDiffOperations<string>();
   const indexKey = (i: IndexDef) => `${i.table}:${i.name}`;
 
-  // システム生成でないインデックスのみを対象
-  const nonSystemGenerated = (i: IndexDef) => !i.systemGenerated;
+  // SQLレベルでシステム生成のインデックスは除外済みなので、すべてを対象とする
   const currentIndexMap = new Map(
-    current.indexes.filter(nonSystemGenerated).map((i) => [indexKey(i), i])
+    current.indexes.map((i) => [indexKey(i), i])
   );
   const idealIndexMap = new Map(
-    ideal.indexes.filter(nonSystemGenerated).map((i) => [indexKey(i), i])
+    ideal.indexes.map((i) => [indexKey(i), i])
   );
 
   const currentKeys = Array.from(currentIndexMap.keys());

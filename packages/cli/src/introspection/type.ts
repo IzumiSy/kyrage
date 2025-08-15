@@ -20,7 +20,6 @@ type IndexAttribute = {
   name: string;
   columns: string[];
   unique: boolean;
-  systemGenerated: boolean;
 };
 
 export type ConstraintAttributes = Array<ConstraintAttribute>;
@@ -30,7 +29,6 @@ type ConstraintAttribute = {
   name: string;
   type: "PRIMARY KEY" | "UNIQUE";
   columns: string[];
-  systemGenerated: boolean;
 };
 
 export type ExtraIntrospector = {

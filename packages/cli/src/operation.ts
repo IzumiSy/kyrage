@@ -99,7 +99,6 @@ export const indexDefSchema = z.object({
   name: z.string(),
   columns: z.array(z.string()),
   unique: z.boolean(),
-  systemGenerated: z.boolean().default(false),
 });
 
 export type IndexDef = z.infer<typeof indexDefSchema>;
