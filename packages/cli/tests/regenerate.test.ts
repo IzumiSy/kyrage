@@ -48,8 +48,10 @@ beforeAll(async () => {
     CREATE TABLE members (
       id UUID PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
-      email TEXT UNIQUE NOT NULL,
+      email TEXT UNIQUE NOT NULL
     );
+    CREATE UNIQUE INDEX "idx_members_name_email" ON "members" ("name", "email");
+
     CREATE TABLE orders (
       customer_id UUID NOT NULL,
       product_id UUID NOT NULL,
@@ -57,7 +59,6 @@ beforeAll(async () => {
       CONSTRAINT pk_orders_customer_id_product_id_order_date PRIMARY KEY (customer_id, product_id, order_date),
       CONSTRAINT uq_customer_product UNIQUE (customer_id, product_id)
     );
-    CREATE UNIQUE INDEX "idx_members_name_email" ON "members" ("name", "email");
   `.execute(db);
 });
 
