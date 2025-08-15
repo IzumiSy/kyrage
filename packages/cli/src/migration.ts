@@ -307,7 +307,7 @@ async function executeDropIndex(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "drop_index" }>
 ): Promise<void> {
-  await db.schema.dropIndex(operation.name).on(operation.table).execute();
+  await db.schema.dropIndex(operation.name).execute();
 }
 
 async function executeCreatePrimaryKeyConstraint(
