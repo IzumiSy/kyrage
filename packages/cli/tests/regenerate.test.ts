@@ -32,7 +32,9 @@ const config = defineConfigForTest({
         order_date: column("date", { notNull: true }),
       },
       (t) => [
-        t.primaryKey(["customer_id", "product_id", "order_date"]),
+        t.primaryKey(["customer_id", "product_id", "order_date"], {
+          name: "pk_orders_customer_id_product_id_order_date",
+        }),
         t.unique(["customer_id", "product_id"], {
           name: "uq_customer_product",
         }),
@@ -77,6 +79,6 @@ describe("generate", () => {
       },
     });
 
-    expect(beforeVol).toEqual(vol.toJSON());
+    expect(vol.toJSON()).toEqual(beforeVol);
   });
 });
