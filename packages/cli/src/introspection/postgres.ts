@@ -17,24 +17,38 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
     await using db = client.getDB();
     const { rows } = await sql`
       SELECT
-          c.table_schema,
-          c.table_name,
-          c.column_name,
-          c.column_default,
-          c.character_maximum_length,
-          tc.constraint_name,
-          tc.constraint_type
-      FROM information_schema.columns c
-      JOIN information_schema.key_column_usage kcu
-          ON c.table_name = kcu.table_name
-          AND c.column_name = kcu.column_name
-          AND c.table_schema = kcu.table_schema
-      JOIN information_schema.table_constraints tc
-          ON kcu.constraint_name = tc.constraint_name
-          AND kcu.table_schema = tc.table_schema
-          AND tc.constraint_type IN ('UNIQUE', 'PRIMARY KEY')
-      WHERE c.table_schema = 'public'
-      ORDER BY c.table_name, c.ordinal_position;
+        n.nspname AS table_schema,
+        c.relname AS table_name,
+        a.attname AS column_name,
+        pg_get_expr(d.adbin, d.adrelid) AS column_default,
+        CASE 
+          WHEN t.typname = 'varchar' OR t.typname = 'char' THEN a.atttypmod - 4
+          ELSE NULL 
+        END AS character_maximum_length,
+        -- 単一カラム制約のみを識別（composite制約は除外）
+        CASE 
+          WHEN con.contype = 'p' AND array_length(con.conkey, 1) = 1 THEN 'PRIMARY KEY'
+          WHEN con.contype = 'u' AND array_length(con.conkey, 1) = 1 THEN 'UNIQUE'
+          ELSE NULL
+        END AS constraint_type,
+        con.conname AS constraint_name
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_attribute a ON a.attrelid = c.oid
+      LEFT JOIN pg_attrdef d ON d.adrelid = c.oid AND d.adnum = a.attnum
+      JOIN pg_type t ON t.oid = a.atttypid
+      -- 単一カラム制約との LEFT JOIN
+      LEFT JOIN pg_constraint con ON (
+        con.conrelid = c.oid
+        AND con.contype IN ('p', 'u')
+        AND array_length(con.conkey, 1) = 1  -- 単一カラム制約のみ
+        AND con.conkey[1] = a.attnum
+      )
+      WHERE c.relkind = 'r'
+        AND n.nspname = 'public'
+        AND a.attnum > 0
+        AND NOT a.attisdropped
+      ORDER BY c.relname, a.attnum;
     `
       .$castTo<PostgresColumnConstraintInfo>()
       .execute(db);
@@ -45,10 +59,13 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       name: row.column_name,
       default: row.column_default,
       characterMaximumLength: row.character_maximum_length,
-      constraint: {
-        name: row.constraint_name,
-        type: row.constraint_type,
-      },
+      constraint:
+        row.constraint_type && row.constraint_name
+          ? {
+              name: row.constraint_name,
+              type: row.constraint_type,
+            }
+          : null,
     }));
   };
 
@@ -159,8 +176,8 @@ export type PostgresColumnConstraintInfo = {
   column_name: string;
   column_default: string | null;
   character_maximum_length: number | null;
-  constraint_name: string;
-  constraint_type: "UNIQUE" | "PRIMARY KEY";
+  constraint_name: string | null;
+  constraint_type: "UNIQUE" | "PRIMARY KEY" | null;
 };
 
 type PostgresIndexInfo = {

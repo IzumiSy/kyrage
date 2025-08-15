@@ -41,7 +41,9 @@ export const getIntrospector = (client: DBClient) => {
                 characterMaximumLength:
                   extraInfo.characterMaximumLength ?? null,
                 notNull: !column.isNullable,
-                constraints: ex.map((c) => c.constraint),
+                constraints: ex.flatMap((c) =>
+                  c.constraint ? [c.constraint] : []
+                ),
               },
             ];
           })

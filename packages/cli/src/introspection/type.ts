@@ -5,7 +5,7 @@ type ColumnExtraAttribute = {
   name: string;
   default: string | null;
   characterMaximumLength: number | null;
-  constraint: ColumnConstraint;
+  constraint: ColumnConstraint | null;
 };
 
 export type ColumnConstraint = {
