@@ -1,28 +1,26 @@
-export type ColumnExtraAttributes = Array<ColumnExtraAttribute>;
-type ColumnExtraAttribute = {
+type ColumnExtraAttributes = Array<{
   schema?: string;
   table: string;
   name: string;
   default: string | null;
   characterMaximumLength: number | null;
   constraint: ColumnConstraint | null;
-};
+}>;
 
 export type ColumnConstraint = {
   name: string;
   type: string;
 };
 
-export type IndexAttributes = Array<IndexAttribute>;
-type IndexAttribute = {
+type IndexAttributes = Array<{
   schema?: string;
   table: string;
   name: string;
   columns: string[];
   unique: boolean;
-};
+}>;
 
-export type ConstraintAttributes = {
+type ConstraintAttributes = {
   primaryKey: Array<ConstraintAttribute>;
   unique: Array<ConstraintAttribute>;
 };
