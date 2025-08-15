@@ -21,9 +21,22 @@ const config = defineConfigForTest({
         id: column("uuid", { primaryKey: true }),
         name: column("text", { unique: true, notNull: true }),
         email: column("text", { unique: true, notNull: true }),
-        age: column("integer"),
       },
       (t) => [t.index(["name", "email"], { unique: true })]
+    ),
+    defineTable(
+      "orders",
+      {
+        customer_id: column("uuid", { notNull: true }),
+        product_id: column("uuid", { notNull: true }),
+        order_date: column("date", { notNull: true }),
+      },
+      (t) => [
+        t.primaryKey(["customer_id", "product_id", "order_date"]),
+        t.unique(["customer_id", "product_id"], {
+          name: "uq_customer_product",
+        }),
+      ]
     ),
   ],
 });
@@ -36,7 +49,13 @@ beforeAll(async () => {
       id UUID PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
       email TEXT UNIQUE NOT NULL,
-      age INT4
+    );
+    CREATE TABLE orders (
+      customer_id UUID NOT NULL,
+      product_id UUID NOT NULL,
+      order_date DATE NOT NULL,
+      CONSTRAINT pk_orders_customer_id_product_id_order_date PRIMARY KEY (customer_id, product_id, order_date),
+      CONSTRAINT uq_customer_product UNIQUE (customer_id, product_id)
     );
     CREATE UNIQUE INDEX "idx_members_name_email" ON "members" ("name", "email");
   `.execute(db);
