@@ -4,7 +4,7 @@ import { migrationDirName, getPendingMigrations } from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
 import { diffSchema } from "../diff";
-import { SchemaDiff, SchemaSnapshot, Tables, Operation } from "../operation";
+import { SchemaDiff, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
 import { postgresExtraIntrospector } from "../introspection/postgres";
