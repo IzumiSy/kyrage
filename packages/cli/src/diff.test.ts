@@ -10,6 +10,8 @@ describe("diffTables", () => {
         { name: "old_table", columns: { id: { type: "integer" } } },
       ],
       indexes: [],
+      primaryKeyConstraints: [],
+      uniqueConstraints: [],
     };
     const ideal: SchemaSnapshot = {
       tables: [
@@ -17,6 +19,8 @@ describe("diffTables", () => {
         { name: "new_table", columns: { id: { type: "integer" } } },
       ],
       indexes: [],
+      primaryKeyConstraints: [],
+      uniqueConstraints: [],
     };
 
     const operations = diffTables({ current, ideal });
@@ -40,6 +44,10 @@ describe("diffTables", () => {
         },
       ],
       indexes: [],
+
+      primaryKeyConstraints: [],
+
+      uniqueConstraints: [],
     };
     const ideal: SchemaSnapshot = {
       tables: [
@@ -54,6 +62,10 @@ describe("diffTables", () => {
         },
       ],
       indexes: [],
+
+      primaryKeyConstraints: [],
+
+      uniqueConstraints: [],
     };
 
     const operations = diffTables({ current, ideal });
@@ -79,6 +91,8 @@ describe("diffIndexes", () => {
           systemGenerated: false,
         },
       ],
+      primaryKeyConstraints: [],
+      uniqueConstraints: [],
     };
     const ideal: SchemaSnapshot = {
       tables: [],
@@ -91,6 +105,8 @@ describe("diffIndexes", () => {
           systemGenerated: false,
         },
       ],
+      primaryKeyConstraints: [],
+      uniqueConstraints: [],
     };
 
     const operations = diffIndexes({ current, ideal });
@@ -113,6 +129,8 @@ describe("diffIndexes", () => {
           systemGenerated: false,
         },
       ],
+      primaryKeyConstraints: [],
+      uniqueConstraints: [],
     };
     const ideal: SchemaSnapshot = {
       tables: [],
@@ -125,6 +143,8 @@ describe("diffIndexes", () => {
           systemGenerated: false,
         },
       ],
+      primaryKeyConstraints: [],
+      uniqueConstraints: [],
     };
 
     const operations = diffIndexes({ current, ideal });
@@ -147,6 +167,8 @@ describe("diffIndexes", () => {
           systemGenerated: false,
         },
       ],
+      primaryKeyConstraints: [],
+      uniqueConstraints: [],
     };
     const ideal: SchemaSnapshot = {
       tables: [],
@@ -159,6 +181,8 @@ describe("diffIndexes", () => {
           systemGenerated: false,
         },
       ],
+      primaryKeyConstraints: [],
+      uniqueConstraints: [],
     };
 
     const operations = diffIndexes({ current, ideal });
@@ -181,10 +205,14 @@ describe("diffIndexes", () => {
           systemGenerated: true,
         },
       ],
+      primaryKeyConstraints: [],
+      uniqueConstraints: [],
     };
     const ideal: SchemaSnapshot = {
       tables: [],
       indexes: [],
+      primaryKeyConstraints: [],
+      uniqueConstraints: [],
     };
 
     const operations = diffIndexes({ current, ideal });

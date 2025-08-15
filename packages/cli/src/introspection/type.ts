@@ -23,9 +23,20 @@ type IndexAttribute = {
   systemGenerated: boolean;
 };
 
+export type ConstraintAttributes = Array<ConstraintAttribute>;
+type ConstraintAttribute = {
+  schema?: string;
+  table: string;
+  name: string;
+  type: "PRIMARY KEY" | "UNIQUE";
+  columns: string[];
+  systemGenerated: boolean;
+};
+
 export type ExtraIntrospector = {
   introspectTables: () => Promise<ColumnExtraAttributes>;
   introspectIndexes: () => Promise<IndexAttributes>;
+  introspectConstraints: () => Promise<ConstraintAttributes>;
   convertTypeName: (type: string) => string;
 };
 

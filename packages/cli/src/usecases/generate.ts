@@ -7,6 +7,8 @@ import { diffSchema } from "../diff";
 import { SchemaDiff, SchemaSnapshot, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
+import { postgresExtraIntrospector } from "../introspection/postgres";
+import { ConstraintAttributes } from "../introspection/type";
 
 export const runGenerate = async (props: {
   client: DBClient;
@@ -70,6 +72,7 @@ const generateMigrationFromIntrospection = async (props: {
 }) => {
   const { client, config } = props;
   const introspector = getIntrospector(client);
+  const extraIntrospector = postgresExtraIntrospector({ client });
   const tables = await introspector.getTables();
   const indexes = await introspector.getIndexes();
 
@@ -106,9 +109,30 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
+  const constraintAttributes: ConstraintAttributes =
+    await extraIntrospector.introspectConstraints();
+
+  const primaryKeyConstraints = constraintAttributes
+    .filter((c) => c.type === "PRIMARY KEY" && !c.systemGenerated)
+    .map((c) => ({
+      table: c.table,
+      name: c.name,
+      columns: c.columns,
+    }));
+
+  const uniqueConstraints = constraintAttributes
+    .filter((c) => c.type === "UNIQUE" && !c.systemGenerated)
+    .map((c) => ({
+      table: c.table,
+      name: c.name,
+      columns: c.columns,
+    }));
+
   const currentSnapshot: SchemaSnapshot = {
     tables: dbTables,
     indexes,
+    primaryKeyConstraints,
+    uniqueConstraints,
   };
   const idealSnapshot: SchemaSnapshot = {
     tables: configTables,
@@ -119,6 +143,8 @@ const generateMigrationFromIntrospection = async (props: {
       unique: i.unique,
       systemGenerated: false,
     })),
+    primaryKeyConstraints: config.primaryKeyConstraints || [],
+    uniqueConstraints: config.uniqueConstraints || [],
   };
   const diff = diffSchema({
     current: currentSnapshot,

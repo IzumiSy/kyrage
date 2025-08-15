@@ -87,9 +87,66 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
     }));
   };
 
+  const introspectConstraints = async () => {
+    const client = props.client;
+    await using db = client.getDB();
+    const { rows } = await sql`
+      SELECT
+          n.nspname AS schema_name,
+          t.relname AS table_name,
+          c.conname AS constraint_name,
+          CASE c.contype
+              WHEN 'p' THEN 'PRIMARY KEY'
+              WHEN 'u' THEN 'UNIQUE'
+          END AS constraint_type,
+          array_agg(a.attname ORDER BY array_position(c.conkey, a.attnum)) AS columns,
+                    -- Determine if constraint is system-generated (from column definitions)
+          -- Check if constraint has automatic dependency in pg_depend
+          CASE 
+              WHEN EXISTS (
+                  SELECT 1 FROM pg_depend d
+                  WHERE d.objid = c.oid 
+                  AND d.deptype = 'a'  -- automatic dependency
+                  AND d.classid = 'pg_constraint'::regclass
+                  AND d.refclassid = 'pg_class'::regclass
+                  AND d.refobjid = t.oid
+              ) THEN TRUE
+              ELSE FALSE
+          END AS is_system_generated
+      FROM pg_constraint c
+      JOIN pg_class t ON c.conrelid = t.oid
+      JOIN pg_namespace n ON t.relnamespace = n.oid
+      JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
+      WHERE c.contype IN ('p', 'u')  -- primary key and unique constraints
+          AND n.nspname = 'public'
+          AND NOT a.attisdropped
+      GROUP BY n.nspname, t.relname, c.conname, c.contype, c.oid, c.conkey, t.oid
+      ORDER BY t.relname, c.conname;
+    `
+      .$castTo<{
+        schema_name: string;
+        table_name: string;
+        constraint_name: string;
+        constraint_type: "PRIMARY KEY" | "UNIQUE";
+        columns: string[];
+        is_system_generated: boolean;
+      }>()
+      .execute(db);
+
+    return rows.map((row) => ({
+      schema: row.schema_name,
+      table: row.table_name,
+      name: row.constraint_name,
+      type: row.constraint_type,
+      columns: row.columns,
+      systemGenerated: row.is_system_generated,
+    }));
+  };
+
   return {
     introspectTables,
     introspectIndexes,
+    introspectConstraints,
     convertTypeName,
   };
 };

@@ -117,6 +117,14 @@ async function executeOperation(
       return executeCreateIndex(db, operation);
     case "drop_index":
       return executeDropIndex(db, operation);
+    case "create_primary_key_constraint":
+      return executeCreatePrimaryKeyConstraint(db, operation);
+    case "drop_primary_key_constraint":
+      return executeDropPrimaryKeyConstraint(db, operation);
+    case "create_unique_constraint":
+      return executeCreateUniqueConstraint(db, operation);
+    case "drop_unique_constraint":
+      return executeDropUniqueConstraint(db, operation);
     default:
       throw new Error(`Unknown operation type: ${(operation as any).type}`);
   }
@@ -300,6 +308,46 @@ async function executeDropIndex(
   operation: Extract<Operation, { type: "drop_index" }>
 ): Promise<void> {
   await db.schema.dropIndex(operation.name).on(operation.table).execute();
+}
+
+async function executeCreatePrimaryKeyConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "create_primary_key_constraint" }>
+): Promise<void> {
+  await db.schema
+    .alterTable(operation.table)
+    .addPrimaryKeyConstraint(operation.name, operation.columns)
+    .execute();
+}
+
+async function executeDropPrimaryKeyConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "drop_primary_key_constraint" }>
+): Promise<void> {
+  await db.schema
+    .alterTable(operation.table)
+    .dropConstraint(operation.name)
+    .execute();
+}
+
+async function executeCreateUniqueConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "create_unique_constraint" }>
+): Promise<void> {
+  await db.schema
+    .alterTable(operation.table)
+    .addUniqueConstraint(operation.name, operation.columns)
+    .execute();
+}
+
+async function executeDropUniqueConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "drop_unique_constraint" }>
+): Promise<void> {
+  await db.schema
+    .alterTable(operation.table)
+    .dropConstraint(operation.name)
+    .execute();
 }
 
 const assertDataType: (
