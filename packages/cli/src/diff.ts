@@ -98,19 +98,19 @@ function computeTableColumnOperations(
 }
 
 export function diffTables(props: {
-  current: SchemaSnapshot;
-  ideal: SchemaSnapshot;
+  current: Tables;
+  ideal: Tables;
 }): Operation[] {
   const { current, ideal } = props;
   const operations: Operation[] = [];
   const diffOps = createDiffOperations<string>();
-  const currentNames = R.map(getName, current.tables);
-  const idealNames = R.map(getName, ideal.tables);
+  const currentNames = R.map(getName, current);
+  const idealNames = R.map(getName, ideal);
 
   // 追加テーブル
   diffOps
     .added(currentNames, idealNames, (name: string) => {
-      const table = ideal.tables.find((t) => t.name === name)!;
+      const table = ideal.find((t) => t.name === name)!;
       return table;
     })
     .forEach((table) => {
@@ -124,9 +124,9 @@ export function diffTables(props: {
 
   // 変更テーブル（カラム操作）
   R.filter((currentTable: Tables[0]) =>
-    ideal.tables.some((t) => t.name === currentTable.name)
-  )(current.tables).forEach((currentTable: Tables[0]) => {
-    const idealTable = ideal.tables.find((t) => t.name === currentTable.name)!;
+    ideal.some((t) => t.name === currentTable.name)
+  )(current).forEach((currentTable: Tables[0]) => {
+    const idealTable = ideal.find((t) => t.name === currentTable.name)!;
     operations.push(...computeTableColumnOperations(currentTable, idealTable));
   });
 
@@ -134,8 +134,8 @@ export function diffTables(props: {
 }
 
 export function diffIndexes(props: {
-  current: SchemaSnapshot;
-  ideal: SchemaSnapshot;
+  current: IndexDef[];
+  ideal: IndexDef[];
 }): Operation[] {
   const { current, ideal } = props;
   const operations: Operation[] = [];
@@ -143,12 +143,8 @@ export function diffIndexes(props: {
   const indexKey = (i: IndexDef) => `${i.table}:${i.name}`;
 
   // SQLレベルでシステム生成のインデックスは除外済みなので、すべてを対象とする
-  const currentIndexMap = new Map(
-    current.indexes.map((i) => [indexKey(i), i])
-  );
-  const idealIndexMap = new Map(
-    ideal.indexes.map((i) => [indexKey(i), i])
-  );
+  const currentIndexMap = new Map(current.map((i) => [indexKey(i), i]));
+  const idealIndexMap = new Map(ideal.map((i) => [indexKey(i), i]));
 
   const currentKeys = Array.from(currentIndexMap.keys());
   const idealKeys = Array.from(idealIndexMap.keys());
@@ -206,20 +202,16 @@ export function diffIndexes(props: {
 }
 
 export function diffPrimaryKeyConstraints(props: {
-  current: SchemaSnapshot;
-  ideal: SchemaSnapshot;
+  current: PrimaryKeyConstraint[];
+  ideal: PrimaryKeyConstraint[];
 }): Operation[] {
   const { current, ideal } = props;
   const operations: Operation[] = [];
   const diffOps = createDiffOperations<string>();
   const constraintKey = (pk: PrimaryKeyConstraint) => `${pk.table}:${pk.name}`;
 
-  const currentPKMap = new Map(
-    current.primaryKeyConstraints.map((pk) => [constraintKey(pk), pk])
-  );
-  const idealPKMap = new Map(
-    ideal.primaryKeyConstraints.map((pk) => [constraintKey(pk), pk])
-  );
+  const currentPKMap = new Map(current.map((pk) => [constraintKey(pk), pk]));
+  const idealPKMap = new Map(ideal.map((pk) => [constraintKey(pk), pk]));
 
   const currentKeys = Array.from(currentPKMap.keys());
   const idealKeys = Array.from(idealPKMap.keys());
@@ -286,20 +278,16 @@ export function diffPrimaryKeyConstraints(props: {
 }
 
 export function diffUniqueConstraints(props: {
-  current: SchemaSnapshot;
-  ideal: SchemaSnapshot;
+  current: UniqueConstraint[];
+  ideal: UniqueConstraint[];
 }): Operation[] {
   const { current, ideal } = props;
   const operations: Operation[] = [];
   const diffOps = createDiffOperations<string>();
   const constraintKey = (uq: UniqueConstraint) => `${uq.table}:${uq.name}`;
 
-  const currentUQMap = new Map(
-    current.uniqueConstraints.map((uq) => [constraintKey(uq), uq])
-  );
-  const idealUQMap = new Map(
-    ideal.uniqueConstraints.map((uq) => [constraintKey(uq), uq])
-  );
+  const currentUQMap = new Map(current.map((uq) => [constraintKey(uq), uq]));
+  const idealUQMap = new Map(ideal.map((uq) => [constraintKey(uq), uq]));
 
   const currentKeys = Array.from(currentUQMap.keys());
   const idealKeys = Array.from(idealUQMap.keys());
@@ -369,10 +357,22 @@ export function diffSchema(props: {
   current: SchemaSnapshot;
   ideal: SchemaSnapshot;
 }): SchemaDiff {
-  const tableOperations = diffTables(props);
-  const indexOperations = diffIndexes(props);
-  const primaryKeyOperations = diffPrimaryKeyConstraints(props);
-  const uniqueOperations = diffUniqueConstraints(props);
+  const tableOperations = diffTables({
+    current: props.current.tables,
+    ideal: props.ideal.tables,
+  });
+  const indexOperations = diffIndexes({
+    current: props.current.indexes,
+    ideal: props.ideal.indexes,
+  });
+  const primaryKeyOperations = diffPrimaryKeyConstraints({
+    current: props.current.primaryKeyConstraints,
+    ideal: props.ideal.primaryKeyConstraints,
+  });
+  const uniqueOperations = diffUniqueConstraints({
+    current: props.current.uniqueConstraints,
+    ideal: props.ideal.uniqueConstraints,
+  });
 
   return {
     operations: [
