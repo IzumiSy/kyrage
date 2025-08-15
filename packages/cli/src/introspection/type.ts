@@ -22,7 +22,11 @@ type IndexAttribute = {
   unique: boolean;
 };
 
-export type ConstraintAttributes = Array<ConstraintAttribute>;
+export type ConstraintAttributes = {
+  primaryKey: Array<ConstraintAttribute>;
+  unique: Array<ConstraintAttribute>;
+};
+
 type ConstraintAttribute = {
   schema?: string;
   table: string;

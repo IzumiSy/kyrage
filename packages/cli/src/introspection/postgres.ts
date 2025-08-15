@@ -127,13 +127,22 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       }>()
       .execute(db);
 
-    return rows.map((row) => ({
+    const constraints = rows.map((row) => ({
       schema: row.schema_name,
       table: row.table_name,
       name: row.constraint_name,
       type: row.constraint_type,
       columns: row.columns,
     }));
+
+    // Group constraints by type
+    const primaryKey = constraints.filter((c) => c.type === "PRIMARY KEY");
+    const unique = constraints.filter((c) => c.type === "UNIQUE");
+
+    return {
+      primaryKey,
+      unique,
+    };
   };
 
   return {
@@ -159,4 +168,17 @@ type PostgresIndexInfo = {
   index_name: string;
   is_unique: boolean;
   column_names: string[];
+};
+
+export type PostgresConstraint = {
+  schema: string;
+  table: string;
+  name: string;
+  type: "PRIMARY KEY" | "UNIQUE";
+  columns: string[];
+};
+
+export type PostgresConstraints = {
+  primaryKey: PostgresConstraint[];
+  unique: PostgresConstraint[];
 };

@@ -74,7 +74,6 @@ const generateMigrationFromIntrospection = async (props: {
   const introspector = getIntrospector(client);
   const extraIntrospector = postgresExtraIntrospector({ client });
   const tables = await introspector.getTables();
-  const indexes = await introspector.getIndexes();
 
   const dbTables: Tables = tables.map((table) => ({
     name: table.name,
@@ -111,43 +110,26 @@ const generateMigrationFromIntrospection = async (props: {
 
   const constraintAttributes: ConstraintAttributes =
     await extraIntrospector.introspectConstraints();
+  const indexes = await introspector.getIndexes();
 
-  const primaryKeyConstraints = constraintAttributes
-    .filter((c) => c.type === "PRIMARY KEY")
-    .map((c) => ({
-      table: c.table,
-      name: c.name,
-      columns: c.columns,
-    }));
-
-  const uniqueConstraints = constraintAttributes
-    .filter((c) => c.type === "UNIQUE")
-    .map((c) => ({
-      table: c.table,
-      name: c.name,
-      columns: c.columns,
-    }));
-
-  const currentSnapshot: SchemaSnapshot = {
-    tables: dbTables,
-    indexes,
-    primaryKeyConstraints,
-    uniqueConstraints,
-  };
-  const idealSnapshot: SchemaSnapshot = {
-    tables: configTables,
-    indexes: config.indexes.map((i) => ({
-      table: i.table,
-      name: i.name,
-      columns: i.columns,
-      unique: i.unique,
-    })),
-    primaryKeyConstraints: config.primaryKeyConstraints || [],
-    uniqueConstraints: config.uniqueConstraints || [],
-  };
   const diff = diffSchema({
-    current: currentSnapshot,
-    ideal: idealSnapshot,
+    current: {
+      tables: dbTables,
+      indexes,
+      primaryKeyConstraints: constraintAttributes.primaryKey,
+      uniqueConstraints: constraintAttributes.unique,
+    },
+    ideal: {
+      tables: configTables,
+      indexes: config.indexes.map((i) => ({
+        table: i.table,
+        name: i.name,
+        columns: i.columns,
+        unique: i.unique,
+      })),
+      primaryKeyConstraints: config.primaryKeyConstraints || [],
+      uniqueConstraints: config.uniqueConstraints || [],
+    },
   });
 
   if (diff.operations.length === 0) {
