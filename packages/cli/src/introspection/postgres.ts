@@ -116,7 +116,7 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
               WHEN 'p' THEN 'PRIMARY KEY'
               WHEN 'u' THEN 'UNIQUE'
           END AS constraint_type,
-          array_agg(a.attname ORDER BY array_position(c.conkey, a.attnum)) AS columns
+          jsonb_agg(a.attname ORDER BY array_position(c.conkey, a.attnum)) AS columns
       FROM pg_constraint c
       JOIN pg_class t ON c.conrelid = t.oid
       JOIN pg_namespace n ON t.relnamespace = n.oid
@@ -124,14 +124,6 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       WHERE c.contype IN ('p', 'u')  -- primary key and unique constraints
           AND n.nspname = 'public'
           AND NOT a.attisdropped
-          AND NOT EXISTS (
-              SELECT 1 FROM pg_depend d
-              WHERE d.objid = c.oid 
-              AND d.deptype = 'a'  -- automatic dependency
-              AND d.classid = 'pg_constraint'::regclass
-              AND d.refclassid = 'pg_class'::regclass
-              AND d.refobjid = t.oid
-          )
       GROUP BY n.nspname, t.relname, c.conname, c.contype, c.oid, c.conkey, t.oid
       ORDER BY t.relname, c.conname;
     `
