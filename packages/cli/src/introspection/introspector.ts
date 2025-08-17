@@ -57,6 +57,7 @@ export const getIntrospector = (client: DBClient) => {
       });
     },
     getIndexes: async () => await extraIntrospector.introspectIndexes(),
+    getConstraints: async () => await extraIntrospector.introspectConstraints(),
   };
 };
 

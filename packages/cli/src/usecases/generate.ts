@@ -7,7 +7,6 @@ import { diffSchema } from "../diff";
 import { SchemaDiff, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
-import { postgresExtraIntrospector } from "../introspection/postgres";
 
 export const runGenerate = async (props: {
   client: DBClient;
@@ -71,7 +70,6 @@ const generateMigrationFromIntrospection = async (props: {
 }) => {
   const { client, config } = props;
   const introspector = getIntrospector(client);
-  const extraIntrospector = postgresExtraIntrospector({ client });
   const tables = await introspector.getTables();
 
   const dbTables: Tables = tables.map((table) => ({
@@ -107,7 +105,7 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const constraintAttributes = await extraIntrospector.introspectConstraints();
+  const constraintAttributes = await introspector.getConstraints();
   const indexes = await introspector.getIndexes();
 
   const diff = diffSchema({
