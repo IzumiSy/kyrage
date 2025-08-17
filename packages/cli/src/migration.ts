@@ -8,6 +8,7 @@ import {
   sql,
 } from "kysely";
 import { SchemaDiff, Operation } from "./operation";
+import { constraintNaming } from "./naming";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 import { migrationSchema, MigrationValue } from "./schema";
@@ -152,14 +153,14 @@ async function executeCreateTable(
 
     if (colDef.primaryKey) {
       builder = builder.addPrimaryKeyConstraint(
-        `${operation.table}_${colName}_primary_key`,
+        constraintNaming.primaryKey(operation.table, [colName]),
         [colName]
       );
     }
 
     if (colDef.unique) {
       builder = builder.addUniqueConstraint(
-        `${operation.table}_${colName}_unique`,
+        constraintNaming.unique(operation.table, [colName]),
         [colName]
       );
     }
@@ -198,7 +199,7 @@ async function executeAddColumn(
     await db.schema
       .alterTable(operation.table)
       .addPrimaryKeyConstraint(
-        `${operation.table}_${operation.column}_primary_key`,
+        constraintNaming.primaryKey(operation.table, [operation.column]),
         [operation.column]
       )
       .execute();
@@ -207,9 +208,10 @@ async function executeAddColumn(
   if (operation.attributes.unique) {
     await db.schema
       .alterTable(operation.table)
-      .addUniqueConstraint(`${operation.table}_${operation.column}_unique`, [
-        operation.column,
-      ])
+      .addUniqueConstraint(
+        constraintNaming.unique(operation.table, [operation.column]),
+        [operation.column]
+      )
       .execute();
   }
 }
@@ -260,12 +262,14 @@ async function executeAlterColumn(
     if (after.primaryKey) {
       await db.schema
         .alterTable(table)
-        .addPrimaryKeyConstraint(`${table}_${column}_primary_key`, [column])
+        .addPrimaryKeyConstraint(constraintNaming.primaryKey(table, [column]), [
+          column,
+        ])
         .execute();
     } else {
       await db.schema
         .alterTable(table)
-        .dropConstraint(`${table}_${column}_primary_key`)
+        .dropConstraint(constraintNaming.primaryKey(table, [column]))
         .execute();
     }
   }
@@ -275,12 +279,12 @@ async function executeAlterColumn(
     if (after.unique) {
       await db.schema
         .alterTable(table)
-        .addUniqueConstraint(`${table}_${column}_unique`, [column])
+        .addUniqueConstraint(constraintNaming.unique(table, [column]), [column])
         .execute();
     } else {
       await db.schema
         .alterTable(table)
-        .dropConstraint(`${table}_${column}_unique`)
+        .dropConstraint(constraintNaming.unique(table, [column]))
         .execute();
     }
   }
