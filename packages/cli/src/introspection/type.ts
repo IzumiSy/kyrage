@@ -1,15 +1,11 @@
-type ColumnExtraAttributes = Array<{
+export type ColumnExtraAttribute = {
   schema?: string;
   table: string;
   name: string;
   default: string | null;
   characterMaximumLength: number | null;
-}>;
-
-export type ColumnConstraint = {
-  name: string;
-  type: string;
 };
+type ColumnExtraAttributes = Array<ColumnExtraAttribute>;
 
 type IndexAttributes = Array<{
   schema?: string;

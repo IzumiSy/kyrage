@@ -1,6 +1,6 @@
 import { DBClient } from "../client";
 import { postgresExtraIntrospector } from "./postgres";
-import { ExtraIntrospector } from "./type";
+import { ColumnExtraAttribute, ExtraIntrospector } from "./type";
 
 const getExtraIntrospector = (client: DBClient): ExtraIntrospector => {
   const dialect = client.getDialect();
@@ -58,12 +58,9 @@ export const getIntrospector = (client: DBClient) => {
   };
 };
 
-type Column = {
-  schema?: string;
-  table: string;
-  name: string;
+// A data structure enriched with the data from kysely introspector
+type Column = ColumnExtraAttribute & {
   dataType: string;
-  default: string | null;
   characterMaximumLength: number | null;
   notNull: boolean;
 };
