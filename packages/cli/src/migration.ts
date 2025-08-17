@@ -150,20 +150,6 @@ async function executeCreateTable(
       }
       return c;
     });
-
-    if (colDef.primaryKey) {
-      builder = builder.addPrimaryKeyConstraint(
-        constraintNaming.primaryKey(operation.table, [colName]),
-        [colName]
-      );
-    }
-
-    if (colDef.unique) {
-      builder = builder.addUniqueConstraint(
-        constraintNaming.unique(operation.table, [colName]),
-        [colName]
-      );
-    }
   }
 
   await builder.execute();
@@ -194,26 +180,6 @@ async function executeAddColumn(
       return c;
     })
     .execute();
-
-  if (operation.attributes.primaryKey) {
-    await db.schema
-      .alterTable(operation.table)
-      .addPrimaryKeyConstraint(
-        constraintNaming.primaryKey(operation.table, [operation.column]),
-        [operation.column]
-      )
-      .execute();
-  }
-
-  if (operation.attributes.unique) {
-    await db.schema
-      .alterTable(operation.table)
-      .addUniqueConstraint(
-        constraintNaming.unique(operation.table, [operation.column]),
-        [operation.column]
-      )
-      .execute();
-  }
 }
 
 async function executeDropColumn(
@@ -253,38 +219,6 @@ async function executeAlterColumn(
       await db.schema
         .alterTable(table)
         .alterColumn(column, (col) => col.dropNotNull())
-        .execute();
-    }
-  }
-
-  // primaryKey
-  if (after.primaryKey !== before.primaryKey) {
-    if (after.primaryKey) {
-      await db.schema
-        .alterTable(table)
-        .addPrimaryKeyConstraint(constraintNaming.primaryKey(table, [column]), [
-          column,
-        ])
-        .execute();
-    } else {
-      await db.schema
-        .alterTable(table)
-        .dropConstraint(constraintNaming.primaryKey(table, [column]))
-        .execute();
-    }
-  }
-
-  // unique
-  if (after.unique !== before.unique) {
-    if (after.unique) {
-      await db.schema
-        .alterTable(table)
-        .addUniqueConstraint(constraintNaming.unique(table, [column]), [column])
-        .execute();
-    } else {
-      await db.schema
-        .alterTable(table)
-        .dropConstraint(constraintNaming.unique(table, [column]))
         .execute();
     }
   }
