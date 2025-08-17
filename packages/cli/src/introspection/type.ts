@@ -15,20 +15,16 @@ type IndexAttributes = Array<{
   unique: boolean;
 }>;
 
-type ConstraintAttributes = {
-  primaryKey: Array<ConstraintAttribute>;
-  unique: Array<ConstraintAttribute>;
-};
-
-export type ConstraintAttribute = {
+type ConstraintAttribute = {
   schema?: string;
   table: string;
   name: string;
   type: "PRIMARY KEY" | "UNIQUE";
   columns: string[];
 };
+export type ConstraintAttributes = Array<ConstraintAttribute>;
 
-export type ExtraIntrospector = {
+export type ExtraIntrospectorDriver = {
   introspectTables: () => Promise<ColumnExtraAttributes>;
   introspectIndexes: () => Promise<IndexAttributes>;
   introspectConstraints: () => Promise<ConstraintAttributes>;

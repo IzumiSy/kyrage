@@ -7,8 +7,7 @@ import { diffSchema } from "../diff";
 import { SchemaDiff, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
-import { ConstraintAttribute } from "../introspection/type";
-import is from "zod/v4/locales/is.js";
+import { ConstraintAttributes } from "../introspection/type";
 
 export const runGenerate = async (props: {
   client: DBClient;
@@ -78,7 +77,7 @@ const generateMigrationFromIntrospection = async (props: {
   // カラム制約の判定
   const columnConstraintPredicate =
     (tableName: string, colName: string) =>
-    (constraints: ReadonlyArray<ConstraintAttribute>) =>
+    (constraints: ConstraintAttributes) =>
       constraints.some(
         (constraint) =>
           constraint.table === tableName &&

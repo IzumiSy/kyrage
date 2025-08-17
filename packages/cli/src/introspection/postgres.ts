@@ -11,7 +11,9 @@ const nameDict = {
 const convertTypeName = (typeName: string) =>
   nameDict[typeName as keyof typeof nameDict] ?? typeName;
 
-export const postgresExtraIntrospector = (props: { client: DBClient }) => {
+export const postgresExtraIntrospectorDriver = (props: {
+  client: DBClient;
+}) => {
   const introspectTables = async () => {
     const client = props.client;
     await using db = client.getDB();
@@ -115,22 +117,13 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       }>()
       .execute(db);
 
-    const constraints = rows.map((row) => ({
+    return rows.map((row) => ({
       schema: row.schema_name,
       table: row.table_name,
       name: row.constraint_name,
       type: row.constraint_type,
       columns: row.columns,
     }));
-
-    // Group constraints by type
-    const primaryKey = constraints.filter((c) => c.type === "PRIMARY KEY");
-    const unique = constraints.filter((c) => c.type === "UNIQUE");
-
-    return {
-      primaryKey,
-      unique,
-    };
   };
 
   return {
