@@ -8,7 +8,6 @@ import {
   sql,
 } from "kysely";
 import { SchemaDiff, Operation } from "./operation";
-import { constraintNaming } from "./naming";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 import { migrationSchema, MigrationValue } from "./schema";
