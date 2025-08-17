@@ -7,6 +7,8 @@ import { diffSchema } from "../diff";
 import { SchemaDiff, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
+import { ConstraintAttribute } from "../introspection/type";
+import is from "zod/v4/locales/is.js";
 
 export const runGenerate = async (props: {
   client: DBClient;
@@ -71,20 +73,35 @@ const generateMigrationFromIntrospection = async (props: {
   const { client, config } = props;
   const introspector = getIntrospector(client);
   const tables = await introspector.getTables();
+  const constraintAttributes = await introspector.getConstraints();
+
+  // カラム制約の判定
+  const columnConstraintPredicate =
+    (tableName: string, colName: string) =>
+    (constraints: ReadonlyArray<ConstraintAttribute>) =>
+      constraints.some(
+        (constraint) =>
+          constraint.table === tableName &&
+          constraint.columns.length === 1 &&
+          constraint.columns[0] === colName
+      );
 
   const dbTables: Tables = tables.map((table) => ({
     name: table.name,
     columns: Object.fromEntries(
       Object.entries(table.columns).map(([colName, colDef]) => {
+        const hasColumnConstraint = columnConstraintPredicate(
+          table.name,
+          colName
+        );
+
         return [
           colName,
           {
             type: colDef.dataType,
             notNull: colDef.notNull,
-            primaryKey: !!colDef.constraints.find(
-              (c) => c.type === "PRIMARY KEY"
-            ),
-            unique: !!colDef.constraints.find((c) => c.type === "UNIQUE"),
+            primaryKey: hasColumnConstraint(constraintAttributes.primaryKey),
+            unique: hasColumnConstraint(constraintAttributes.unique),
             defaultSql: colDef.default ?? undefined,
           },
         ];
@@ -105,7 +122,6 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const constraintAttributes = await introspector.getConstraints();
   const indexes = await introspector.getIndexes();
 
   const diff = diffSchema({

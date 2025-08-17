@@ -1,6 +1,6 @@
 import { DBClient } from "../client";
 import { postgresExtraIntrospector } from "./postgres";
-import { ColumnConstraint, ExtraIntrospector } from "./type";
+import { ExtraIntrospector } from "./type";
 
 const getExtraIntrospector = (client: DBClient): ExtraIntrospector => {
   const dialect = client.getDialect();
@@ -41,9 +41,6 @@ export const getIntrospector = (client: DBClient) => {
                 characterMaximumLength:
                   extraInfo.characterMaximumLength ?? null,
                 notNull: !column.isNullable,
-                constraints: ex.flatMap((c) =>
-                  c.constraint ? [c.constraint] : []
-                ),
               },
             ];
           })
@@ -69,5 +66,4 @@ type Column = {
   default: string | null;
   characterMaximumLength: number | null;
   notNull: boolean;
-  constraints: Array<ColumnConstraint>;
 };

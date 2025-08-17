@@ -4,7 +4,6 @@ type ColumnExtraAttributes = Array<{
   name: string;
   default: string | null;
   characterMaximumLength: number | null;
-  constraint: ColumnConstraint | null;
 }>;
 
 export type ColumnConstraint = {
@@ -25,7 +24,7 @@ type ConstraintAttributes = {
   unique: Array<ConstraintAttribute>;
 };
 
-type ConstraintAttribute = {
+export type ConstraintAttribute = {
   schema?: string;
   table: string;
   name: string;

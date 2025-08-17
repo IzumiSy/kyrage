@@ -24,33 +24,19 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
         CASE 
           WHEN t.typname = 'varchar' OR t.typname = 'char' THEN a.atttypmod - 4
           ELSE NULL 
-        END AS character_maximum_length,
-        -- 単一カラム制約のみを識別（composite制約は除外）
-        CASE 
-          WHEN con.contype = 'p' AND array_length(con.conkey, 1) = 1 THEN 'PRIMARY KEY'
-          WHEN con.contype = 'u' AND array_length(con.conkey, 1) = 1 THEN 'UNIQUE'
-          ELSE NULL
-        END AS constraint_type,
-        con.conname AS constraint_name
+        END AS character_maximum_length
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
       JOIN pg_attribute a ON a.attrelid = c.oid
       LEFT JOIN pg_attrdef d ON d.adrelid = c.oid AND d.adnum = a.attnum
       JOIN pg_type t ON t.oid = a.atttypid
-      -- 単一カラム制約との LEFT JOIN
-      LEFT JOIN pg_constraint con ON (
-        con.conrelid = c.oid
-        AND con.contype IN ('p', 'u')
-        AND array_length(con.conkey, 1) = 1  -- 単一カラム制約のみ
-        AND con.conkey[1] = a.attnum
-      )
       WHERE c.relkind = 'r'
         AND n.nspname = 'public'
         AND a.attnum > 0
         AND NOT a.attisdropped
       ORDER BY c.relname, a.attnum;
     `
-      .$castTo<PostgresColumnConstraintInfo>()
+      .$castTo<PostgresColumnInfo>()
       .execute(db);
 
     return rows.map((row) => ({
@@ -59,13 +45,6 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       name: row.column_name,
       default: row.column_default,
       characterMaximumLength: row.character_maximum_length,
-      constraint:
-        row.constraint_type && row.constraint_name
-          ? {
-              name: row.constraint_name,
-              type: row.constraint_type,
-            }
-          : null,
     }));
   };
 
@@ -162,14 +141,12 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
   };
 };
 
-export type PostgresColumnConstraintInfo = {
+export type PostgresColumnInfo = {
   table_schema: string;
   table_name: string;
   column_name: string;
   column_default: string | null;
   character_maximum_length: number | null;
-  constraint_name: string | null;
-  constraint_type: "UNIQUE" | "PRIMARY KEY" | null;
 };
 
 type PostgresIndexInfo = {
