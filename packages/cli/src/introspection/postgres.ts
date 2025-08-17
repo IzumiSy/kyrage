@@ -124,7 +124,14 @@ export const postgresExtraIntrospector = (props: { client: DBClient }) => {
       WHERE c.contype IN ('p', 'u')  -- primary key and unique constraints
           AND n.nspname = 'public'
           AND NOT a.attisdropped
-          AND c.conindid = 0 -- no dependent objects
+          AND NOT EXISTS (
+              SELECT 1 FROM pg_depend d
+              WHERE d.objid = c.oid 
+              AND d.deptype = 'a'  -- automatic dependency
+              AND d.classid = 'pg_constraint'::regclass
+              AND d.refclassid = 'pg_class'::regclass
+              AND d.refobjid = t.oid
+          )
       GROUP BY n.nspname, t.relname, c.conname, c.contype, c.oid, c.conkey, t.oid
       ORDER BY t.relname, c.conname;
     `
