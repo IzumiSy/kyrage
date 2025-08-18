@@ -104,61 +104,52 @@ export const defineTable = <T extends Record<string, DefinedColumn>>(
     | ReturnType<ExpressionBuilders<T>["unique"]>
   >
 ) => {
-  const indexBuilder: ExpressionBuilders<T>["index"] = (cols, options) => {
-    const columnNames = cols.map(String);
-    return {
-      kind: "index",
-      name: options?.name ?? `idx_${name}_${columnNames.join("_")}`,
-      columns: columnNames,
-      unique: options?.unique ?? false,
-    };
+  const ensureNotEmptyColumns = (columns: string[]) => {
+    if (columns.length === 0) {
+      throw new Error("At least one column must be specified.");
+    }
   };
-
-  const primaryKeyBuilder: ExpressionBuilders<T>["primaryKey"] = (
-    cols,
-    options
-  ) => {
-    const columnNames = cols.map(String);
-    return {
-      kind: "primaryKey",
-      name: options?.name ?? `pk_${name}_${columnNames.join("_")}`,
-      columns: columnNames,
-    };
-  };
-
-  const uniqueBuilder: ExpressionBuilders<T>["unique"] = (cols, options) => {
-    const columnNames = cols.map(String);
-    return {
-      kind: "unique",
-      name: options?.name ?? `uq_${name}_${columnNames.join("_")}`,
-      columns: columnNames,
-    };
-  };
+  const createAutogenName = (prefix: string, columnNames: string[]) =>
+    `${prefix}_${name}_${columnNames.join("_")}`;
 
   const builtConstraints = tableExpBuilder
     ? tableExpBuilder({
-        index: indexBuilder,
-        primaryKey: primaryKeyBuilder,
-        unique: uniqueBuilder,
+        index: (columns, options) => {
+          ensureNotEmptyColumns(columns);
+          return {
+            kind: "index" as const,
+            name: options?.name ?? createAutogenName("idx", columns),
+            columns,
+            unique: options?.unique ?? false,
+          };
+        },
+        primaryKey: (columns, options) => {
+          ensureNotEmptyColumns(columns);
+          return {
+            kind: "primaryKey" as const,
+            name: options?.name ?? createAutogenName("pk", columns),
+            columns,
+          };
+        },
+        unique: (columns, options) => {
+          ensureNotEmptyColumns(columns);
+          return {
+            kind: "unique" as const,
+            name: options?.name ?? createAutogenName("uq", columns),
+            columns,
+          };
+        },
       })
     : [];
-
-  const indexes = builtConstraints.filter(
-    (c) => c.kind === "index"
-  ) as DefinedIndex[];
-  const primaryKeys = builtConstraints.filter(
-    (c) => c.kind === "primaryKey"
-  ) as DefinedPrimaryKeyConstraint[];
-  const uniques = builtConstraints.filter(
-    (c) => c.kind === "unique"
-  ) as DefinedUniqueConstraint[];
 
   return {
     tableName: name,
     columns,
-    indexes,
-    primaryKeys,
-    uniques,
+    indexes: builtConstraints.filter((c) => c.kind === ("index" as const)),
+    primaryKeys: builtConstraints.filter(
+      (c) => c.kind === ("primaryKey" as const)
+    ),
+    uniques: builtConstraints.filter((c) => c.kind === ("unique" as const)),
   };
 };
 
