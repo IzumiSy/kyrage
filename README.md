@@ -281,9 +281,9 @@ kyrage automatically generates constraint names following these patterns:
 
 You can override these by providing a custom `name` option.
 
-### Known Limitations
+### 💬 Known Limitations
 
-### Constraint Creation Strategy
+#### Constraint Creation Strategy
 
 Due to kyrage's internal diff detection design, **PRIMARY KEY and UNIQUE constraints are always created as separate `ALTER TABLE` statements**, not inline within `CREATE TABLE` statements.
 
