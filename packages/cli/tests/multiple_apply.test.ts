@@ -21,7 +21,6 @@ const config = defineConfigForTest({
 });
 
 describe("apply migrations in multiple times", () => {
-  // TODO: this test fails due to the bug in `geneate` usecase that unexpectedly drops kysely_ table constraints
   it("should update DB in multiple times by the schema in config", async () => {
     await using db = client.getDB();
 
