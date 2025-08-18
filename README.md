@@ -55,22 +55,38 @@ Create your table definitions (e.g., in `schema.ts`):
 ```typescript
 import { column as c, defineTable as t } from "@izumisy/kyrage";
 
-export const members = t("members", {
-  id: c("uuid", { primaryKey: true }),
-  email: c("text", { unique: true, notNull: true }),
-  name: c("text", { unique: true }),
-  age: c("integer"),
-  createdAt: c("timestamptz", { defaultSql: "now()" }),
-});
+export const members = t(
+  "members",
+  {
+    id: c("uuid", { primaryKey: true }),
+    email: c("text", { unique: true, notNull: true }),
+    name: c("text", { unique: true }),
+    age: c("integer"),
+    createdAt: c("timestamptz", { defaultSql: "now()" }),
+  },
+  (t) => [
+    t.index(["name", "email"], {
+      unique: true,
+    }),
+  ]
+);
 
-export const posts = t("posts", {
-  id: c("uuid", { primaryKey: true }),
-  author_id: c("uuid", { notNull: true }),
-  title: c("text", { notNull: true }),
-  content: c("text", { notNull: true }),
-  published: c("boolean", { defaultSql: "false" }),
-  published_at: c("timestamptz", { defaultSql: "now()" }),
-});
+export const posts = t(
+  "posts",
+  {
+    id: c("uuid"),
+    author_id: c("uuid"),
+    slug: c("text", { notNull: true }),
+    title: c("text"),
+    content: c("text", { notNull: true }),
+  },
+  (t) => [
+    t.primaryKey(["id", "author_id"]),
+    t.unique(["author_id", "slug"], {
+      name: "unique_author_slug",
+    }),
+  ]
+);
 ```
 
 Add your schema to the configuration:
@@ -95,19 +111,24 @@ Compare your schema with the database and generate a migration:
 ```bash
 $ kyrage generate
 -- create_table: members
-   -> column: id ({"type":"uuid","primaryKey":true,"notNull":false "unique":false})
+   -> column: id ({"type":"uuid","primaryKey":true,"notNull":true,"unique":false})
    -> column: email ({"type":"text","primaryKey":false,"notNull":true,"unique":true})
    -> column: name ({"type":"text","primaryKey":false,"notNull":false,"unique":true})
    -> column: age ({"type":"integer","primaryKey":false,"notNull":false,"unique":false})
    -> column: createdAt ({"type":"timestamptz","primaryKey":false,"notNull":false,"unique":false,"defaultSql":"now()"})
 -- create_table: posts
-   -> column: id ({"type":"uuid","primaryKey":true,"notNull":false,"unique":false})
-   -> column: author_id ({"type":"uuid","primaryKey":false,"notNull":true,"unique":false})
-   -> column: title ({"type":"text","primaryKey":false,"notNull":true,"unique":false})
+   -> column: id ({"type":"uuid","primaryKey":false,"notNull":false,"unique":false})
+   -> column: author_id ({"type":"uuid","primaryKey":false,"notNull":false,"unique":false})
+   -> column: slug ({"type":"text","primaryKey":false,"notNull":true,"unique":false})
+   -> column: title ({"type":"text","primaryKey":false,"notNull":false,"unique":false})
    -> column: content ({"type":"text","primaryKey":false,"notNull":true,"unique":false})
-   -> column: published ({"type":"boolean","primaryKey":false,"notNull":false,"unique":false,"defaultSql":"false"})
-   -> column: published_at ({"type":"timestamptz","primaryKey":false,"notNull":false,"unique":false,"defaultSql":"now()"})
-✔ Migration file generated: migrations/1754553798672.json
+-- create_index: members.idx_members_name_email (name, email) [unique]
+-- create_primary_key_constraint: members.members_id_primary_key (id)
+-- create_primary_key_constraint: posts.pk_posts_id_author_id (id, author_id)
+-- create_unique_constraint: members.members_email_unique (email)
+-- create_unique_constraint: members.members_name_unique (name)
+-- create_unique_constraint: posts.unique_author_slug (author_id, slug)
+✔ Migration file generated: migrations/1755525514175.json
 ```
 
 `generate` command will fail if there is a pending migration. Use `--ignore-pending` option in that case.
@@ -119,20 +140,25 @@ You can use `apply --plan` beforehand to check SQL queries that will be executed
 ```bash
 $ kyrage apply --plan --pretty
 create table "members" (
-  "id" uuid primary key,
-  "email" text not null unique,
-  "name" text unique,
-  "age" int4,
+  "id" uuid not null,
+  "email" text not null,
+  "name" text,
+  "age" integer,
   "createdAt" timestamptz default now ()
 )
 create table "posts" (
-  "id" uuid primary key,
-  "author_id" uuid not null,
+  "id" uuid,
+  "author_id" uuid,
+  "slug" text not null,
   "title" text,
-  "content" text not null,
-  "published" boolean default false,
-  "published_at" timestamptz default now ()
+  "content" text not null
 )
+create unique index "idx_members_name_email" on "members" ("name", "email")
+alter table "members" add constraint "members_id_primary_key" primary key ("id")
+alter table "posts" add constraint "pk_posts_id_author_id" primary key ("id", "author_id")
+alter table "members" add constraint "members_email_unique" unique ("email")
+alter table "members" add constraint "members_name_unique" unique ("name")
+alter table "posts" add constraint "unique_author_slug" unique ("author_id", "slug")
 ```
 
 ### 5. Apply
@@ -141,7 +167,7 @@ If everything looks good, execute the generated migrations:
 
 ```bash
 $ kyrage apply
-✔ Migration applied: 1754372124127
+✔ Migration applied: 1755525514175
 ```
 
 **PROTIP**: You can also apply the changes immediately on generating migration: `kyrage generate --apply`
@@ -159,32 +185,153 @@ $ kyrage apply
 
 Your `kyrage.config.ts` file supports the following options:
 
+#### Database Configuration
+
+```typescript
+import { defineConfig } from "@izumisy/kyrage";
+
+export default defineConfig({
+  database: {
+    dialect: "postgres" | "cockroachdb",  // Database dialect
+    connectionString: string,             // Database connection string
+  },
+  tables: [
+    /* table definitions */
+  ],
+});
+```
+
+Kyrage internally employes [unjs/c12](https://github.com/unjs/c12) that helps users define environment specific configurations that can be switched with `NODE_ENV`.
+
+```typescript
+import { defineConfig } from "@izumisy/kyrage";
+
+export default defineConfig({
+  // Using different databases by environment
+  $development: {
+    database: {
+      dialect: "postgres",
+      connectionString: "psql://dev:pass@localhost/myapp_dev"
+    }
+  },
+  $production: {
+    database: {
+      dialect: "cockroachdb",
+      connectionString: "psql://user:pass@prod-db.com/myapp_prod?ssl=true"
+    }
+  },
+
+  // Tables are common in all environment
+  tables: [
+    /* ... */
+  ]
+});
+```
+
+#### Table Definition
+
+Use the `defineTable` function to define your database tables:
+
 ```typescript
 import { column as c, defineTable as t } from "@izumisy/kyrage";
 
-export default {
-  database: {
-    dialect: "postgres",           // Database dialect
-    connectionString: string,      // Database connection string
+const tableName = t(
+  "table_name",           // Table name
+  {                       // Column definitions
+    columnName: c("type", options),
+    // ... more columns
   },
-  tables: [                        // Array of table definitions
-    t("tableName", {               // Use defineTable function
-      columnName: c("type", {      // Use column function
-        primaryKey?: boolean,      // PRIMARY KEY constraint
-        unique?: boolean,          // UNIQUE constraint
-        notNull?: boolean,         // NOT NULL constraint 
-        defaultSql?: string,       // Default SQL expression
-      })
-    }),
-    // ... more tables
+  (t) => [                // Optional: table constraints
+    t.index(["col1", "col2"], { unique: true }),
+    t.primaryKey(["col1", "col2"]),
+    t.unique(["col1", "col2"], { name: "custom_name" }),
   ]
-}
+);
 ```
 
-## 🗄️ Supported Databases
+#### Column Definition
 
-* PostgreSQL
-* CockroachDB
+The `column` function accepts the following options:
+
+```typescript
+c("dataType", {
+  primaryKey?: boolean,   // Creates a PRIMARY KEY constraint
+  unique?: boolean,       // Creates a UNIQUE constraint  
+  notNull?: boolean,      // NOT NULL constraint
+  defaultSql?: string,    // Default SQL expression (e.g., "now()", "gen_random_uuid()")
+})
+```
+
+#### Table Constraints
+
+##### Indexes
+```typescript
+// Create a regular index
+t.index(["column1", "column2"])
+
+// Create a unique index  
+t.index(["column1", "column2"], { unique: true })
+
+// Create an index with custom name
+t.index(["column1"], { name: "custom_idx_name" })
+```
+
+##### Primary Key Constraints
+```typescript
+// Single column primary key
+c("uuid", { primaryKey: true })
+
+// Composite primary key
+t.primaryKey(["id", "tenant_id"])
+
+// Custom constraint name
+t.primaryKey(["id", "tenant_id"], { name: "pk_custom_name" })
+```
+
+##### Unique Constraints
+```typescript
+// Single column unique
+c("email", { unique: true })
+
+// Composite unique constraint
+t.unique(["tenant_id", "slug"])
+
+// Custom constraint name
+t.unique(["tenant_id", "slug"], { name: "unique_tenant_slug" })
+```
+
+#### Constraint Naming Convention
+
+kyrage automatically generates constraint names following these patterns:
+
+- **Primary Key**: `{table}_{column}_primary_key` (single) or `pk_{table}_{columns}` (composite)
+- **Unique Constraint**: `{table}_{column}_unique` (single) or `uq_{table}_{columns}` (composite)  
+- **Index**: `idx_{table}_{columns}`
+
+You can override these by providing a custom `name` option.
+
+### 💬 Known Limitations
+
+#### Constraint Creation Strategy
+
+Due to kyrage's internal diff detection design, **PRIMARY KEY and UNIQUE constraints are always created as separate `ALTER TABLE` statements**, not inline within `CREATE TABLE` statements.
+
+**Example behavior:**
+```sql
+-- kyrage generates this:
+CREATE TABLE "users" (
+  "id" uuid NOT NULL,
+  "email" text NOT NULL
+);
+ALTER TABLE "users" ADD CONSTRAINT "users_id_primary_key" PRIMARY KEY ("id");
+ALTER TABLE "users" ADD CONSTRAINT "users_email_unique" UNIQUE ("email");
+
+-- Instead of the more common:
+CREATE TABLE "users" (
+  "id" uuid PRIMARY KEY,
+  "email" text UNIQUE NOT NULL
+);
+```
 
 ## 🏗️ Examples
 
@@ -193,50 +340,6 @@ Check out the [examples/basic](./examples/basic) directory for a complete workin
 - Schema definitions
 - Generated migrations
 - Applied database changes
-
-## 💡 Best Practices
-
-### Schema Management
-- **Version Control**: Always commit your `kyrage.config.ts` and schema files
-- **Migration Files**: Keep generated migration files in version control
-- **Team Coordination**: Coordinate with your team when generating new migrations
-
-### Development Workflow
-1. Update your schema definitions in TypeScript
-2. Run `kyrage generate` to create migration files
-3. Review the generated migrations before applying
-4. Run `kyrage apply` to update your database
-5. Commit both schema changes and migration files
-
-### Production Deployments
-- Test migrations thoroughly in staging environments
-- Run migrations as part of your deployment pipeline
-- Always backup your database before running migrations in production
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-**Migration Generation Fails**
-- Verify database connection string and credentials
-- Ensure database server is running and accessible
-- Check that your schema definitions are valid TypeScript
-
-**Migration Application Fails**
-- Review the generated migration file for correctness
-- Ensure no conflicting migrations exist
-- Check database permissions for DDL operations
-
-**Schema Conflicts**
-- Resolve any pending migrations before generating new ones
-- Coordinate with team members to avoid concurrent schema changes
-- Use database transactions where possible
-
-### Getting Help
-
-- Check the [examples](./examples/) directory for reference implementations
-- Review error messages carefully - they often contain helpful details
-- Ensure your `migrations/` directory exists and is writable
 
 ## 🤝 Contributing
 

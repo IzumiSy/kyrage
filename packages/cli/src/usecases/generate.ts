@@ -208,6 +208,30 @@ const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
         diffOutputs.push(`-- drop_index: ${operation.table}.${operation.name}`);
         break;
 
+      case "create_primary_key_constraint":
+        diffOutputs.push(
+          `-- create_primary_key_constraint: ${operation.table}.${operation.name} (${operation.columns.join(", ")})`
+        );
+        break;
+
+      case "drop_primary_key_constraint":
+        diffOutputs.push(
+          `-- drop_primary_key_constraint: ${operation.table}.${operation.name}`
+        );
+        break;
+
+      case "create_unique_constraint":
+        diffOutputs.push(
+          `-- create_unique_constraint: ${operation.table}.${operation.name} (${operation.columns.join(", ")})`
+        );
+        break;
+
+      case "drop_unique_constraint":
+        diffOutputs.push(
+          `-- drop_unique_constraint: ${operation.table}.${operation.name}`
+        );
+        break;
+
       default:
         break;
     }
