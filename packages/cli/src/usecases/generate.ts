@@ -8,6 +8,7 @@ import { SchemaDiff, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
 import { ConstraintAttributes } from "../introspection/type";
+import { b } from "vitest/dist/chunks/suite.d.FvehnV49.js";
 
 export const runGenerate = async (props: {
   client: DBClient;
@@ -206,6 +207,30 @@ const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
 
       case "drop_index":
         diffOutputs.push(`-- drop_index: ${operation.table}.${operation.name}`);
+        break;
+
+      case "create_primary_key_constraint":
+        diffOutputs.push(
+          `-- create_primary_key_constraint: ${operation.table}.${operation.name} (${operation.columns.join(", ")})`
+        );
+        break;
+
+      case "drop_primary_key_constraint":
+        diffOutputs.push(
+          `-- drop_primary_key_constraint: ${operation.table}.${operation.name}`
+        );
+        break;
+
+      case "create_unique_constraint":
+        diffOutputs.push(
+          `-- create_unique_constraint: ${operation.table}.${operation.name} (${operation.columns.join(", ")})`
+        );
+        break;
+
+      case "drop_unique_constraint":
+        diffOutputs.push(
+          `-- drop_unique_constraint: ${operation.table}.${operation.name}`
+        );
         break;
 
       default:
