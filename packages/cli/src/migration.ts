@@ -93,7 +93,10 @@ export async function buildMigrationFromDiff(
   db: Kysely<any>,
   diff: SchemaDiff
 ): Promise<void> {
-  for (const operation of diff.operations) {
+  // Sort operations by dependency to ensure correct execution order
+  const sortedOperations = sortOperationsByDependency(diff.operations);
+
+  for (const operation of sortedOperations) {
     await executeOperation(db, operation);
   }
 }
@@ -117,6 +120,14 @@ async function executeOperation(
       return executeCreateIndex(db, operation);
     case "drop_index":
       return executeDropIndex(db, operation);
+    case "create_primary_key_constraint":
+      return executeCreatePrimaryKeyConstraint(db, operation);
+    case "drop_primary_key_constraint":
+      return executeDropPrimaryKeyConstraint(db, operation);
+    case "create_unique_constraint":
+      return executeCreateUniqueConstraint(db, operation);
+    case "drop_unique_constraint":
+      return executeDropUniqueConstraint(db, operation);
     default:
       throw new Error(`Unknown operation type: ${(operation as any).type}`);
   }
@@ -141,20 +152,6 @@ async function executeCreateTable(
       }
       return c;
     });
-
-    if (colDef.primaryKey) {
-      builder = builder.addPrimaryKeyConstraint(
-        `${operation.table}_${colName}_primary_key`,
-        [colName]
-      );
-    }
-
-    if (colDef.unique) {
-      builder = builder.addUniqueConstraint(
-        `${operation.table}_${colName}_unique`,
-        [colName]
-      );
-    }
   }
 
   await builder.execute();
@@ -185,25 +182,6 @@ async function executeAddColumn(
       return c;
     })
     .execute();
-
-  if (operation.attributes.primaryKey) {
-    await db.schema
-      .alterTable(operation.table)
-      .addPrimaryKeyConstraint(
-        `${operation.table}_${operation.column}_primary_key`,
-        [operation.column]
-      )
-      .execute();
-  }
-
-  if (operation.attributes.unique) {
-    await db.schema
-      .alterTable(operation.table)
-      .addUniqueConstraint(`${operation.table}_${operation.column}_unique`, [
-        operation.column,
-      ])
-      .execute();
-  }
 }
 
 async function executeDropColumn(
@@ -246,36 +224,6 @@ async function executeAlterColumn(
         .execute();
     }
   }
-
-  // primaryKey
-  if (after.primaryKey !== before.primaryKey) {
-    if (after.primaryKey) {
-      await db.schema
-        .alterTable(table)
-        .addPrimaryKeyConstraint(`${table}_${column}_primary_key`, [column])
-        .execute();
-    } else {
-      await db.schema
-        .alterTable(table)
-        .dropConstraint(`${table}_${column}_primary_key`)
-        .execute();
-    }
-  }
-
-  // unique
-  if (after.unique !== before.unique) {
-    if (after.unique) {
-      await db.schema
-        .alterTable(table)
-        .addUniqueConstraint(`${table}_${column}_unique`, [column])
-        .execute();
-    } else {
-      await db.schema
-        .alterTable(table)
-        .dropConstraint(`${table}_${column}_unique`)
-        .execute();
-    }
-  }
 }
 
 async function executeCreateIndex(
@@ -299,7 +247,47 @@ async function executeDropIndex(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "drop_index" }>
 ): Promise<void> {
-  await db.schema.dropIndex(operation.name).on(operation.table).execute();
+  await db.schema.dropIndex(operation.name).execute();
+}
+
+async function executeCreatePrimaryKeyConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "create_primary_key_constraint" }>
+): Promise<void> {
+  await db.schema
+    .alterTable(operation.table)
+    .addPrimaryKeyConstraint(operation.name, operation.columns)
+    .execute();
+}
+
+async function executeDropPrimaryKeyConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "drop_primary_key_constraint" }>
+): Promise<void> {
+  await db.schema
+    .alterTable(operation.table)
+    .dropConstraint(operation.name)
+    .execute();
+}
+
+async function executeCreateUniqueConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "create_unique_constraint" }>
+): Promise<void> {
+  await db.schema
+    .alterTable(operation.table)
+    .addUniqueConstraint(operation.name, operation.columns)
+    .execute();
+}
+
+async function executeDropUniqueConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "drop_unique_constraint" }>
+): Promise<void> {
+  await db.schema
+    .alterTable(operation.table)
+    .dropConstraint(operation.name)
+    .execute();
 }
 
 const assertDataType: (
@@ -309,3 +297,58 @@ const assertDataType: (
     throw new Error(`Unsupported data type: ${dataType}`);
   }
 };
+
+// Operation priority for dependency sorting
+// Lower numbers have higher priority (executed first)
+const OPERATION_PRIORITY = {
+  // 1. Drop constraints and indexes first (highest priority)
+  drop_unique_constraint: 1,
+  drop_primary_key_constraint: 2,
+  drop_index: 3,
+
+  // 2. Drop columns and tables
+  drop_column: 4,
+  drop_table: 5,
+
+  // 3. Create tables and columns
+  create_table: 6,
+  add_column: 7,
+
+  // 4. Alter columns
+  alter_column: 8,
+
+  // 5. Create indexes and constraints last (lowest priority)
+  create_index: 9,
+  create_primary_key_constraint: 10,
+  create_unique_constraint: 11,
+} as const;
+
+/**
+ * Sort operations by dependency to ensure correct execution order.
+ * This prevents issues like trying to alter a dropped table or
+ * creating constraints before the required tables exist.
+ */
+export function sortOperationsByDependency(
+  operations: Operation[]
+): Operation[] {
+  return operations.slice().sort((a, b) => {
+    const priorityA = OPERATION_PRIORITY[a.type];
+    const priorityB = OPERATION_PRIORITY[b.type];
+
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+
+    // Same priority: sort by table name for consistent ordering
+    const tableA = getOperationTableName(a);
+    const tableB = getOperationTableName(b);
+    return tableA.localeCompare(tableB);
+  });
+}
+
+/**
+ * Extract table name from any operation type.
+ */
+function getOperationTableName(operation: Operation): string {
+  return operation.table;
+}

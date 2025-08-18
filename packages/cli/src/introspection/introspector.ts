@@ -1,26 +1,28 @@
 import { DBClient } from "../client";
-import { postgresExtraIntrospector } from "./postgres";
-import { ColumnConstraint, ExtraIntrospector } from "./type";
+import { postgresExtraIntrospectorDriver } from "./postgres";
+import { ColumnExtraAttribute, ExtraIntrospectorDriver } from "./type";
 
-const getExtraIntrospector = (client: DBClient): ExtraIntrospector => {
+const getExtraIntrospectorDriver = (
+  client: DBClient
+): ExtraIntrospectorDriver => {
   const dialect = client.getDialect();
 
   switch (dialect) {
     case "postgres":
     case "cockroachdb":
-      return postgresExtraIntrospector({ client });
+      return postgresExtraIntrospectorDriver({ client });
     default:
       throw new Error(`Unsupported dialect: ${dialect}`);
   }
 };
 
 export const getIntrospector = (client: DBClient) => {
-  const extraIntrospector = getExtraIntrospector(client);
+  const extIntrospectorDriver = getExtraIntrospectorDriver(client);
   return {
     getTables: async () => {
       await using db = client.getDB();
       const kyselyIntrospection = await db.introspection.getTables();
-      const columnExtra = await extraIntrospector.introspectTables();
+      const columnExtra = await extIntrospectorDriver.introspectTables();
 
       return kyselyIntrospection.map((table) => {
         const columns: Record<string, Column> = Object.fromEntries(
@@ -36,12 +38,13 @@ export const getIntrospector = (client: DBClient) => {
                 schema: table.schema,
                 table: table.name,
                 name: column.name,
-                dataType: extraIntrospector.convertTypeName(column.dataType),
+                dataType: extIntrospectorDriver.convertTypeName(
+                  column.dataType
+                ),
                 default: extraInfo.default ?? null,
                 characterMaximumLength:
                   extraInfo.characterMaximumLength ?? null,
                 notNull: !column.isNullable,
-                constraints: ex.map((c) => c.constraint),
               },
             ];
           })
@@ -54,17 +57,28 @@ export const getIntrospector = (client: DBClient) => {
         };
       });
     },
-    getIndexes: async () => await extraIntrospector.introspectIndexes(),
+    getIndexes: async () =>
+      (await extIntrospectorDriver.introspectIndexes()).filter(
+        (v) => !v.table.startsWith("kysely_")
+      ),
+    getConstraints: async () => {
+      const constraints = (
+        await extIntrospectorDriver.introspectConstraints()
+      ).filter((v) => !v.table.startsWith("kysely_"));
+      const primaryKey = constraints.filter((c) => c.type === "PRIMARY KEY");
+      const unique = constraints.filter((c) => c.type === "UNIQUE");
+
+      return {
+        primaryKey,
+        unique,
+      };
+    },
   };
 };
 
-type Column = {
-  schema?: string;
-  table: string;
-  name: string;
+// A data structure enriched with the data from kysely introspector
+type Column = ColumnExtraAttribute & {
   dataType: string;
-  default: string | null;
   characterMaximumLength: number | null;
   notNull: boolean;
-  constraints: Array<ColumnConstraint>;
 };

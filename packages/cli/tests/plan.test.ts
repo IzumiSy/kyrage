@@ -11,24 +11,6 @@ vi.mock("fs/promises", async () => {
 });
 
 const { database, client } = await setupTestDB();
-const config = defineConfigForTest({
-  database,
-  tables: [
-    defineTable(
-      "members",
-      {
-        id: column("uuid", { primaryKey: true }),
-        name: column("text", { unique: true }),
-        email: column("text"),
-      },
-      (t) => [t.index(["name", "email"])]
-    ),
-    defineTable("category", {
-      id: column("uuid", { primaryKey: true }),
-      name: column("text", { unique: true }),
-    }),
-  ],
-});
 
 it("generate with planned apply", async () => {
   const loggerStdout = vi
@@ -38,7 +20,29 @@ it("generate with planned apply", async () => {
   await runGenerate({
     client,
     logger: defaultConsolaLogger,
-    config,
+    config: defineConfigForTest({
+      database,
+      tables: [
+        defineTable(
+          "members",
+          {
+            id: column("uuid", { primaryKey: true }),
+            name: column("text", { unique: true }),
+            email: column("text"),
+          },
+          (t) => [t.index(["name", "email"]), t.unique(["name", "email"])]
+        ),
+        defineTable(
+          "category",
+          {
+            id: column("uuid"),
+            member_id: column("uuid"),
+            name: column("text", { unique: true }),
+          },
+          (t) => [t.primaryKey(["id", "member_id"])]
+        ),
+      ],
+    }),
     options: {
       ignorePending: false,
       apply: true,
@@ -85,17 +89,26 @@ it("generate with planned apply", async () => {
 
   [
     // 1st time
-    `create table "members" ("id" uuid not null, "name" text, "email" text, constraint "members_id_primary_key" primary key ("id"), constraint "members_name_unique" unique ("name"))`,
-    `create table "category" ("id" uuid not null, "name" text, constraint "category_id_primary_key" primary key ("id"), constraint "category_name_unique" unique ("name"))`,
+    `create table "category" ("id" uuid, "member_id" uuid, "name" text)`,
+    `create table "members" ("id" uuid not null, "name" text, "email" text)`,
     `create index "idx_members_name_email" on "members" ("name", "email")`,
+    `alter table "category" add constraint "pk_category_id_member_id" primary key ("id", "member_id")`,
+    `alter table "members" add constraint "members_id_primary_key" primary key ("id")`,
+    `alter table "category" add constraint "category_name_unique" unique ("name")`,
+    `alter table "members" add constraint "uq_members_name_email" unique ("name", "email")`,
+    `alter table "members" add constraint "members_name_unique" unique ("name")`,
 
     // 2nd time
-    `create table "posts" ("id" uuid not null, "content" text, constraint "posts_id_primary_key" primary key ("id"))`,
-    `drop table "category"`,
+    `alter table "category" drop constraint "category_name_unique"`,
     `alter table "members" drop constraint "members_name_unique"`,
-    `alter table "members" add constraint "members_email_unique" unique ("email")`,
+    `alter table "members" drop constraint "uq_members_name_email"`,
+    `alter table "category" drop constraint "pk_category_id_member_id"`,
+    `drop index "idx_members_name_email"`,
+    `drop table "category"`,
+    `create table "posts" ("id" uuid not null, "content" text)`,
     `create unique index "idx_members_id_email" on "members" ("id", "email")`,
-    `drop index "idx_members_name_email" on "members"`,
+    `alter table "posts" add constraint "posts_id_primary_key" primary key ("id")`,
+    `alter table "members" add constraint "members_email_unique" unique ("email")`,
   ].forEach((expectedCall, index) => {
     expect(loggerStdout).toHaveBeenNthCalledWith(index + 1, expectedCall);
   });

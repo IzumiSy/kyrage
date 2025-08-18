@@ -23,6 +23,18 @@ const indexSchema = z.object({
 });
 export type IndexValue = z.infer<typeof indexSchema>;
 
+const primaryKeyConstraintSchema = z.object({
+  table: z.string(),
+  name: z.string(),
+  columns: z.array(z.string()),
+});
+
+const uniqueConstraintSchema = z.object({
+  table: z.string(),
+  name: z.string(),
+  columns: z.array(z.string()),
+});
+
 const dialectEnum = z.enum(["postgres", "cockroachdb", "mysql", "sqlite"]);
 export type DialectEnum = z.infer<typeof dialectEnum>;
 
@@ -36,6 +48,8 @@ export const configSchema = z.object({
   database: databaseSchema,
   tables: z.array(tableSchema),
   indexes: z.array(indexSchema),
+  primaryKeyConstraints: z.array(primaryKeyConstraintSchema),
+  uniqueConstraints: z.array(uniqueConstraintSchema),
 });
 export type ConfigValue = z.infer<typeof configSchema>;
 

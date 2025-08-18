@@ -4,9 +4,10 @@ import { migrationDirName, getPendingMigrations } from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
 import { diffSchema } from "../diff";
-import { SchemaDiff, SchemaSnapshot, Tables, Operation } from "../operation";
+import { SchemaDiff, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
+import { ConstraintAttributes } from "../introspection/type";
 
 export const runGenerate = async (props: {
   client: DBClient;
@@ -71,21 +72,35 @@ const generateMigrationFromIntrospection = async (props: {
   const { client, config } = props;
   const introspector = getIntrospector(client);
   const tables = await introspector.getTables();
-  const indexes = await introspector.getIndexes();
+  const constraintAttributes = await introspector.getConstraints();
+
+  // カラム制約の判定
+  const columnConstraintPredicate =
+    (tableName: string, colName: string) =>
+    (constraints: ConstraintAttributes) =>
+      constraints.some(
+        (constraint) =>
+          constraint.table === tableName &&
+          constraint.columns.length === 1 &&
+          constraint.columns[0] === colName
+      );
 
   const dbTables: Tables = tables.map((table) => ({
     name: table.name,
     columns: Object.fromEntries(
       Object.entries(table.columns).map(([colName, colDef]) => {
+        const hasColumnConstraint = columnConstraintPredicate(
+          table.name,
+          colName
+        );
+
         return [
           colName,
           {
             type: colDef.dataType,
             notNull: colDef.notNull,
-            primaryKey: !!colDef.constraints.find(
-              (c) => c.type === "PRIMARY KEY"
-            ),
-            unique: !!colDef.constraints.find((c) => c.type === "UNIQUE"),
+            primaryKey: hasColumnConstraint(constraintAttributes.primaryKey),
+            unique: hasColumnConstraint(constraintAttributes.unique),
             defaultSql: colDef.default ?? undefined,
           },
         ];
@@ -106,23 +121,26 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const currentSnapshot: SchemaSnapshot = {
-    tables: dbTables,
-    indexes,
-  };
-  const idealSnapshot: SchemaSnapshot = {
-    tables: configTables,
-    indexes: config.indexes.map((i) => ({
-      table: i.table,
-      name: i.name,
-      columns: i.columns,
-      unique: i.unique,
-      systemGenerated: false,
-    })),
-  };
+  const indexes = await introspector.getIndexes();
+
   const diff = diffSchema({
-    current: currentSnapshot,
-    ideal: idealSnapshot,
+    current: {
+      tables: dbTables,
+      indexes,
+      primaryKeyConstraints: constraintAttributes.primaryKey,
+      uniqueConstraints: constraintAttributes.unique,
+    },
+    ideal: {
+      tables: configTables,
+      indexes: config.indexes.map((i) => ({
+        table: i.table,
+        name: i.name,
+        columns: i.columns,
+        unique: i.unique,
+      })),
+      primaryKeyConstraints: config.primaryKeyConstraints || [],
+      uniqueConstraints: config.uniqueConstraints || [],
+    },
   });
 
   if (diff.operations.length === 0) {

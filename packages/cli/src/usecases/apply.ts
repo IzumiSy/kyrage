@@ -61,7 +61,10 @@ export const runApply = async (props: {
   }
 
   if (migrationError) {
-    reporter.error(`Migration error: ${migrationError}`);
-    process.exit(1);
+    if (migrationError instanceof Error) {
+      throw migrationError;
+    } else {
+      throw new Error(`Migration error: ${migrationError}`);
+    }
   }
 };
