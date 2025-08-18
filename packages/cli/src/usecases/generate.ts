@@ -8,7 +8,6 @@ import { SchemaDiff, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
 import { ConstraintAttributes } from "../introspection/type";
-import { b } from "vitest/dist/chunks/suite.d.FvehnV49.js";
 
 export const runGenerate = async (props: {
   client: DBClient;
