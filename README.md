@@ -185,29 +185,133 @@ $ kyrage apply
 
 Your `kyrage.config.ts` file supports the following options:
 
+#### Database Configuration
+
+```typescript
+import { defineConfig } from "@izumisy/kyrage";
+
+export default defineConfig({
+  database: {
+    dialect: "postgres" | "cockroachdb",  // Database dialect
+    connectionString: string,             // Database connection string
+  },
+  tables: [/* table definitions */],
+});
+```
+
+**Supported Dialects:**
+- `postgres` - PostgreSQL
+- `cockroachdb` - CockroachDB
+
+#### Table Definition
+
+Use the `defineTable` function to define your database tables:
+
 ```typescript
 import { column as c, defineTable as t } from "@izumisy/kyrage";
 
-export default {
-  database: {
-    dialect: "postgres",           // Database dialect
-    connectionString: string,      // Database connection string
+const tableName = t(
+  "table_name",           // Table name
+  {                       // Column definitions
+    columnName: c("type", options),
+    // ... more columns
   },
-  tables: [                        // Array of table definitions
-    t("tableName", {               // Use defineTable function
-      columnName: c("type", {      // Use column function
-        primaryKey?: boolean,      // PRIMARY KEY constraint
-        unique?: boolean,          // UNIQUE constraint
-        notNull?: boolean,         // NOT NULL constraint 
-        defaultSql?: string,       // Default SQL expression
-      })
-    }),
-    // ... more tables
+  (t) => [                // Optional: table constraints
+    t.index(["col1", "col2"], { unique: true }),
+    t.primaryKey(["col1", "col2"]),
+    t.unique(["col1", "col2"], { name: "custom_name" }),
   ]
-}
+);
 ```
 
-## 🗄️ Supported Databases
+#### Column Definition
+
+The `column` function accepts the following options:
+
+```typescript
+c("dataType", {
+  primaryKey?: boolean,   // Creates a PRIMARY KEY constraint
+  unique?: boolean,       // Creates a UNIQUE constraint  
+  notNull?: boolean,      // NOT NULL constraint
+  defaultSql?: string,    // Default SQL expression (e.g., "now()", "gen_random_uuid()")
+})
+```
+
+**Supported Data Types:**
+Common PostgreSQL/CockroachDB types: `text`, `varchar`, `integer`, `bigint`, `uuid`, `boolean`, `timestamptz`, `jsonb`, etc.
+
+#### Table Constraints
+
+##### Indexes
+```typescript
+// Create a regular index
+t.index(["column1", "column2"])
+
+// Create a unique index  
+t.index(["column1", "column2"], { unique: true })
+
+// Create an index with custom name
+t.index(["column1"], { name: "custom_idx_name" })
+```
+
+##### Primary Key Constraints
+```typescript
+// Single column primary key
+c("uuid", { primaryKey: true })
+
+// Composite primary key
+t.primaryKey(["id", "tenant_id"])
+
+// Custom constraint name
+t.primaryKey(["id", "tenant_id"], { name: "pk_custom_name" })
+```
+
+##### Unique Constraints
+```typescript
+// Single column unique
+c("email", { unique: true })
+
+// Composite unique constraint
+t.unique(["tenant_id", "slug"])
+
+// Custom constraint name
+t.unique(["tenant_id", "slug"], { name: "unique_tenant_slug" })
+```
+
+#### Constraint Naming Convention
+
+kyrage automatically generates constraint names following these patterns:
+
+- **Primary Key**: `{table}_{column}_primary_key` (single) or `pk_{table}_{columns}` (composite)
+- **Unique Constraint**: `{table}_{column}_unique` (single) or `uq_{table}_{columns}` (composite)  
+- **Index**: `idx_{table}_{columns}`
+
+You can override these by providing a custom `name` option.
+
+### Known Limitations
+
+### Constraint Creation Strategy
+
+Due to kyrage's internal diff detection design, **PRIMARY KEY and UNIQUE constraints are always created as separate `ALTER TABLE` statements**, not inline within `CREATE TABLE` statements.
+
+**Example behavior:**
+```sql
+-- kyrage generates this:
+CREATE TABLE "users" (
+  "id" uuid NOT NULL,
+  "email" text NOT NULL
+);
+ALTER TABLE "users" ADD CONSTRAINT "users_id_primary_key" PRIMARY KEY ("id");
+ALTER TABLE "users" ADD CONSTRAINT "users_email_unique" UNIQUE ("email");
+
+-- Instead of the more common:
+CREATE TABLE "users" (
+  "id" uuid PRIMARY KEY,
+  "email" text UNIQUE NOT NULL
+);
+```
+
+## �🗄️ Supported Databases
 
 * PostgreSQL
 * CockroachDB
