@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "id": "1755184693593",
+  "id": "1755525514175",
   "diff": {
     "operations": [
       {
@@ -46,12 +46,18 @@
         "columns": {
           "id": {
             "type": "uuid",
-            "primaryKey": true,
-            "notNull": true,
+            "primaryKey": false,
+            "notNull": false,
             "unique": false
           },
           "author_id": {
             "type": "uuid",
+            "primaryKey": false,
+            "notNull": false,
+            "unique": false
+          },
+          "slug": {
+            "type": "text",
             "primaryKey": false,
             "notNull": true,
             "unique": false
@@ -67,20 +73,6 @@
             "primaryKey": false,
             "notNull": true,
             "unique": false
-          },
-          "published": {
-            "type": "boolean",
-            "primaryKey": false,
-            "notNull": false,
-            "unique": false,
-            "defaultSql": "false"
-          },
-          "published_at": {
-            "type": "timestamptz",
-            "primaryKey": false,
-            "notNull": false,
-            "unique": false,
-            "defaultSql": "now()"
           }
         }
       },
@@ -93,6 +85,48 @@
           "email"
         ],
         "unique": true
+      },
+      {
+        "type": "create_primary_key_constraint",
+        "table": "members",
+        "name": "members_id_primary_key",
+        "columns": [
+          "id"
+        ]
+      },
+      {
+        "type": "create_primary_key_constraint",
+        "table": "posts",
+        "name": "pk_posts_id_author_id",
+        "columns": [
+          "id",
+          "author_id"
+        ]
+      },
+      {
+        "type": "create_unique_constraint",
+        "table": "members",
+        "name": "members_email_unique",
+        "columns": [
+          "email"
+        ]
+      },
+      {
+        "type": "create_unique_constraint",
+        "table": "members",
+        "name": "members_name_unique",
+        "columns": [
+          "name"
+        ]
+      },
+      {
+        "type": "create_unique_constraint",
+        "table": "posts",
+        "name": "unique_author_slug",
+        "columns": [
+          "author_id",
+          "slug"
+        ]
       }
     ]
   }
