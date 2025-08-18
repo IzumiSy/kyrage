@@ -209,12 +209,16 @@ import { defineConfig } from "@izumisy/kyrage";
 export default defineConfig({
   // Using different databases by environment
   $development: {
-    dialect: "postgres",
-    connectionString: "psql://dev:pass@localhost/myapp_dev"
+    database: {
+      dialect: "postgres",
+      connectionString: "psql://dev:pass@localhost/myapp_dev"
+    }
   },
   $production: {
-    dialect: "cockroachdb",
-    connectionString: "psql://user:pass@prod-db.com/myapp_prod?ssl=true"
+    database: {
+      dialect: "cockroachdb",
+      connectionString: "psql://user:pass@prod-db.com/myapp_prod?ssl=true"
+    }
   },
 
   // Tables are common in all environment
