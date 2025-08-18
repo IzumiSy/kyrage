@@ -199,10 +199,6 @@ export default defineConfig({
 });
 ```
 
-**Supported Dialects:**
-- `postgres` - PostgreSQL
-- `cockroachdb` - CockroachDB
-
 #### Table Definition
 
 Use the `defineTable` function to define your database tables:
@@ -236,9 +232,6 @@ c("dataType", {
   defaultSql?: string,    // Default SQL expression (e.g., "now()", "gen_random_uuid()")
 })
 ```
-
-**Supported Data Types:**
-Common PostgreSQL/CockroachDB types: `text`, `varchar`, `integer`, `bigint`, `uuid`, `boolean`, `timestamptz`, `jsonb`, etc.
 
 #### Table Constraints
 
@@ -310,11 +303,6 @@ CREATE TABLE "users" (
   "email" text UNIQUE NOT NULL
 );
 ```
-
-## �🗄️ Supported Databases
-
-* PostgreSQL
-* CockroachDB
 
 ## 🏗️ Examples
 
