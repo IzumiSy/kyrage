@@ -93,7 +93,10 @@ export async function buildMigrationFromDiff(
   db: Kysely<any>,
   diff: SchemaDiff
 ): Promise<void> {
-  for (const operation of diff.operations) {
+  // Sort operations by dependency to ensure correct execution order
+  const sortedOperations = sortOperationsByDependency(diff.operations);
+
+  for (const operation of sortedOperations) {
     await executeOperation(db, operation);
   }
 }
@@ -294,3 +297,58 @@ const assertDataType: (
     throw new Error(`Unsupported data type: ${dataType}`);
   }
 };
+
+// Operation priority for dependency sorting
+// Lower numbers have higher priority (executed first)
+const OPERATION_PRIORITY = {
+  // 1. Drop constraints and indexes first (highest priority)
+  drop_unique_constraint: 1,
+  drop_primary_key_constraint: 2,
+  drop_index: 3,
+
+  // 2. Drop columns and tables
+  drop_column: 4,
+  drop_table: 5,
+
+  // 3. Create tables and columns
+  create_table: 6,
+  add_column: 7,
+
+  // 4. Alter columns
+  alter_column: 8,
+
+  // 5. Create indexes and constraints last (lowest priority)
+  create_index: 9,
+  create_primary_key_constraint: 10,
+  create_unique_constraint: 11,
+} as const;
+
+/**
+ * Sort operations by dependency to ensure correct execution order.
+ * This prevents issues like trying to alter a dropped table or
+ * creating constraints before the required tables exist.
+ */
+export function sortOperationsByDependency(
+  operations: Operation[]
+): Operation[] {
+  return operations.slice().sort((a, b) => {
+    const priorityA = OPERATION_PRIORITY[a.type];
+    const priorityB = OPERATION_PRIORITY[b.type];
+
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+
+    // Same priority: sort by table name for consistent ordering
+    const tableA = getOperationTableName(a);
+    const tableB = getOperationTableName(b);
+    return tableA.localeCompare(tableB);
+  });
+}
+
+/**
+ * Extract table name from any operation type.
+ */
+function getOperationTableName(operation: Operation): string {
+  return operation.table;
+}

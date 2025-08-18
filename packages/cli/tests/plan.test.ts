@@ -85,17 +85,24 @@ it("generate with planned apply", async () => {
 
   [
     // 1st time
-    `create table "members" ("id" uuid not null, "name" text, "email" text, constraint "members_id_primary_key" primary key ("id"), constraint "members_name_unique" unique ("name"))`,
-    `create table "category" ("id" uuid not null, "name" text, constraint "category_id_primary_key" primary key ("id"), constraint "category_name_unique" unique ("name"))`,
+    `create table "category" ("id" uuid not null, "name" text)`,
+    `create table "members" ("id" uuid not null, "name" text, "email" text)`,
     `create index "idx_members_name_email" on "members" ("name", "email")`,
+    `alter table "category" add constraint "category_id_primary_key" primary key ("id")`,
+    `alter table "members" add constraint "members_id_primary_key" primary key ("id")`,
+    `alter table "category" add constraint "category_name_unique" unique ("name")`,
+    `alter table "members" add constraint "members_name_unique" unique ("name")`,
 
     // 2nd time
-    `create table "posts" ("id" uuid not null, "content" text, constraint "posts_id_primary_key" primary key ("id"))`,
-    `drop table "category"`,
+    `alter table "category" drop constraint "category_name_unique"`,
     `alter table "members" drop constraint "members_name_unique"`,
-    `alter table "members" add constraint "members_email_unique" unique ("email")`,
-    `create unique index "idx_members_id_email" on "members" ("id", "email")`,
+    `alter table "category" drop constraint "category_id_primary_key"`,
     `drop index "idx_members_name_email"`,
+    `drop table "category"`,
+    `create table "posts" ("id" uuid not null, "content" text)`,
+    `create unique index "idx_members_id_email" on "members" ("id", "email")`,
+    `alter table "posts" add constraint "posts_id_primary_key" primary key ("id")`,
+    `alter table "members" add constraint "members_email_unique" unique ("email")`,
   ].forEach((expectedCall, index) => {
     expect(loggerStdout).toHaveBeenNthCalledWith(index + 1, expectedCall);
   });
