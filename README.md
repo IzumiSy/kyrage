@@ -215,7 +215,7 @@ export default defineConfig({
   $production: {
     dialect: "cockroachdb",
     connectionString: "psql://user:pass@prod-db.com/myapp_prod?ssl=true"
-  }
+  },
 
   // Tables are common in all environment
   tables: [
