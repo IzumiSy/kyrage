@@ -11,8 +11,11 @@ import { diffSchema } from "../diff";
 import { Tables, Operation } from "../operation";
 import { getIntrospector } from "../introspection/introspector";
 import { ConfigValue } from "../config/loader";
+import { getClient } from "../client";
+import { createDevDatabaseManager } from "../dev/manager";
+import { applyBaselineToDevDatabase } from "../dev/baseline";
 
-export const runGenerate = async (props: {
+type RunGenerateProps = {
   client: DBClient;
   logger: Logger;
   config: ConfigValue;
@@ -20,52 +23,112 @@ export const runGenerate = async (props: {
     ignorePending: boolean;
     apply: boolean;
     plan: boolean;
+    dev?: boolean;
   };
-}) => {
+};
+
+export const runGenerate = async (props: RunGenerateProps) => {
   const { reporter } = props.logger;
-  const loadedConfig = props.config;
-  if (!props.options.ignorePending) {
-    const pm = await getPendingMigrations(props.client);
-    if (pm.length > 0) {
-      reporter.warn(
-        [
-          `There are pending migrations: ${pm.map((m) => m.id).join(", ")}`,
-          "Please apply them first before generating a new migration.",
-          "Otherwise, use --ignore-pending to skip this check.",
-        ].join("\n")
-      );
+
+  // Create the appropriate client (dev or production)
+  const { client: targetClient, cleanup } = await setupDatabaseClient(props);
+
+  try {
+    if (!props.options.ignorePending) {
+      const pm = await getPendingMigrations(props.client); // Always check against production for pending migrations
+      if (pm.length > 0) {
+        reporter.warn(
+          [
+            `There are pending migrations: ${pm.map((m) => m.id).join(", ")}`,
+            "Please apply them first before generating a new migration.",
+            "Otherwise, use --ignore-pending to skip this check.",
+          ].join("\n")
+        );
+        return;
+      }
+    }
+
+    const newMigration = await generateMigrationFromIntrospection({
+      client: targetClient,
+      config: props.config,
+    });
+
+    if (!newMigration) {
+      reporter.info("No changes detected, no migration needed.");
       return;
     }
+
+    printPrettyDiff(props.logger, newMigration.diff);
+
+    const migrationFilePath = `${migrationDirName}/${newMigration.id}.json`;
+    await mkdir(migrationDirName, { recursive: true });
+    await writeFile(migrationFilePath, JSON.stringify(newMigration, null, 2));
+
+    reporter.success(`Migration file generated: ${migrationFilePath}`);
+
+    if (props.options.apply) {
+      if (props.options.dev) {
+        reporter.warn(
+          "--apply flag is ignored when using --dev. Use 'kyrage apply' to apply to production database."
+        );
+      } else {
+        await runApply({
+          client: props.client,
+          logger: props.logger,
+          options: {
+            plan: props.options.plan,
+            pretty: false,
+          },
+        });
+      }
+    }
+  } finally {
+    await cleanup();
   }
+};
 
-  const newMigration = await generateMigrationFromIntrospection({
-    client: props.client,
-    config: loadedConfig,
-  });
+const setupDatabaseClient = async (props: RunGenerateProps) => {
+  const { reporter } = props.logger;
 
-  if (!newMigration) {
-    reporter.info("No changes detected, no migration needed.");
-    return;
-  }
-
-  printPrettyDiff(props.logger, newMigration.diff);
-
-  const migrationFilePath = `${migrationDirName}/${newMigration.id}.json`;
-  await mkdir(migrationDirName, { recursive: true });
-  await writeFile(migrationFilePath, JSON.stringify(newMigration, null, 2));
-
-  reporter.success(`Migration file generated: ${migrationFilePath}`);
-
-  if (props.options.apply) {
-    await runApply({
+  if (!props.options.dev) {
+    // Production database case - no cleanup needed
+    return {
       client: props.client,
-      logger: props.logger,
-      options: {
-        plan: props.options.plan,
-        pretty: false,
-      },
-    });
+      cleanup: async () => void 0,
+    };
   }
+
+  if (!props.config.dev) {
+    throw new Error(
+      "Dev database configuration is required when using --dev flag"
+    );
+  }
+
+  reporter.info("🚀 Starting dev database for migration generation...");
+
+  // Create dev database manager (closure)
+  const devManager = createDevDatabaseManager(
+    props.config.dev,
+    props.config.database.dialect
+  );
+
+  const devDatabase = await devManager.start();
+  reporter.success(`Dev database started: ${devDatabase.dialect}`);
+
+  // Create client for dev database
+  const devClient = getClient({ database: devDatabase });
+
+  // Apply baseline migrations to dev database
+  await applyBaselineToDevDatabase(devClient, props.logger);
+
+  // Return client and cleanup function that closes over devManager
+  return {
+    client: devClient,
+    cleanup: async () => {
+      await devManager.stop();
+      reporter.success("Dev database stopped");
+    },
+  };
 };
 
 const generateMigrationFromIntrospection = async (props: {

@@ -29,6 +29,11 @@ const generateCmd = defineCommand({
       description: "Ignore pending migrations and generate a new one",
       default: false,
     },
+    dev: {
+      type: "boolean",
+      description: "Use dev database for safe migration generation",
+      default: false,
+    },
   },
   run: async (ctx) => {
     try {
@@ -45,6 +50,7 @@ const generateCmd = defineCommand({
           ignorePending: ctx.args["ignore-pending"],
           apply: ctx.args.apply,
           plan: ctx.args.plan,
+          dev: ctx.args.dev,
         },
       });
     } catch (error) {

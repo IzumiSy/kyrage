@@ -37,8 +37,21 @@ const databaseSchema = z.object({
 });
 export type DatabaseValue = z.infer<typeof databaseSchema>;
 
+const devDatabaseSchema = z
+  .union([
+    z.object({
+      image: z.string(),
+    }),
+    z.object({
+      connectionString: z.string(),
+    }),
+  ])
+  .optional();
+export type DevDatabaseValue = z.infer<typeof devDatabaseSchema>;
+
 export const configSchema = z.object({
   database: databaseSchema,
+  dev: devDatabaseSchema,
   tables: z.array(tableSchema).readonly(),
   indexes: z.array(indexSchema).readonly(),
   primaryKeyConstraints: z.array(primaryKeyConstraintSchema).readonly(),

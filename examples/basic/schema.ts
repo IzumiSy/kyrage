@@ -7,6 +7,7 @@ export const members = t(
     email: c("text", { unique: true, notNull: true }),
     name: c("text", { unique: true }),
     age: c("integer"),
+    has_car: c("boolean", { defaultSql: "false" }),
     createdAt: c("timestamptz", { defaultSql: "now()" }),
   },
   (t) => [
