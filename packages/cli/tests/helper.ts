@@ -8,7 +8,7 @@ import { DialectEnum, configSchema } from "../src/config/loader";
 const getContainer = (dialect: string) => {
   switch (dialect) {
     case "postgres":
-      return new PostgreSqlContainer("postgres:14");
+      return new PostgreSqlContainer("postgres:16");
     case "cockroachdb":
       return new CockroachDbContainer("cockroachdb/cockroach:latest-v24.3");
     default:
