@@ -80,7 +80,7 @@ const generateMigrationFromIntrospection = async (props: {
   // カラム制約の判定
   const columnConstraintPredicate =
     (tableName: string, colName: string) =>
-    (constraints: Array<{ table: string; columns: string[] }>) =>
+    (constraints: ReadonlyArray<{ table: string; columns: string[] }>) =>
       constraints.some(
         (constraint) =>
           constraint.table === tableName &&

@@ -10,7 +10,7 @@ const tableColumnAttributesSchema = z
 export type TableColumnAttributes = z.infer<typeof tableColumnAttributesSchema>;
 
 // Tables型定義
-export type Tables = Array<{
+export type Tables = ReadonlyArray<{
   name: string;
   columns: Record<string, TableColumnAttributes>;
 }>;

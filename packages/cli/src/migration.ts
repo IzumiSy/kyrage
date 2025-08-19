@@ -72,7 +72,9 @@ export const getPendingMigrations = async (client: DBClient) => {
 
 type CreateMigrationProviderProps = {
   db: Kysely<any>;
-  migrationsResolver: () => Promise<Array<z.infer<typeof migrationSchema>>>;
+  migrationsResolver: () => Promise<
+    ReadonlyArray<z.infer<typeof migrationSchema>>
+  >;
   options: {
     plan: boolean;
   };

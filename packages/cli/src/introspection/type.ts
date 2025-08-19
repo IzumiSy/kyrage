@@ -7,9 +7,9 @@ export type ColumnExtraAttribute = {
   default: string | null;
   characterMaximumLength: number | null;
 };
-type ColumnExtraAttributes = Array<ColumnExtraAttribute>;
+type ColumnExtraAttributes = ReadonlyArray<ColumnExtraAttribute>;
 
-type IndexAttributes = Array<{
+type IndexAttributes = ReadonlyArray<{
   schema?: string;
   table: string;
   name: string;
@@ -52,7 +52,7 @@ export type ExtraIntrospectorDriver = {
 
 export type IndexIntrospector = {
   introspectIndexes: () => Promise<
-    Array<{
+    ReadonlyArray<{
       table: string;
       name: string;
       columns: string[];
