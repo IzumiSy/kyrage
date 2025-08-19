@@ -7,7 +7,6 @@ import { diffSchema } from "../diff";
 import { SchemaDiff, Tables, Operation } from "../operation";
 import { ConfigValue } from "../schema";
 import { getIntrospector } from "../introspection/introspector";
-import { ConstraintAttributes } from "../introspection/type";
 
 export const runGenerate = async (props: {
   client: DBClient;
@@ -77,7 +76,7 @@ const generateMigrationFromIntrospection = async (props: {
   // カラム制約の判定
   const columnConstraintPredicate =
     (tableName: string, colName: string) =>
-    (constraints: ConstraintAttributes) =>
+    (constraints: Array<{ table: string; columns: string[] }>) =>
       constraints.some(
         (constraint) =>
           constraint.table === tableName &&
@@ -129,6 +128,7 @@ const generateMigrationFromIntrospection = async (props: {
       indexes,
       primaryKeyConstraints: constraintAttributes.primaryKey,
       uniqueConstraints: constraintAttributes.unique,
+      foreignKeyConstraints: constraintAttributes.foreignKey,
     },
     ideal: {
       tables: configTables,
@@ -140,6 +140,7 @@ const generateMigrationFromIntrospection = async (props: {
       })),
       primaryKeyConstraints: config.primaryKeyConstraints || [],
       uniqueConstraints: config.uniqueConstraints || [],
+      foreignKeyConstraints: config.foreignKeyConstraints || [],
     },
   });
 
@@ -229,6 +230,18 @@ const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
       case "drop_unique_constraint":
         diffOutputs.push(
           `-- drop_unique_constraint: ${operation.table}.${operation.name}`
+        );
+        break;
+
+      case "create_foreign_key_constraint":
+        diffOutputs.push(
+          `-- create_foreign_key_constraint: ${operation.table}.${operation.name} (${operation.columns.join(", ")}) -> ${operation.referencedTable} (${operation.referencedColumns.join(", ")})${operation.onDelete ? ` ON DELETE ${operation.onDelete.toUpperCase()}` : ""}${operation.onUpdate ? ` ON UPDATE ${operation.onUpdate.toUpperCase()}` : ""}`
+        );
+        break;
+
+      case "drop_foreign_key_constraint":
+        diffOutputs.push(
+          `-- drop_foreign_key_constraint: ${operation.table}.${operation.name}`
         );
         break;
 

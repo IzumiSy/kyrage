@@ -22,7 +22,24 @@ type ConstraintAttribute = {
   type: "PRIMARY KEY" | "UNIQUE";
   columns: string[];
 };
-export type ConstraintAttributes = Array<ConstraintAttribute>;
+
+type ForeignKeyConstraintAttribute = {
+  schema?: string;
+  table: string;
+  name: string;
+  type: "FOREIGN KEY";
+  columns: string[];
+  referencedTable: string;
+  referencedColumns: string[];
+  onDelete?: "cascade" | "set null" | "set default" | "restrict" | "no action";
+  onUpdate?: "cascade" | "set null" | "set default" | "restrict" | "no action";
+};
+
+export type ConstraintAttributes = {
+  primaryKey: ConstraintAttribute[];
+  unique: ConstraintAttribute[];
+  foreignKey: ForeignKeyConstraintAttribute[];
+};
 
 export type ExtraIntrospectorDriver = {
   introspectTables: () => Promise<ColumnExtraAttributes>;

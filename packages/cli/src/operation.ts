@@ -82,6 +82,27 @@ export const operationSchema = z.discriminatedUnion("type", [
     table: z.string(),
     name: z.string(),
   }),
+
+  // Foreign key constraint operations
+  z.object({
+    type: z.literal("create_foreign_key_constraint"),
+    table: z.string(),
+    name: z.string(),
+    columns: z.array(z.string()),
+    referencedTable: z.string(),
+    referencedColumns: z.array(z.string()),
+    onDelete: z
+      .enum(["cascade", "set null", "set default", "restrict", "no action"])
+      .optional(),
+    onUpdate: z
+      .enum(["cascade", "set null", "set default", "restrict", "no action"])
+      .optional(),
+  }),
+  z.object({
+    type: z.literal("drop_foreign_key_constraint"),
+    table: z.string(),
+    name: z.string(),
+  }),
 ]);
 
 export type Operation = z.infer<typeof operationSchema>;
@@ -117,6 +138,17 @@ export type UniqueConstraint = {
   columns: string[];
 };
 
+// Foreign key constraint definition type
+export type ForeignKeyConstraint = {
+  table: string;
+  name: string;
+  columns: string[];
+  referencedTable: string;
+  referencedColumns: string[];
+  onDelete?: "cascade" | "set null" | "set default" | "restrict" | "no action";
+  onUpdate?: "cascade" | "set null" | "set default" | "restrict" | "no action";
+};
+
 // Tables型定義
 export type Tables = Array<{
   name: string;
@@ -128,6 +160,7 @@ export type SchemaSnapshot = {
   indexes: IndexDef[];
   primaryKeyConstraints: PrimaryKeyConstraint[];
   uniqueConstraints: UniqueConstraint[];
+  foreignKeyConstraints: ForeignKeyConstraint[];
 };
 
 // Operation creation helpers namespace
@@ -226,6 +259,36 @@ export const ops = {
 
   dropUniqueConstraint: (table: string, name: string) => ({
     type: "drop_unique_constraint" as const,
+    table,
+    name,
+  }),
+
+  createForeignKeyConstraint: (
+    table: string,
+    name: string,
+    columns: string[],
+    referencedTable: string,
+    referencedColumns: string[],
+    onDelete?:
+      | "cascade"
+      | "set null"
+      | "set default"
+      | "restrict"
+      | "no action",
+    onUpdate?: "cascade" | "set null" | "set default" | "restrict" | "no action"
+  ) => ({
+    type: "create_foreign_key_constraint" as const,
+    table,
+    name,
+    columns,
+    referencedTable,
+    referencedColumns,
+    onDelete,
+    onUpdate,
+  }),
+
+  dropForeignKeyConstraint: (table: string, name: string) => ({
+    type: "drop_foreign_key_constraint" as const,
     table,
     name,
   }),

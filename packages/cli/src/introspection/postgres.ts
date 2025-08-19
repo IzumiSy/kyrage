@@ -96,34 +96,120 @@ export const postgresExtraIntrospectorDriver = (props: {
           CASE c.contype
               WHEN 'p' THEN 'PRIMARY KEY'
               WHEN 'u' THEN 'UNIQUE'
+              WHEN 'f' THEN 'FOREIGN KEY'
           END AS constraint_type,
-          jsonb_agg(a.attname ORDER BY array_position(c.conkey, a.attnum)) AS columns
+          jsonb_agg(a.attname ORDER BY array_position(c.conkey, a.attnum)) AS columns,
+          -- Foreign Key専用の情報
+          CASE 
+              WHEN c.contype = 'f' THEN rt.relname 
+              ELSE NULL 
+          END AS referenced_table,
+          CASE 
+              WHEN c.contype = 'f' THEN jsonb_agg(ra.attname ORDER BY array_position(c.confkey, ra.attnum))
+              ELSE NULL 
+          END AS referenced_columns,
+          CASE 
+              WHEN c.contype = 'f' THEN 
+                  CASE c.confdeltype
+                      WHEN 'c' THEN 'cascade'
+                      WHEN 'n' THEN 'set null'
+                      WHEN 'd' THEN 'set default'
+                      WHEN 'r' THEN 'restrict'
+                      WHEN 'a' THEN 'no action'
+                  END
+              ELSE NULL
+          END AS on_delete,
+          CASE 
+              WHEN c.contype = 'f' THEN 
+                  CASE c.confupdtype
+                      WHEN 'c' THEN 'cascade'
+                      WHEN 'n' THEN 'set null'
+                      WHEN 'd' THEN 'set default'
+                      WHEN 'r' THEN 'restrict'
+                      WHEN 'a' THEN 'no action'
+                  END
+              ELSE NULL
+          END AS on_update
       FROM pg_constraint c
       JOIN pg_class t ON c.conrelid = t.oid
       JOIN pg_namespace n ON t.relnamespace = n.oid
       JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
-      WHERE c.contype IN ('p', 'u')  -- primary key and unique constraints
+      -- Foreign Key用のJOIN
+      LEFT JOIN pg_class rt ON c.confrelid = rt.oid
+      LEFT JOIN pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = ANY(c.confkey)
+      WHERE c.contype IN ('p', 'u', 'f')  -- primary key, unique, foreign key constraints
           AND n.nspname = 'public'
           AND NOT a.attisdropped
-      GROUP BY n.nspname, t.relname, c.conname, c.contype, c.oid, c.conkey, t.oid
+          AND (c.contype != 'f' OR NOT ra.attisdropped)  -- Foreign Key用の条件
+      GROUP BY n.nspname, t.relname, c.conname, c.contype, c.oid, c.conkey, t.oid, 
+               rt.relname, c.confkey, c.confdeltype, c.confupdtype
       ORDER BY t.relname, c.conname;
     `
       .$castTo<{
         schema_name: string;
         table_name: string;
         constraint_name: string;
-        constraint_type: "PRIMARY KEY" | "UNIQUE";
+        constraint_type: "PRIMARY KEY" | "UNIQUE" | "FOREIGN KEY";
         columns: string[];
+        referenced_table: string | null;
+        referenced_columns: string[] | null;
+        on_delete:
+          | "cascade"
+          | "set null"
+          | "set default"
+          | "restrict"
+          | "no action"
+          | null;
+        on_update:
+          | "cascade"
+          | "set null"
+          | "set default"
+          | "restrict"
+          | "no action"
+          | null;
       }>()
       .execute(db);
 
-    return rows.map((row) => ({
-      schema: row.schema_name,
-      table: row.table_name,
-      name: row.constraint_name,
-      type: row.constraint_type,
-      columns: row.columns,
-    }));
+    // 制約タイプ別に分離
+    const primaryKeyConstraints = rows
+      .filter((row) => row.constraint_type === "PRIMARY KEY")
+      .map((row) => ({
+        schema: row.schema_name,
+        table: row.table_name,
+        name: row.constraint_name,
+        type: "PRIMARY KEY" as const,
+        columns: row.columns,
+      }));
+
+    const uniqueConstraints = rows
+      .filter((row) => row.constraint_type === "UNIQUE")
+      .map((row) => ({
+        schema: row.schema_name,
+        table: row.table_name,
+        name: row.constraint_name,
+        type: "UNIQUE" as const,
+        columns: row.columns,
+      }));
+
+    const foreignKeyConstraints = rows
+      .filter((row) => row.constraint_type === "FOREIGN KEY")
+      .map((row) => ({
+        schema: row.schema_name,
+        table: row.table_name,
+        name: row.constraint_name,
+        type: "FOREIGN KEY" as const,
+        columns: row.columns,
+        referencedTable: row.referenced_table!,
+        referencedColumns: row.referenced_columns!,
+        onDelete: row.on_delete || undefined,
+        onUpdate: row.on_update || undefined,
+      }));
+
+    return {
+      primaryKey: primaryKeyConstraints,
+      unique: uniqueConstraints,
+      foreignKey: foreignKeyConstraints,
+    };
   };
 
   return {
@@ -153,11 +239,20 @@ export type PostgresConstraint = {
   schema: string;
   table: string;
   name: string;
-  type: "PRIMARY KEY" | "UNIQUE";
+  type: "PRIMARY KEY" | "UNIQUE" | "FOREIGN KEY";
   columns: string[];
+};
+
+export type PostgresForeignKeyConstraint = PostgresConstraint & {
+  type: "FOREIGN KEY";
+  referencedTable: string;
+  referencedColumns: string[];
+  onDelete?: "cascade" | "set null" | "set default" | "restrict" | "no action";
+  onUpdate?: "cascade" | "set null" | "set default" | "restrict" | "no action";
 };
 
 export type PostgresConstraints = {
   primaryKey: PostgresConstraint[];
   unique: PostgresConstraint[];
+  foreignKey: PostgresForeignKeyConstraint[];
 };

@@ -62,15 +62,22 @@ export const getIntrospector = (client: DBClient) => {
         (v) => !v.table.startsWith("kysely_")
       ),
     getConstraints: async () => {
-      const constraints = (
-        await extIntrospectorDriver.introspectConstraints()
-      ).filter((v) => !v.table.startsWith("kysely_"));
-      const primaryKey = constraints.filter((c) => c.type === "PRIMARY KEY");
-      const unique = constraints.filter((c) => c.type === "UNIQUE");
+      const constraintResult =
+        await extIntrospectorDriver.introspectConstraints();
+      const primaryKey = constraintResult.primaryKey.filter(
+        (v) => !v.table.startsWith("kysely_")
+      );
+      const unique = constraintResult.unique.filter(
+        (v) => !v.table.startsWith("kysely_")
+      );
+      const foreignKey = constraintResult.foreignKey.filter(
+        (v) => !v.table.startsWith("kysely_")
+      );
 
       return {
         primaryKey,
         unique,
+        foreignKey,
       };
     },
   };

@@ -128,6 +128,10 @@ async function executeOperation(
       return executeCreateUniqueConstraint(db, operation);
     case "drop_unique_constraint":
       return executeDropUniqueConstraint(db, operation);
+    case "create_foreign_key_constraint":
+      return executeCreateForeignKeyConstraint(db, operation);
+    case "drop_foreign_key_constraint":
+      return executeDropForeignKeyConstraint(db, operation);
     default:
       throw new Error(`Unknown operation type: ${(operation as any).type}`);
   }
@@ -290,6 +294,39 @@ async function executeDropUniqueConstraint(
     .execute();
 }
 
+async function executeCreateForeignKeyConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "create_foreign_key_constraint" }>
+): Promise<void> {
+  let builder = db.schema
+    .alterTable(operation.table)
+    .addForeignKeyConstraint(
+      operation.name,
+      operation.columns,
+      operation.referencedTable,
+      operation.referencedColumns
+    );
+
+  if (operation.onDelete) {
+    builder = builder.onDelete(operation.onDelete);
+  }
+  if (operation.onUpdate) {
+    builder = builder.onUpdate(operation.onUpdate);
+  }
+
+  await builder.execute();
+}
+
+async function executeDropForeignKeyConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "drop_foreign_key_constraint" }>
+): Promise<void> {
+  await db.schema
+    .alterTable(operation.table)
+    .dropConstraint(operation.name)
+    .execute();
+}
+
 const assertDataType: (
   dataType: string
 ) => asserts dataType is ColumnDataType = (dataType) => {
@@ -302,6 +339,7 @@ const assertDataType: (
 // Lower numbers have higher priority (executed first)
 const OPERATION_PRIORITY = {
   // 1. Drop constraints and indexes first (highest priority)
+  drop_foreign_key_constraint: 0, // Foreign keys must be dropped first
   drop_unique_constraint: 1,
   drop_primary_key_constraint: 2,
   drop_index: 3,
@@ -321,6 +359,7 @@ const OPERATION_PRIORITY = {
   create_index: 9,
   create_primary_key_constraint: 10,
   create_unique_constraint: 11,
+  create_foreign_key_constraint: 12, // Foreign keys must be created last
 } as const;
 
 /**

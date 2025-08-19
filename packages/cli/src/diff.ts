@@ -7,6 +7,7 @@ import {
   IndexDef,
   PrimaryKeyConstraint,
   UniqueConstraint,
+  ForeignKeyConstraint,
   ops,
 } from "./operation";
 import * as R from "ramda";
@@ -353,6 +354,80 @@ export function diffUniqueConstraints(props: {
   return operations;
 }
 
+// Foreign Key制約のdiff計算
+function diffForeignKeyConstraints(props: {
+  current: ForeignKeyConstraint[];
+  ideal: ForeignKeyConstraint[];
+}): Operation[] {
+  const operations: Operation[] = [];
+  const diffOps = createDiffOperations<string>();
+
+  const currentNames = props.current.map(getName);
+  const idealNames = props.ideal.map(getName);
+
+  // 追加されたForeign Key制約
+  operations.push(
+    ...diffOps.added(currentNames, idealNames, (name) => {
+      const fk = props.ideal.find((f) => f.name === name)!;
+      return ops.createForeignKeyConstraint(
+        fk.table,
+        fk.name,
+        fk.columns,
+        fk.referencedTable,
+        fk.referencedColumns,
+        fk.onDelete,
+        fk.onUpdate
+      );
+    })
+  );
+
+  // 削除されたForeign Key制約
+  operations.push(
+    ...diffOps.removed(currentNames, idealNames, (name) => {
+      const fk = props.current.find((f) => f.name === name)!;
+      return ops.dropForeignKeyConstraint(fk.table, fk.name);
+    })
+  );
+
+  // 変更されたForeign Key制約（削除→追加で対応）
+  const foreignKeyChanged = (name: string) => {
+    const current = props.current.find((f) => f.name === name);
+    const ideal = props.ideal.find((f) => f.name === name);
+    if (!current || !ideal) return false;
+
+    return !(
+      R.equals(current.columns, ideal.columns) &&
+      current.referencedTable === ideal.referencedTable &&
+      R.equals(current.referencedColumns, ideal.referencedColumns) &&
+      current.onDelete === ideal.onDelete &&
+      current.onUpdate === ideal.onUpdate
+    );
+  };
+
+  operations.push(
+    ...diffOps
+      .changed(currentNames, idealNames, foreignKeyChanged, (name) => {
+        const current = props.current.find((f) => f.name === name)!;
+        const ideal = props.ideal.find((f) => f.name === name)!;
+        return [
+          ops.dropForeignKeyConstraint(current.table, current.name),
+          ops.createForeignKeyConstraint(
+            ideal.table,
+            ideal.name,
+            ideal.columns,
+            ideal.referencedTable,
+            ideal.referencedColumns,
+            ideal.onDelete,
+            ideal.onUpdate
+          ),
+        ];
+      })
+      .flat()
+  );
+
+  return operations;
+}
+
 export function diffSchema(props: {
   current: SchemaSnapshot;
   ideal: SchemaSnapshot;
@@ -373,6 +448,10 @@ export function diffSchema(props: {
     current: props.current.uniqueConstraints,
     ideal: props.ideal.uniqueConstraints,
   });
+  const foreignKeyOperations = diffForeignKeyConstraints({
+    current: props.current.foreignKeyConstraints,
+    ideal: props.ideal.foreignKeyConstraints,
+  });
 
   return {
     operations: [
@@ -380,6 +459,7 @@ export function diffSchema(props: {
       ...indexOperations,
       ...primaryKeyOperations,
       ...uniqueOperations,
+      ...foreignKeyOperations,
     ],
   };
 }

@@ -35,6 +35,24 @@ const uniqueConstraintSchema = z.object({
   columns: z.array(z.string()),
 });
 
+const foreignKeyConstraintSchema = z.object({
+  table: z.string(),
+  name: z.string(),
+  columns: z.array(z.string()),
+  referencedTable: z.string(),
+  referencedColumns: z.array(z.string()),
+  onDelete: z
+    .enum(["cascade", "set null", "set default", "restrict", "no action"])
+    .optional(),
+  onUpdate: z
+    .enum(["cascade", "set null", "set default", "restrict", "no action"])
+    .optional(),
+});
+
+export type ForeignKeyConstraintValue = z.infer<
+  typeof foreignKeyConstraintSchema
+>;
+
 const dialectEnum = z.enum(["postgres", "cockroachdb", "mysql", "sqlite"]);
 export type DialectEnum = z.infer<typeof dialectEnum>;
 
@@ -50,6 +68,7 @@ export const configSchema = z.object({
   indexes: z.array(indexSchema),
   primaryKeyConstraints: z.array(primaryKeyConstraintSchema),
   uniqueConstraints: z.array(uniqueConstraintSchema),
+  foreignKeyConstraints: z.array(foreignKeyConstraintSchema),
 });
 export type ConfigValue = z.infer<typeof configSchema>;
 
