@@ -1,17 +1,6 @@
-import { z } from "zod";
-import {
-  ForeignKeyConstraint,
-  foreignKeyConstraintSchema,
-  PrimaryKeyConstraint,
-  primaryKeyConstraintSchema,
-  ReferentialActions,
-  tableColumnOpSchemaBase,
-  tableOpSchemaBase,
-  UniqueConstraint,
-  uniqueConstraintSchema,
-} from "./schema";
+import z from "zod";
+import { IndexSchema } from "./config/loader";
 
-// TableColumnAttributesのスキーマを直接定義
 const tableColumnAttributesSchema = z
   .object({
     type: z.string(),
@@ -19,6 +8,67 @@ const tableColumnAttributesSchema = z
   .catchall(z.any());
 
 export type TableColumnAttributes = z.infer<typeof tableColumnAttributesSchema>;
+
+// Tables型定義
+export type Tables = Array<{
+  name: string;
+  columns: Record<string, TableColumnAttributes>;
+}>;
+
+export type SchemaSnapshot = {
+  tables: Tables;
+  indexes: IndexSchema[];
+  primaryKeyConstraints: PrimaryKeyConstraintSchema[];
+  uniqueConstraints: UniqueConstraintSchema[];
+  foreignKeyConstraints: ForeignKeyConstraintSchema[];
+};
+
+export const tableOpSchemaBase = z.object({
+  table: z.string(),
+  name: z.string(),
+});
+export type TableOpValue = z.infer<typeof tableOpSchemaBase>;
+
+export const tableColumnOpSchemaBase = z.object({
+  table: z.string(),
+  column: z.string(),
+});
+export type TableColumnOpValue = z.infer<typeof tableColumnOpSchemaBase>;
+
+export const primaryKeyConstraintSchema = z.object({
+  ...tableOpSchemaBase.shape,
+  columns: z.array(z.string()),
+});
+export type PrimaryKeyConstraintSchema = z.infer<
+  typeof primaryKeyConstraintSchema
+>;
+
+export const uniqueConstraintSchema = z.object({
+  ...tableOpSchemaBase.shape,
+  columns: z.array(z.string()),
+});
+export type UniqueConstraintSchema = z.infer<typeof uniqueConstraintSchema>;
+
+const referentialActionsSchema = z.enum([
+  "cascade",
+  "set null",
+  "set default",
+  "restrict",
+  "no action",
+]);
+export type ReferentialActions = z.infer<typeof referentialActionsSchema>;
+
+export const foreignKeyConstraintSchema = z.object({
+  ...tableOpSchemaBase.shape,
+  columns: z.array(z.string()),
+  referencedTable: z.string(),
+  referencedColumns: z.array(z.string()),
+  onDelete: referentialActionsSchema.optional(),
+  onUpdate: referentialActionsSchema.optional(),
+});
+export type ForeignKeyConstraintSchema = z.infer<
+  typeof foreignKeyConstraintSchema
+>;
 
 // Operation型定義
 export const operationSchema = z.discriminatedUnion("type", [
@@ -35,17 +85,17 @@ export const operationSchema = z.discriminatedUnion("type", [
 
   // Column operations
   z.object({
-    ...tableColumnOpSchemaBase,
+    ...tableColumnOpSchemaBase.shape,
     type: z.literal("add_column"),
     attributes: tableColumnAttributesSchema,
   }),
   z.object({
-    ...tableColumnOpSchemaBase,
+    ...tableColumnOpSchemaBase.shape,
     type: z.literal("drop_column"),
     attributes: tableColumnAttributesSchema,
   }),
   z.object({
-    ...tableColumnOpSchemaBase,
+    ...tableColumnOpSchemaBase.shape,
     type: z.literal("alter_column"),
     before: tableColumnAttributesSchema,
     after: tableColumnAttributesSchema,
@@ -53,13 +103,13 @@ export const operationSchema = z.discriminatedUnion("type", [
 
   // Index operations
   z.object({
-    ...tableOpSchemaBase,
+    ...tableOpSchemaBase.shape,
     type: z.literal("create_index"),
     columns: z.array(z.string()),
     unique: z.boolean(),
   }),
   z.object({
-    ...tableOpSchemaBase,
+    ...tableOpSchemaBase.shape,
     type: z.literal("drop_index"),
   }),
 
@@ -69,7 +119,7 @@ export const operationSchema = z.discriminatedUnion("type", [
     type: z.literal("create_primary_key_constraint"),
   }),
   z.object({
-    ...tableOpSchemaBase,
+    ...tableOpSchemaBase.shape,
     type: z.literal("drop_primary_key_constraint"),
   }),
 
@@ -79,7 +129,7 @@ export const operationSchema = z.discriminatedUnion("type", [
     type: z.literal("create_unique_constraint"),
   }),
   z.object({
-    ...tableOpSchemaBase,
+    ...tableOpSchemaBase.shape,
     type: z.literal("drop_unique_constraint"),
   }),
 
@@ -89,42 +139,11 @@ export const operationSchema = z.discriminatedUnion("type", [
     type: z.literal("create_foreign_key_constraint"),
   }),
   z.object({
-    ...tableOpSchemaBase,
+    ...tableOpSchemaBase.shape,
     type: z.literal("drop_foreign_key_constraint"),
   }),
 ]);
-
 export type Operation = z.infer<typeof operationSchema>;
-
-// 新しいSchemaDiff型
-export const schemaDiffSchema = z.object({
-  operations: z.array(operationSchema),
-});
-
-export type SchemaDiff = z.infer<typeof schemaDiffSchema>;
-
-// Index定義型
-export const indexDefSchema = z.object({
-  ...tableOpSchemaBase,
-  columns: z.array(z.string()),
-  unique: z.boolean(),
-});
-
-export type IndexDef = z.infer<typeof indexDefSchema>;
-
-// Tables型定義
-export type Tables = Array<{
-  name: string;
-  columns: Record<string, TableColumnAttributes>;
-}>;
-
-export type SchemaSnapshot = {
-  tables: Tables;
-  indexes: IndexDef[];
-  primaryKeyConstraints: PrimaryKeyConstraint[];
-  uniqueConstraints: UniqueConstraint[];
-  foreignKeyConstraints: ForeignKeyConstraint[];
-};
 
 // Operation creation helpers namespace
 export const ops = {
@@ -143,111 +162,81 @@ export const ops = {
   }),
 
   addColumn: (
-    table: string,
-    column: string,
+    tableColumn: TableColumnOpValue,
     attributes: TableColumnAttributes
   ) => ({
+    ...tableColumn,
     type: "add_column" as const,
-    table,
-    column,
     attributes,
   }),
 
   dropColumn: (
-    table: string,
-    column: string,
+    tableColumn: TableColumnOpValue,
     attributes: TableColumnAttributes
   ) => ({
+    ...tableColumn,
     type: "drop_column" as const,
-    table,
-    column,
     attributes,
   }),
 
   alterColumn: (
-    table: string,
-    column: string,
+    tableColumn: TableColumnOpValue,
     before: TableColumnAttributes,
     after: TableColumnAttributes
   ) => ({
+    ...tableColumn,
     type: "alter_column" as const,
-    table,
-    column,
     before,
     after,
   }),
 
-  createIndex: (
-    table: string,
-    name: string,
-    columns: string[],
-    unique: boolean
-  ) => ({
+  createIndex: (value: IndexSchema) => ({
+    ...value,
     type: "create_index" as const,
-    table,
-    name,
-    columns,
-    unique,
   }),
 
-  dropIndex: (table: string, name: string) => ({
+  dropIndex: (value: TableOpValue) => ({
+    ...value,
     type: "drop_index" as const,
-    table,
-    name,
   }),
 
-  createPrimaryKeyConstraint: (
-    table: string,
-    name: string,
-    columns: string[]
-  ) => ({
+  createPrimaryKeyConstraint: (value: PrimaryKeyConstraintSchema) => ({
+    ...value,
     type: "create_primary_key_constraint" as const,
-    table,
-    name,
-    columns,
   }),
 
-  dropPrimaryKeyConstraint: (table: string, name: string) => ({
+  dropPrimaryKeyConstraint: (value: TableOpValue) => ({
+    ...value,
     type: "drop_primary_key_constraint" as const,
-    table,
-    name,
   }),
 
-  createUniqueConstraint: (table: string, name: string, columns: string[]) => ({
+  createUniqueConstraint: (value: UniqueConstraintSchema) => ({
+    ...value,
     type: "create_unique_constraint" as const,
-    table,
-    name,
-    columns,
   }),
 
-  dropUniqueConstraint: (table: string, name: string) => ({
+  dropUniqueConstraint: (value: TableOpValue) => ({
+    ...value,
     type: "drop_unique_constraint" as const,
-    table,
-    name,
   }),
 
   createForeignKeyConstraint: (
-    table: string,
-    name: string,
-    columns: string[],
-    referencedTable: string,
-    referencedColumns: string[],
-    onDelete?: ReferentialActions,
-    onUpdate?: ReferentialActions
+    tableOpValue: TableOpValue,
+    options: {
+      columns: string[];
+      referencedTable: string;
+      referencedColumns: string[];
+      onDelete?: ReferentialActions;
+      onUpdate?: ReferentialActions;
+    }
   ) => ({
+    ...tableOpValue,
+    ...options,
     type: "create_foreign_key_constraint" as const,
-    table,
-    name,
-    columns,
-    referencedTable,
-    referencedColumns,
-    onDelete,
-    onUpdate,
   }),
 
-  dropForeignKeyConstraint: (table: string, name: string) => ({
+  dropForeignKeyConstraint: (value: TableOpValue) => ({
+    ...value,
     type: "drop_foreign_key_constraint" as const,
-    table,
-    name,
   }),
 };

@@ -7,19 +7,14 @@ import {
   PostgresDialect,
   SqliteDialect,
 } from "kysely";
-import { DialectEnum } from "./schema";
 import { Pool } from "pg";
 import { createPool } from "mysql2";
 import Database from "better-sqlite3";
 import { CockroachDBDialect } from "./dialects/cockroachdb";
 import { SQLCollectingDriver } from "./collector";
+import { DatabaseValue } from "./config/loader";
 
-type DatabaseProps = {
-  dialect: DialectEnum;
-  connectionString: string;
-};
-
-const getDialect = (props: DatabaseProps) => {
+const getDialect = (props: DatabaseValue) => {
   switch (props.dialect) {
     case "cockroachdb": {
       return new CockroachDBDialect({
@@ -51,7 +46,7 @@ const getDialect = (props: DatabaseProps) => {
 };
 
 export type GetClientProps = {
-  database: DatabaseProps;
+  database: DatabaseValue;
   options?: {
     plan: boolean;
   };
@@ -61,7 +56,7 @@ export const getClient = (props: GetClientProps) =>
   new DBClient({ databaseProps: props.database, options: props.options });
 
 type DBClientConstructorProps = {
-  databaseProps: DatabaseProps;
+  databaseProps: DatabaseValue;
   options?: {
     plan: boolean;
   };

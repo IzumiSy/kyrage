@@ -1,18 +1,16 @@
 import {
-  Operation,
-  SchemaDiff,
-  TableColumnAttributes,
   Tables,
   SchemaSnapshot,
-  IndexDef,
   ops,
+  Operation,
+  TableColumnAttributes,
+  ForeignKeyConstraintSchema,
+  PrimaryKeyConstraintSchema,
+  UniqueConstraintSchema,
 } from "./operation";
 import * as R from "ramda";
-import {
-  PrimaryKeyConstraint,
-  UniqueConstraint,
-  ForeignKeyConstraint,
-} from "./schema";
+import { IndexSchema } from "./config/loader";
+import { SchemaDiff } from "./migration";
 
 // 汎用的なdiff演算子
 const createDiffOperations = <K>() => ({
@@ -63,7 +61,13 @@ function computeTableColumnOperations(
     }))
     .forEach((col) => {
       operations.push(
-        ops.addColumn(currentTable.name, col.column, col.attributes)
+        ops.addColumn(
+          {
+            table: currentTable.name,
+            column: col.column,
+          },
+          col.attributes
+        )
       );
     });
 
@@ -75,7 +79,13 @@ function computeTableColumnOperations(
     }))
     .forEach((col) => {
       operations.push(
-        ops.dropColumn(currentTable.name, col.column, col.attributes)
+        ops.dropColumn(
+          {
+            table: currentTable.name,
+            column: col.column,
+          },
+          col.attributes
+        )
       );
     });
 
@@ -93,7 +103,14 @@ function computeTableColumnOperations(
     )
     .forEach((col) => {
       operations.push(
-        ops.alterColumn(currentTable.name, col.column, col.before, col.after)
+        ops.alterColumn(
+          {
+            table: currentTable.name,
+            column: col.column,
+          },
+          col.before,
+          col.after
+        )
       );
     });
 
@@ -137,13 +154,13 @@ export function diffTables(props: {
 }
 
 export function diffIndexes(props: {
-  current: IndexDef[];
-  ideal: IndexDef[];
+  current: IndexSchema[];
+  ideal: IndexSchema[];
 }): Operation[] {
   const { current, ideal } = props;
   const operations: Operation[] = [];
   const diffOps = createDiffOperations<string>();
-  const indexKey = (i: IndexDef) => `${i.table}:${i.name}`;
+  const indexKey = (i: IndexSchema) => `${i.table}:${i.name}`;
 
   // SQLレベルでシステム生成のインデックスは除外済みなので、すべてを対象とする
   const currentIndexMap = new Map(current.map((i) => [indexKey(i), i]));
@@ -156,9 +173,7 @@ export function diffIndexes(props: {
   diffOps
     .added(currentKeys, idealKeys, (key: string) => idealIndexMap.get(key)!)
     .forEach((index) => {
-      operations.push(
-        ops.createIndex(index.table, index.name, index.columns, index.unique)
-      );
+      operations.push(ops.createIndex(index));
     });
 
   // 削除インデックス
@@ -168,7 +183,7 @@ export function diffIndexes(props: {
       return { table: index.table, name: index.name };
     })
     .forEach((index) => {
-      operations.push(ops.dropIndex(index.table, index.name));
+      operations.push(ops.dropIndex(index));
     });
 
   // 変更インデックス（削除→再作成）
@@ -190,28 +205,22 @@ export function diffIndexes(props: {
     )
     .forEach(({ current: currentIndex, ideal: idealIndex }) => {
       // 削除してから再作成
-      operations.push(ops.dropIndex(currentIndex.table, currentIndex.name));
-      operations.push(
-        ops.createIndex(
-          idealIndex.table,
-          idealIndex.name,
-          idealIndex.columns,
-          idealIndex.unique
-        )
-      );
+      operations.push(ops.dropIndex(currentIndex));
+      operations.push(ops.createIndex(idealIndex));
     });
 
   return operations;
 }
 
 export function diffPrimaryKeyConstraints(props: {
-  current: PrimaryKeyConstraint[];
-  ideal: PrimaryKeyConstraint[];
+  current: PrimaryKeyConstraintSchema[];
+  ideal: PrimaryKeyConstraintSchema[];
 }): Operation[] {
   const { current, ideal } = props;
   const operations: Operation[] = [];
   const diffOps = createDiffOperations<string>();
-  const constraintKey = (pk: PrimaryKeyConstraint) => `${pk.table}:${pk.name}`;
+  const constraintKey = (pk: PrimaryKeyConstraintSchema) =>
+    `${pk.table}:${pk.name}`;
 
   const currentPKMap = new Map(current.map((pk) => [constraintKey(pk), pk]));
   const idealPKMap = new Map(ideal.map((pk) => [constraintKey(pk), pk]));
@@ -223,13 +232,7 @@ export function diffPrimaryKeyConstraints(props: {
   diffOps
     .added(currentKeys, idealKeys, (key: string) => idealPKMap.get(key)!)
     .forEach((constraint) => {
-      operations.push(
-        ops.createPrimaryKeyConstraint(
-          constraint.table,
-          constraint.name,
-          constraint.columns
-        )
-      );
+      operations.push(ops.createPrimaryKeyConstraint(constraint));
     });
 
   // 削除制約
@@ -239,9 +242,7 @@ export function diffPrimaryKeyConstraints(props: {
       return { table: constraint.table, name: constraint.name };
     })
     .forEach((constraint) => {
-      operations.push(
-        ops.dropPrimaryKeyConstraint(constraint.table, constraint.name)
-      );
+      operations.push(ops.dropPrimaryKeyConstraint(constraint));
     });
 
   // 変更制約（カラムが変更された場合は削除→再作成）
@@ -262,32 +263,22 @@ export function diffPrimaryKeyConstraints(props: {
     )
     .forEach(({ current: currentConstraint, ideal: idealConstraint }) => {
       // 削除してから再作成
-      operations.push(
-        ops.dropPrimaryKeyConstraint(
-          currentConstraint.table,
-          currentConstraint.name
-        )
-      );
-      operations.push(
-        ops.createPrimaryKeyConstraint(
-          idealConstraint.table,
-          idealConstraint.name,
-          idealConstraint.columns
-        )
-      );
+      operations.push(ops.dropPrimaryKeyConstraint(currentConstraint));
+      operations.push(ops.createPrimaryKeyConstraint(idealConstraint));
     });
 
   return operations;
 }
 
 export function diffUniqueConstraints(props: {
-  current: UniqueConstraint[];
-  ideal: UniqueConstraint[];
+  current: UniqueConstraintSchema[];
+  ideal: UniqueConstraintSchema[];
 }): Operation[] {
   const { current, ideal } = props;
   const operations: Operation[] = [];
   const diffOps = createDiffOperations<string>();
-  const constraintKey = (uq: UniqueConstraint) => `${uq.table}:${uq.name}`;
+  const constraintKey = (uq: UniqueConstraintSchema) =>
+    `${uq.table}:${uq.name}`;
 
   const currentUQMap = new Map(current.map((uq) => [constraintKey(uq), uq]));
   const idealUQMap = new Map(ideal.map((uq) => [constraintKey(uq), uq]));
@@ -299,13 +290,7 @@ export function diffUniqueConstraints(props: {
   diffOps
     .added(currentKeys, idealKeys, (key: string) => idealUQMap.get(key)!)
     .forEach((constraint) => {
-      operations.push(
-        ops.createUniqueConstraint(
-          constraint.table,
-          constraint.name,
-          constraint.columns
-        )
-      );
+      operations.push(ops.createUniqueConstraint(constraint));
     });
 
   // 削除制約
@@ -315,9 +300,7 @@ export function diffUniqueConstraints(props: {
       return { table: constraint.table, name: constraint.name };
     })
     .forEach((constraint) => {
-      operations.push(
-        ops.dropUniqueConstraint(constraint.table, constraint.name)
-      );
+      operations.push(ops.dropUniqueConstraint(constraint));
     });
 
   // 変更制約（カラムが変更された場合は削除→再作成）
@@ -338,19 +321,8 @@ export function diffUniqueConstraints(props: {
     )
     .forEach(({ current: currentConstraint, ideal: idealConstraint }) => {
       // 削除してから再作成
-      operations.push(
-        ops.dropUniqueConstraint(
-          currentConstraint.table,
-          currentConstraint.name
-        )
-      );
-      operations.push(
-        ops.createUniqueConstraint(
-          idealConstraint.table,
-          idealConstraint.name,
-          idealConstraint.columns
-        )
-      );
+      operations.push(ops.dropUniqueConstraint(currentConstraint));
+      operations.push(ops.createUniqueConstraint(idealConstraint));
     });
 
   return operations;
@@ -358,8 +330,8 @@ export function diffUniqueConstraints(props: {
 
 // Foreign Key制約のdiff計算
 function diffForeignKeyConstraints(props: {
-  current: ForeignKeyConstraint[];
-  ideal: ForeignKeyConstraint[];
+  current: ForeignKeyConstraintSchema[];
+  ideal: ForeignKeyConstraintSchema[];
 }): Operation[] {
   const operations: Operation[] = [];
   const diffOps = createDiffOperations<string>();
@@ -369,25 +341,24 @@ function diffForeignKeyConstraints(props: {
 
   // 追加されたForeign Key制約
   operations.push(
-    ...diffOps.added(currentNames, idealNames, (name) => {
-      const fk = props.ideal.find((f) => f.name === name)!;
+    ...diffOps.added(currentNames, idealNames, (fkName) => {
+      const fk = props.ideal.find((f) => f.name === fkName)!;
+      const { table, name, ...options } = fk;
       return ops.createForeignKeyConstraint(
-        fk.table,
-        fk.name,
-        fk.columns,
-        fk.referencedTable,
-        fk.referencedColumns,
-        fk.onDelete,
-        fk.onUpdate
+        {
+          table,
+          name,
+        },
+        options
       );
     })
   );
 
   // 削除されたForeign Key制約
   operations.push(
-    ...diffOps.removed(currentNames, idealNames, (name) => {
-      const fk = props.current.find((f) => f.name === name)!;
-      return ops.dropForeignKeyConstraint(fk.table, fk.name);
+    ...diffOps.removed(currentNames, idealNames, (fkName) => {
+      const fk = props.current.find((f) => f.name === fkName)!;
+      return ops.dropForeignKeyConstraint(fk);
     })
   );
 
@@ -408,19 +379,18 @@ function diffForeignKeyConstraints(props: {
 
   operations.push(
     ...diffOps
-      .changed(currentNames, idealNames, foreignKeyChanged, (name) => {
-        const current = props.current.find((f) => f.name === name)!;
-        const ideal = props.ideal.find((f) => f.name === name)!;
+      .changed(currentNames, idealNames, foreignKeyChanged, (fkName) => {
+        const current = props.current.find((f) => f.name === fkName)!;
+        const ideal = props.ideal.find((f) => f.name === fkName)!;
+        const { table, name, ...options } = ideal;
         return [
-          ops.dropForeignKeyConstraint(current.table, current.name),
+          ops.dropForeignKeyConstraint(current),
           ops.createForeignKeyConstraint(
-            ideal.table,
-            ideal.name,
-            ideal.columns,
-            ideal.referencedTable,
-            ideal.referencedColumns,
-            ideal.onDelete,
-            ideal.onUpdate
+            {
+              table,
+              name,
+            },
+            options
           ),
         ];
       })

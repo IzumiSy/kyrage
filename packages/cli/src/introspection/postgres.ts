@@ -1,6 +1,7 @@
 import { sql } from "kysely";
 import { DBClient } from "../client";
-import { ReferentialActions } from "../schema";
+import { ReferentialActions } from "../operation";
+import { ExtraIntrospectorDriver } from "./type";
 
 const nameDict = {
   bool: "boolean",
@@ -14,7 +15,7 @@ const convertTypeName = (typeName: string) =>
 
 export const postgresExtraIntrospectorDriver = (props: {
   client: DBClient;
-}) => {
+}): ExtraIntrospectorDriver => {
   const introspectTables = async () => {
     const client = props.client;
     await using db = client.getDB();
@@ -91,14 +92,14 @@ export const postgresExtraIntrospectorDriver = (props: {
     await using db = client.getDB();
     const { rows } = await sql`
       SELECT
-          n.nspname AS schema_name,
-          t.relname AS table_name,
-          c.conname AS constraint_name,
+          n.nspname AS schema,
+          t.relname AS table,
+          c.conname AS name,
           CASE c.contype
               WHEN 'p' THEN 'PRIMARY KEY'
               WHEN 'u' THEN 'UNIQUE'
               WHEN 'f' THEN 'FOREIGN KEY'
-          END AS constraint_type,
+          END AS type,
           jsonb_agg(a.attname ORDER BY array_position(c.conkey, a.attnum)) AS columns,
           -- Foreign Key専用の情報
           CASE 
@@ -146,48 +147,18 @@ export const postgresExtraIntrospectorDriver = (props: {
                rt.relname, c.confkey, c.confdeltype, c.confupdtype
       ORDER BY t.relname, c.conname;
     `
-      .$castTo<{
-        schema_name: string;
-        table_name: string;
-        constraint_name: string;
-        constraint_type: "PRIMARY KEY" | "UNIQUE" | "FOREIGN KEY";
-        columns: string[];
-        referenced_table: string | null;
-        referenced_columns: string[] | null;
-        on_delete: ReferentialActions | null;
-        on_update: ReferentialActions | null;
-      }>()
+      .$castTo<PostgresConstraint>()
       .execute(db);
 
     // 制約タイプ別に分離
-    const primaryKeyConstraints = rows
-      .filter((row) => row.constraint_type === "PRIMARY KEY")
-      .map((row) => ({
-        schema: row.schema_name,
-        table: row.table_name,
-        name: row.constraint_name,
-        type: "PRIMARY KEY" as const,
-        columns: row.columns,
-      }));
-
-    const uniqueConstraints = rows
-      .filter((row) => row.constraint_type === "UNIQUE")
-      .map((row) => ({
-        schema: row.schema_name,
-        table: row.table_name,
-        name: row.constraint_name,
-        type: "UNIQUE" as const,
-        columns: row.columns,
-      }));
-
+    const primaryKeyConstraints = rows.filter(
+      (row) => row.type === "PRIMARY KEY"
+    );
+    const uniqueConstraints = rows.filter((row) => row.type === "UNIQUE");
     const foreignKeyConstraints = rows
-      .filter((row) => row.constraint_type === "FOREIGN KEY")
+      .filter((row) => row.type === "FOREIGN KEY")
       .map((row) => ({
-        schema: row.schema_name,
-        table: row.table_name,
-        name: row.constraint_name,
-        type: "FOREIGN KEY" as const,
-        columns: row.columns,
+        ...row,
         referencedTable: row.referenced_table!,
         referencedColumns: row.referenced_columns!,
         onDelete: row.on_delete || undefined,
@@ -209,7 +180,7 @@ export const postgresExtraIntrospectorDriver = (props: {
   };
 };
 
-export type PostgresColumnInfo = {
+type PostgresColumnInfo = {
   table_schema: string;
   table_name: string;
   column_name: string;
@@ -224,24 +195,33 @@ type PostgresIndexInfo = {
   column_names: string[];
 };
 
-export type PostgresConstraint = {
+type PostgresConstraintBase = {
   schema: string;
   table: string;
   name: string;
-  type: "PRIMARY KEY" | "UNIQUE" | "FOREIGN KEY";
   columns: string[];
 };
 
-export type PostgresForeignKeyConstraint = PostgresConstraint & {
-  type: "FOREIGN KEY";
-  referencedTable: string;
-  referencedColumns: string[];
-  onDelete?: ReferentialActions;
-  onUpdate?: ReferentialActions;
+type PostgresForeignKeyConstraint = {
+  referenced_table: string;
+  referenced_columns: string[];
+  on_delete?: ReferentialActions;
+  on_update?: ReferentialActions;
 };
 
+export type PostgresConstraint =
+  | (PostgresConstraintBase & {
+      type: "PRIMARY KEY";
+    })
+  | (PostgresConstraintBase & {
+      type: "UNIQUE";
+    })
+  | (PostgresConstraintBase &
+      PostgresForeignKeyConstraint & {
+        type: "FOREIGN KEY";
+      });
 export type PostgresConstraints = {
-  primaryKey: PostgresConstraint[];
-  unique: PostgresConstraint[];
-  foreignKey: PostgresForeignKeyConstraint[];
+  primaryKey: ReadonlyArray<PostgresConstraint & { type: "PRIMARY KEY" }>;
+  unique: ReadonlyArray<PostgresConstraint & { type: "UNIQUE" }>;
+  foreignKey: ReadonlyArray<PostgresConstraint & { type: "FOREIGN KEY" }>;
 };

@@ -1,12 +1,16 @@
 import { mkdir, writeFile } from "fs/promises";
 import { Logger } from "../logger";
-import { migrationDirName, getPendingMigrations } from "../migration";
+import {
+  migrationDirName,
+  getPendingMigrations,
+  SchemaDiff,
+} from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
 import { diffSchema } from "../diff";
-import { SchemaDiff, Tables, Operation } from "../operation";
-import { ConfigValue } from "../schema";
+import { Tables, Operation } from "../operation";
 import { getIntrospector } from "../introspection/introspector";
+import { ConfigValue } from "../config/loader";
 
 export const runGenerate = async (props: {
   client: DBClient;

@@ -7,13 +7,22 @@ import {
   Migration,
   sql,
 } from "kysely";
-import { SchemaDiff, Operation } from "./operation";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
-import { migrationSchema, MigrationValue } from "./schema";
 import { DBClient } from "./client";
+import z from "zod";
+import { Operation, operationSchema } from "./operation";
 
 export const migrationDirName = "migrations";
+export const schemaDiffSchema = z.object({
+  operations: z.array(operationSchema),
+});
+export type SchemaDiff = z.infer<typeof schemaDiffSchema>;
+export const migrationSchema = z.object({
+  id: z.string(),
+  version: z.string(),
+  diff: schemaDiffSchema,
+});
 
 export const getAllMigrations = async () => {
   try {
@@ -63,7 +72,7 @@ export const getPendingMigrations = async (client: DBClient) => {
 
 type CreateMigrationProviderProps = {
   db: Kysely<any>;
-  migrationsResolver: () => Promise<Array<MigrationValue>>;
+  migrationsResolver: () => Promise<Array<z.infer<typeof migrationSchema>>>;
   options: {
     plan: boolean;
   };

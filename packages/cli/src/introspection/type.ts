@@ -1,4 +1,4 @@
-import { ReferentialActions } from "../schema";
+import { ReferentialActions } from "../operation";
 
 export type ColumnExtraAttribute = {
   schema?: string;

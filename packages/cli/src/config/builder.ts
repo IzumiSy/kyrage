@@ -1,13 +1,11 @@
-import {
-  ColumnValue,
-  DatabaseValue,
-  IndexValue,
-  PrimaryKeyConstraint,
-  ReferentialActions,
-  UniqueConstraint,
-} from "../schema";
 import { ColumnDataType } from "kysely";
 import { constraintNaming } from "../naming";
+import { ColumnValue, IndexSchema, DatabaseValue } from "./loader";
+import {
+  PrimaryKeyConstraintSchema,
+  UniqueConstraintSchema,
+  ReferentialActions,
+} from "../operation";
 
 /**
  * Defines a column in a table.
@@ -27,12 +25,12 @@ type DefinedValue<T, K extends string> = Omit<T, "table"> & {
   kind: K;
 };
 type DefinedColumn = ReturnType<typeof column>;
-type DefinedIndex = DefinedValue<IndexValue, "index">;
+type DefinedIndex = DefinedValue<IndexSchema, "index">;
 type DefinedPrimaryKeyConstraint = DefinedValue<
-  PrimaryKeyConstraint,
+  PrimaryKeyConstraintSchema,
   "primaryKey"
 >;
-type DefinedUniqueConstraint = DefinedValue<UniqueConstraint, "unique">;
+type DefinedUniqueConstraint = DefinedValue<UniqueConstraintSchema, "unique">;
 
 type DefinedForeignKeyConstraint = {
   kind: "foreignKey";
