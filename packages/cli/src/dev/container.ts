@@ -67,8 +67,8 @@ export const createDevDatabaseManager = (
       devConfig.connectionString,
       dialect
     );
-  } else if ("image" in devConfig) {
-    return new ContainerDevDatabaseManager(devConfig.image, dialect);
+  } else if ("container" in devConfig) {
+    return new ContainerDevDatabaseManager(devConfig.container.image, dialect);
   } else {
     throw new Error("Invalid dev database configuration");
   }

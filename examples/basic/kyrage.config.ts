@@ -7,7 +7,9 @@ export default defineConfig({
     connectionString: "postgres://postgres:postgres@localhost:5432/postgres",
   },
   dev: {
-    image: "postgres:16",
+    container: {
+      image: "postgres:16",
+    },
   },
   tables: [members, posts],
 });

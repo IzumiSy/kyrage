@@ -40,7 +40,9 @@ export type DatabaseValue = z.infer<typeof databaseSchema>;
 const devDatabaseSchema = z
   .union([
     z.object({
-      image: z.string(),
+      container: z.object({
+        image: z.string(),
+      }),
     }),
     z.object({
       connectionString: z.string(),
