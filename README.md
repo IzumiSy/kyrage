@@ -239,12 +239,12 @@ export default defineConfig({
 Use the `defineTable` function to define your database tables:
 
 ```typescript
-import { column as c, defineTable as t } from "@izumisy/kyrage";
+import { column, defineTable } from "@izumisy/kyrage";
 
-const tableName = t(
-  "table_name",                       // Table name 
-  { columnName: c("type", options) }, // Column definitions (record)
-  (t) => [                            // Optional: table constraints
+const tableName = defineTable(
+  "table_name",                            // Table name 
+  { columnName: column("type", options) }, // Column definitions (record)
+  (t) => [                                 // Optional: table constraints
     t.primaryKey(["col1", "col2"]),
     t.index(["col1", "col2"], { unique: true }),
     t.unique(["col1", "col2"], { name: "custom_name" }),
@@ -258,7 +258,7 @@ const tableName = t(
 The `column` function accepts the following options:
 
 ```typescript
-c("dataType", {
+column("dataType", {
   primaryKey?: boolean,   // Creates a PRIMARY KEY constraint
   unique?: boolean,       // Creates a UNIQUE constraint  
   notNull?: boolean,      // NOT NULL constraint
@@ -283,7 +283,7 @@ t.index(["column1"], { name: "custom_idx_name" })
 ##### Primary Key Constraints
 ```typescript
 // Single column primary key
-c("uuid", { primaryKey: true })
+column("uuid", { primaryKey: true })
 
 // Composite primary key
 t.primaryKey(["id", "tenant_id"])
@@ -295,7 +295,7 @@ t.primaryKey(["id", "tenant_id"], { name: "pk_custom_name" })
 ##### Unique Constraints
 ```typescript
 // Single column unique
-c("email", { unique: true })
+column("email", { unique: true })
 
 // Composite unique constraint
 t.unique(["tenant_id", "slug"])
