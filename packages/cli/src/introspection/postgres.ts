@@ -150,25 +150,28 @@ export const postgresExtraIntrospectorDriver = (props: {
       .$castTo<PostgresConstraint>()
       .execute(db);
 
-    // 制約タイプ別に分離
-    const primaryKeyConstraints = rows.filter(
-      (row) => row.type === "PRIMARY KEY"
-    );
-    const uniqueConstraints = rows.filter((row) => row.type === "UNIQUE");
-    const foreignKeyConstraints = rows
-      .filter((row) => row.type === "FOREIGN KEY")
-      .map((row) => ({
-        ...row,
-        referencedTable: row.referenced_table!,
-        referencedColumns: row.referenced_columns!,
-        onDelete: row.on_delete || undefined,
-        onUpdate: row.on_update || undefined,
-      }));
-
     return {
-      primaryKey: primaryKeyConstraints,
-      unique: uniqueConstraints,
-      foreignKey: foreignKeyConstraints,
+      primaryKey: rows.filter((row) => row.type === "PRIMARY KEY"),
+      unique: rows.filter((row) => row.type === "UNIQUE"),
+      foreignKey: rows
+        .filter((row) => row.type === "FOREIGN KEY")
+        .map((row) => {
+          const {
+            referenced_table: referencedTable,
+            referenced_columns: referencedColumns,
+            on_delete: onDelete,
+            on_update: onUpdate,
+            ...columns
+          } = row;
+
+          return {
+            ...columns,
+            referencedTable,
+            referencedColumns,
+            onDelete,
+            onUpdate,
+          };
+        }),
     };
   };
 
@@ -209,7 +212,7 @@ type PostgresForeignKeyConstraint = {
   on_update?: ReferentialActions;
 };
 
-export type PostgresConstraint =
+type PostgresConstraint =
   | (PostgresConstraintBase & {
       type: "PRIMARY KEY";
     })
@@ -220,8 +223,3 @@ export type PostgresConstraint =
       PostgresForeignKeyConstraint & {
         type: "FOREIGN KEY";
       });
-export type PostgresConstraints = {
-  primaryKey: ReadonlyArray<PostgresConstraint & { type: "PRIMARY KEY" }>;
-  unique: ReadonlyArray<PostgresConstraint & { type: "UNIQUE" }>;
-  foreignKey: ReadonlyArray<PostgresConstraint & { type: "FOREIGN KEY" }>;
-};
