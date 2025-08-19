@@ -7,13 +7,22 @@ import {
   Migration,
   sql,
 } from "kysely";
-import { SchemaDiff, Operation } from "./operation";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
-import { migrationSchema, MigrationValue } from "./schema";
 import { DBClient } from "./client";
+import z from "zod";
+import { Operation, operationSchema } from "./operation";
 
 export const migrationDirName = "migrations";
+export const schemaDiffSchema = z.object({
+  operations: z.array(operationSchema).readonly(),
+});
+export type SchemaDiff = z.infer<typeof schemaDiffSchema>;
+export const migrationSchema = z.object({
+  id: z.string(),
+  version: z.string(),
+  diff: schemaDiffSchema,
+});
 
 export const getAllMigrations = async () => {
   try {
@@ -63,7 +72,9 @@ export const getPendingMigrations = async (client: DBClient) => {
 
 type CreateMigrationProviderProps = {
   db: Kysely<any>;
-  migrationsResolver: () => Promise<Array<MigrationValue>>;
+  migrationsResolver: () => Promise<
+    ReadonlyArray<z.infer<typeof migrationSchema>>
+  >;
   options: {
     plan: boolean;
   };
@@ -128,6 +139,10 @@ async function executeOperation(
       return executeCreateUniqueConstraint(db, operation);
     case "drop_unique_constraint":
       return executeDropUniqueConstraint(db, operation);
+    case "create_foreign_key_constraint":
+      return executeCreateForeignKeyConstraint(db, operation);
+    case "drop_foreign_key_constraint":
+      return executeDropForeignKeyConstraint(db, operation);
     default:
       throw new Error(`Unknown operation type: ${(operation as any).type}`);
   }
@@ -256,7 +271,7 @@ async function executeCreatePrimaryKeyConstraint(
 ): Promise<void> {
   await db.schema
     .alterTable(operation.table)
-    .addPrimaryKeyConstraint(operation.name, operation.columns)
+    .addPrimaryKeyConstraint(operation.name, operation.columns as Array<string>)
     .execute();
 }
 
@@ -276,13 +291,46 @@ async function executeCreateUniqueConstraint(
 ): Promise<void> {
   await db.schema
     .alterTable(operation.table)
-    .addUniqueConstraint(operation.name, operation.columns)
+    .addUniqueConstraint(operation.name, operation.columns as Array<string>)
     .execute();
 }
 
 async function executeDropUniqueConstraint(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "drop_unique_constraint" }>
+): Promise<void> {
+  await db.schema
+    .alterTable(operation.table)
+    .dropConstraint(operation.name)
+    .execute();
+}
+
+async function executeCreateForeignKeyConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "create_foreign_key_constraint" }>
+): Promise<void> {
+  let builder = db.schema
+    .alterTable(operation.table)
+    .addForeignKeyConstraint(
+      operation.name,
+      operation.columns as Array<string>,
+      operation.referencedTable,
+      operation.referencedColumns as Array<string>
+    );
+
+  if (operation.onDelete) {
+    builder = builder.onDelete(operation.onDelete);
+  }
+  if (operation.onUpdate) {
+    builder = builder.onUpdate(operation.onUpdate);
+  }
+
+  await builder.execute();
+}
+
+async function executeDropForeignKeyConstraint(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "drop_foreign_key_constraint" }>
 ): Promise<void> {
   await db.schema
     .alterTable(operation.table)
@@ -302,6 +350,7 @@ const assertDataType: (
 // Lower numbers have higher priority (executed first)
 const OPERATION_PRIORITY = {
   // 1. Drop constraints and indexes first (highest priority)
+  drop_foreign_key_constraint: 0, // Foreign keys must be dropped first
   drop_unique_constraint: 1,
   drop_primary_key_constraint: 2,
   drop_index: 3,
@@ -321,6 +370,7 @@ const OPERATION_PRIORITY = {
   create_index: 9,
   create_primary_key_constraint: 10,
   create_unique_constraint: 11,
+  create_foreign_key_constraint: 12, // Foreign keys must be created last
 } as const;
 
 /**
@@ -328,10 +378,10 @@ const OPERATION_PRIORITY = {
  * This prevents issues like trying to alter a dropped table or
  * creating constraints before the required tables exist.
  */
-export function sortOperationsByDependency(
-  operations: Operation[]
-): Operation[] {
-  return operations.slice().sort((a, b) => {
+export const sortOperationsByDependency = (
+  operations: ReadonlyArray<Operation>
+) =>
+  operations.slice().sort((a, b) => {
     const priorityA = OPERATION_PRIORITY[a.type];
     const priorityB = OPERATION_PRIORITY[b.type];
 
@@ -339,12 +389,8 @@ export function sortOperationsByDependency(
       return priorityA - priorityB;
     }
 
-    // Same priority: sort by table name for consistent ordering
-    const tableA = getOperationTableName(a);
-    const tableB = getOperationTableName(b);
-    return tableA.localeCompare(tableB);
+    return getOperationTableName(a).localeCompare(getOperationTableName(b));
   });
-}
 
 /**
  * Extract table name from any operation type.

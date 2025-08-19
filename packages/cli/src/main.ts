@@ -1,18 +1,10 @@
 import { defineCommand, runMain } from "citty";
 import { getClient } from "./client";
 import * as pkg from "../package.json";
-import { configSchema, ConfigValue } from "./schema";
 import { runApply } from "./usecases/apply";
 import { defaultConsolaLogger } from "./logger";
 import { runGenerate } from "./usecases/generate";
-import { loadConfig } from "c12";
-
-const loadConfigFile = async () => {
-  const loadedConfig = await loadConfig<ConfigValue>({
-    name: "kyrage",
-  });
-  return configSchema.parse(loadedConfig.config);
-};
+import { loadConfigFile } from "./config/loader";
 
 const logger = defaultConsolaLogger;
 

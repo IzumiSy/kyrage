@@ -1,5 +1,11 @@
-import { z } from "zod";
-import { schemaDiffSchema } from "./operation";
+import z from "zod";
+import { loadConfig } from "c12";
+import {
+  tableOpSchemaBase,
+  primaryKeyConstraintSchema,
+  uniqueConstraintSchema,
+  foreignKeyConstraintSchema,
+} from "../operation";
 
 const columnSchema = z.object({
   type: z.string(),
@@ -16,24 +22,11 @@ const tableSchema = z.object({
 });
 
 const indexSchema = z.object({
-  table: z.string(),
-  name: z.string(),
-  columns: z.array(z.string()),
+  ...tableOpSchemaBase.shape,
+  columns: z.array(z.string()).readonly(),
   unique: z.boolean().default(false),
 });
-export type IndexValue = z.infer<typeof indexSchema>;
-
-const primaryKeyConstraintSchema = z.object({
-  table: z.string(),
-  name: z.string(),
-  columns: z.array(z.string()),
-});
-
-const uniqueConstraintSchema = z.object({
-  table: z.string(),
-  name: z.string(),
-  columns: z.array(z.string()),
-});
+export type IndexSchema = z.infer<typeof indexSchema>;
 
 const dialectEnum = z.enum(["postgres", "cockroachdb", "mysql", "sqlite"]);
 export type DialectEnum = z.infer<typeof dialectEnum>;
@@ -46,17 +39,17 @@ export type DatabaseValue = z.infer<typeof databaseSchema>;
 
 export const configSchema = z.object({
   database: databaseSchema,
-  tables: z.array(tableSchema),
-  indexes: z.array(indexSchema),
-  primaryKeyConstraints: z.array(primaryKeyConstraintSchema),
-  uniqueConstraints: z.array(uniqueConstraintSchema),
+  tables: z.array(tableSchema).readonly(),
+  indexes: z.array(indexSchema).readonly(),
+  primaryKeyConstraints: z.array(primaryKeyConstraintSchema).readonly(),
+  uniqueConstraints: z.array(uniqueConstraintSchema).readonly(),
+  foreignKeyConstraints: z.array(foreignKeyConstraintSchema).readonly(),
 });
 export type ConfigValue = z.infer<typeof configSchema>;
 
-export const migrationSchema = z.object({
-  id: z.string(),
-  version: z.string(),
-  diff: schemaDiffSchema,
-});
-
-export type MigrationValue = z.infer<typeof migrationSchema>;
+export const loadConfigFile = async () => {
+  const loadedConfig = await loadConfig<ConfigValue>({
+    name: "kyrage",
+  });
+  return configSchema.parse(loadedConfig.config);
+};

@@ -1,5 +1,7 @@
 import { sql } from "kysely";
 import { DBClient } from "../client";
+import { ReferentialActions } from "../operation";
+import { ExtraIntrospectorDriver } from "./type";
 
 const nameDict = {
   bool: "boolean",
@@ -13,7 +15,7 @@ const convertTypeName = (typeName: string) =>
 
 export const postgresExtraIntrospectorDriver = (props: {
   client: DBClient;
-}) => {
+}): ExtraIntrospectorDriver => {
   const introspectTables = async () => {
     const client = props.client;
     await using db = client.getDB();
@@ -90,40 +92,87 @@ export const postgresExtraIntrospectorDriver = (props: {
     await using db = client.getDB();
     const { rows } = await sql`
       SELECT
-          n.nspname AS schema_name,
-          t.relname AS table_name,
-          c.conname AS constraint_name,
+          n.nspname AS schema,
+          t.relname AS table,
+          c.conname AS name,
           CASE c.contype
               WHEN 'p' THEN 'PRIMARY KEY'
               WHEN 'u' THEN 'UNIQUE'
-          END AS constraint_type,
-          jsonb_agg(a.attname ORDER BY array_position(c.conkey, a.attnum)) AS columns
+              WHEN 'f' THEN 'FOREIGN KEY'
+          END AS type,
+          jsonb_agg(a.attname ORDER BY array_position(c.conkey, a.attnum)) AS columns,
+          -- Foreign Key専用の情報
+          CASE 
+              WHEN c.contype = 'f' THEN rt.relname 
+              ELSE NULL 
+          END AS referenced_table,
+          CASE 
+              WHEN c.contype = 'f' THEN jsonb_agg(ra.attname ORDER BY array_position(c.confkey, ra.attnum))
+              ELSE NULL 
+          END AS referenced_columns,
+          CASE 
+              WHEN c.contype = 'f' THEN 
+                  CASE c.confdeltype
+                      WHEN 'c' THEN 'cascade'
+                      WHEN 'n' THEN 'set null'
+                      WHEN 'd' THEN 'set default'
+                      WHEN 'r' THEN 'restrict'
+                      WHEN 'a' THEN 'no action'
+                  END
+              ELSE NULL
+          END AS on_delete,
+          CASE 
+              WHEN c.contype = 'f' THEN 
+                  CASE c.confupdtype
+                      WHEN 'c' THEN 'cascade'
+                      WHEN 'n' THEN 'set null'
+                      WHEN 'd' THEN 'set default'
+                      WHEN 'r' THEN 'restrict'
+                      WHEN 'a' THEN 'no action'
+                  END
+              ELSE NULL
+          END AS on_update
       FROM pg_constraint c
       JOIN pg_class t ON c.conrelid = t.oid
       JOIN pg_namespace n ON t.relnamespace = n.oid
       JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
-      WHERE c.contype IN ('p', 'u')  -- primary key and unique constraints
+      -- Foreign Key用のJOIN
+      LEFT JOIN pg_class rt ON c.confrelid = rt.oid
+      LEFT JOIN pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = ANY(c.confkey)
+      WHERE c.contype IN ('p', 'u', 'f')  -- primary key, unique, foreign key constraints
           AND n.nspname = 'public'
           AND NOT a.attisdropped
-      GROUP BY n.nspname, t.relname, c.conname, c.contype, c.oid, c.conkey, t.oid
+          AND (c.contype != 'f' OR NOT ra.attisdropped)  -- Foreign Key用の条件
+      GROUP BY n.nspname, t.relname, c.conname, c.contype, c.oid, c.conkey, t.oid, 
+               rt.relname, c.confkey, c.confdeltype, c.confupdtype
       ORDER BY t.relname, c.conname;
     `
-      .$castTo<{
-        schema_name: string;
-        table_name: string;
-        constraint_name: string;
-        constraint_type: "PRIMARY KEY" | "UNIQUE";
-        columns: string[];
-      }>()
+      .$castTo<PostgresConstraint>()
       .execute(db);
 
-    return rows.map((row) => ({
-      schema: row.schema_name,
-      table: row.table_name,
-      name: row.constraint_name,
-      type: row.constraint_type,
-      columns: row.columns,
-    }));
+    return {
+      primaryKey: rows.filter((row) => row.type === "PRIMARY KEY"),
+      unique: rows.filter((row) => row.type === "UNIQUE"),
+      foreignKey: rows
+        .filter((row) => row.type === "FOREIGN KEY")
+        .map((row) => {
+          const {
+            referenced_table: referencedTable,
+            referenced_columns: referencedColumns,
+            on_delete: onDelete,
+            on_update: onUpdate,
+            ...columns
+          } = row;
+
+          return {
+            ...columns,
+            referencedTable,
+            referencedColumns,
+            onDelete,
+            onUpdate,
+          };
+        }),
+    };
   };
 
   return {
@@ -134,7 +183,7 @@ export const postgresExtraIntrospectorDriver = (props: {
   };
 };
 
-export type PostgresColumnInfo = {
+type PostgresColumnInfo = {
   table_schema: string;
   table_name: string;
   column_name: string;
@@ -146,18 +195,31 @@ type PostgresIndexInfo = {
   table_name: string;
   index_name: string;
   is_unique: boolean;
-  column_names: string[];
+  column_names: ReadonlyArray<string>;
 };
 
-export type PostgresConstraint = {
+type PostgresConstraintBase = {
   schema: string;
   table: string;
   name: string;
-  type: "PRIMARY KEY" | "UNIQUE";
-  columns: string[];
+  columns: ReadonlyArray<string>;
 };
 
-export type PostgresConstraints = {
-  primaryKey: PostgresConstraint[];
-  unique: PostgresConstraint[];
+type PostgresForeignKeyConstraint = {
+  referenced_table: string;
+  referenced_columns: ReadonlyArray<string>;
+  on_delete?: ReferentialActions;
+  on_update?: ReferentialActions;
 };
+
+type PostgresConstraint =
+  | (PostgresConstraintBase & {
+      type: "PRIMARY KEY";
+    })
+  | (PostgresConstraintBase & {
+      type: "UNIQUE";
+    })
+  | (PostgresConstraintBase &
+      PostgresForeignKeyConstraint & {
+        type: "FOREIGN KEY";
+      });

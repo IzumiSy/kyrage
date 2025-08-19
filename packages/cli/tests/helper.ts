@@ -1,9 +1,9 @@
 import { afterAll } from "vitest";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { CockroachDbContainer } from "@testcontainers/cockroachdb";
-import { configSchema, DialectEnum } from "../src/schema";
 import { getClient } from "../src/client";
 import { defineConfig, DefineConfigProp } from "../src/config/builder";
+import { DialectEnum, configSchema } from "../src/config/loader";
 
 const getContainer = (dialect: string) => {
   switch (dialect) {

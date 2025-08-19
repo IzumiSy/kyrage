@@ -85,6 +85,10 @@ export const posts = t(
     t.unique(["author_id", "slug"], {
       name: "unique_author_slug",
     }),
+    t.reference("author_id", members, "id", {
+      onDelete: "cascade",
+      name: "posts_author_fk"
+    }),
   ]
 );
 ```
@@ -128,6 +132,7 @@ $ kyrage generate
 -- create_unique_constraint: members.members_email_unique (email)
 -- create_unique_constraint: members.members_name_unique (name)
 -- create_unique_constraint: posts.unique_author_slug (author_id, slug)
+-- create_foreign_key_constraint: posts.posts_author_fk (author_id) -> members (id) ON DELETE CASCADE
 ✔ Migration file generated: migrations/1755525514175.json
 ```
 
@@ -159,6 +164,7 @@ alter table "posts" add constraint "pk_posts_id_author_id" primary key ("id", "a
 alter table "members" add constraint "members_email_unique" unique ("email")
 alter table "members" add constraint "members_name_unique" unique ("name")
 alter table "posts" add constraint "unique_author_slug" unique ("author_id", "slug")
+alter table "posts" add constraint "posts_author_fk" foreign key ("author_id") references "members" ("id") on delete cascade
 ```
 
 ### 5. Apply
@@ -233,18 +239,16 @@ export default defineConfig({
 Use the `defineTable` function to define your database tables:
 
 ```typescript
-import { column as c, defineTable as t } from "@izumisy/kyrage";
+import { column, defineTable } from "@izumisy/kyrage";
 
-const tableName = t(
-  "table_name",           // Table name
-  {                       // Column definitions
-    columnName: c("type", options),
-    // ... more columns
-  },
-  (t) => [                // Optional: table constraints
-    t.index(["col1", "col2"], { unique: true }),
+const tableName = defineTable(
+  "table_name",                            // Table name 
+  { columnName: column("type", options) }, // Column definitions (record)
+  (t) => [                                 // Optional: table constraints
     t.primaryKey(["col1", "col2"]),
+    t.index(["col1", "col2"], { unique: true }),
     t.unique(["col1", "col2"], { name: "custom_name" }),
+    t.reference("col1", anotherTable, "id")
   ]
 );
 ```
@@ -254,7 +258,7 @@ const tableName = t(
 The `column` function accepts the following options:
 
 ```typescript
-c("dataType", {
+column("dataType", {
   primaryKey?: boolean,   // Creates a PRIMARY KEY constraint
   unique?: boolean,       // Creates a UNIQUE constraint  
   notNull?: boolean,      // NOT NULL constraint
@@ -279,7 +283,7 @@ t.index(["column1"], { name: "custom_idx_name" })
 ##### Primary Key Constraints
 ```typescript
 // Single column primary key
-c("uuid", { primaryKey: true })
+column("uuid", { primaryKey: true })
 
 // Composite primary key
 t.primaryKey(["id", "tenant_id"])
@@ -291,13 +295,29 @@ t.primaryKey(["id", "tenant_id"], { name: "pk_custom_name" })
 ##### Unique Constraints
 ```typescript
 // Single column unique
-c("email", { unique: true })
+column("email", { unique: true })
 
 // Composite unique constraint
 t.unique(["tenant_id", "slug"])
 
 // Custom constraint name
 t.unique(["tenant_id", "slug"], { name: "unique_tenant_slug" })
+```
+
+##### Foreign Key Constraints
+```typescript
+// Single column foreign key
+t.reference("user_id", usersTable, "id")
+
+// Multiple column foreign key
+t.reference(["tenant_id", "user_id"], usersTable, ["tenant_id", "id"])
+
+// With referential actions and custom name
+t.reference("author_id", usersTable, "id", {
+  onDelete: "cascade",
+  onUpdate: "restrict", 
+  name: "posts_author_fk"
+})
 ```
 
 #### Constraint Naming Convention

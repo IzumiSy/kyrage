@@ -26,7 +26,7 @@ type Operation =
   | { type: "add_column"; table: string; column: string; attributes: TableColumnAttributes }
   | { type: "drop_column"; table: string; column: string; attributes: TableColumnAttributes }
   | { type: "alter_column"; table: string; column: string; before: TableColumnAttributes; after: TableColumnAttributes }
-  | { type: "create_index"; table: string; name: string; columns: string[]; unique: boolean }
+  | { type: "create_index"; table: string; name: string; columns: ReadonlyArray<string>; unique: boolean }
   | { type: "drop_index"; table: string; name: string };
 
 type SchemaDiff = {

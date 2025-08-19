@@ -47,9 +47,13 @@ describe("diffTables", () => {
     const operations = diffTables({ current, ideal });
 
     expect(operations).toEqual([
-      ops.addColumn("users", "email", { type: "varchar" }),
-      ops.dropColumn("users", "age", { type: "integer" }),
-      ops.alterColumn("users", "name", { type: "varchar" }, { type: "text" }),
+      ops.addColumn({ table: "users", column: "email" }, { type: "varchar" }),
+      ops.dropColumn({ table: "users", column: "age" }, { type: "integer" }),
+      ops.alterColumn(
+        { table: "users", column: "name" },
+        { type: "varchar" },
+        { type: "text" }
+      ),
     ]);
   });
 });
@@ -76,8 +80,13 @@ describe("diffIndexes", () => {
     const operations = diffIndexes({ current, ideal });
 
     expect(operations).toEqual([
-      ops.createIndex("users", "idx_new", ["email"], false),
-      ops.dropIndex("users", "idx_old"),
+      ops.createIndex({
+        table: "users",
+        name: "idx_new",
+        columns: ["email"],
+        unique: false,
+      }),
+      ops.dropIndex({ table: "users", name: "idx_old" }),
     ]);
   });
 
@@ -102,8 +111,15 @@ describe("diffIndexes", () => {
     const operations = diffIndexes({ current, ideal });
 
     expect(operations).toEqual([
-      ops.dropIndex("users", "idx_test"),
-      ops.createIndex("users", "idx_test", ["id"], true),
+      expect.objectContaining(
+        ops.dropIndex({ table: "users", name: "idx_test" })
+      ),
+      ops.createIndex({
+        table: "users",
+        name: "idx_test",
+        columns: ["id"],
+        unique: true,
+      }),
     ]);
   });
 
@@ -128,8 +144,15 @@ describe("diffIndexes", () => {
     const operations = diffIndexes({ current, ideal });
 
     expect(operations).toEqual([
-      ops.dropIndex("users", "idx_users_a_b"),
-      ops.createIndex("users", "idx_users_a_b", ["b", "a"], false),
+      expect.objectContaining(
+        ops.dropIndex({ table: "users", name: "idx_users_a_b" })
+      ),
+      ops.createIndex({
+        table: "users",
+        name: "idx_users_a_b",
+        columns: ["b", "a"],
+        unique: false,
+      }),
     ]);
   });
 });

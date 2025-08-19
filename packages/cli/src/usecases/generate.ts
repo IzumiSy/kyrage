@@ -1,13 +1,16 @@
 import { mkdir, writeFile } from "fs/promises";
 import { Logger } from "../logger";
-import { migrationDirName, getPendingMigrations } from "../migration";
+import {
+  migrationDirName,
+  getPendingMigrations,
+  SchemaDiff,
+} from "../migration";
 import { runApply } from "./apply";
 import { DBClient } from "../client";
 import { diffSchema } from "../diff";
-import { SchemaDiff, Tables, Operation } from "../operation";
-import { ConfigValue } from "../schema";
+import { Tables, Operation } from "../operation";
 import { getIntrospector } from "../introspection/introspector";
-import { ConstraintAttributes } from "../introspection/type";
+import { ConfigValue } from "../config/loader";
 
 export const runGenerate = async (props: {
   client: DBClient;
@@ -77,7 +80,12 @@ const generateMigrationFromIntrospection = async (props: {
   // カラム制約の判定
   const columnConstraintPredicate =
     (tableName: string, colName: string) =>
-    (constraints: ConstraintAttributes) =>
+    (
+      constraints: ReadonlyArray<{
+        table: string;
+        columns: ReadonlyArray<string>;
+      }>
+    ) =>
       constraints.some(
         (constraint) =>
           constraint.table === tableName &&
@@ -129,6 +137,7 @@ const generateMigrationFromIntrospection = async (props: {
       indexes,
       primaryKeyConstraints: constraintAttributes.primaryKey,
       uniqueConstraints: constraintAttributes.unique,
+      foreignKeyConstraints: constraintAttributes.foreignKey,
     },
     ideal: {
       tables: configTables,
@@ -140,6 +149,7 @@ const generateMigrationFromIntrospection = async (props: {
       })),
       primaryKeyConstraints: config.primaryKeyConstraints || [],
       uniqueConstraints: config.uniqueConstraints || [],
+      foreignKeyConstraints: config.foreignKeyConstraints || [],
     },
   });
 
@@ -156,7 +166,7 @@ const generateMigrationFromIntrospection = async (props: {
 };
 
 const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
-  const diffOutputs: string[] = [];
+  const diffOutputs: Array<string> = [];
 
   diff.operations.forEach((operation: Operation) => {
     switch (operation.type) {
@@ -229,6 +239,18 @@ const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
       case "drop_unique_constraint":
         diffOutputs.push(
           `-- drop_unique_constraint: ${operation.table}.${operation.name}`
+        );
+        break;
+
+      case "create_foreign_key_constraint":
+        diffOutputs.push(
+          `-- create_foreign_key_constraint: ${operation.table}.${operation.name} (${operation.columns.join(", ")}) -> ${operation.referencedTable} (${operation.referencedColumns.join(", ")})${operation.onDelete ? ` ON DELETE ${operation.onDelete.toUpperCase()}` : ""}${operation.onUpdate ? ` ON UPDATE ${operation.onUpdate.toUpperCase()}` : ""}`
+        );
+        break;
+
+      case "drop_foreign_key_constraint":
+        diffOutputs.push(
+          `-- drop_foreign_key_constraint: ${operation.table}.${operation.name}`
         );
         break;
 
