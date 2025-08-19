@@ -140,7 +140,7 @@ $ kyrage generate
 
 #### Development Database Support
 
-kyrage supports generating migrations against ephemeral development databases using Docker containers. 
+kyrage supports generating migrations against ephemeral development databases using Docker containers that is pretty much similar to the concept of [Atlas's Dev Database](https://atlasgo.io/concepts/dev-database).
 
 This is useful when you want to generate migrations without affecting your production database state.
 
