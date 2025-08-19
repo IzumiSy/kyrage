@@ -138,6 +138,32 @@ $ kyrage generate
 
 `generate` command will fail if there is a pending migration. Use `--ignore-pending` option in that case.
 
+#### Development Database Support
+
+kyrage supports generating migrations against ephemeral development databases using Docker containers. 
+
+This is useful when you want to generate migrations without affecting your production database state.
+
+```bash
+# Generate migration against a clean dev database
+$ kyrage generate --dev
+🚀 Starting dev database for migration generation...
+✔ Dev database started: postgres
+-- create_table: users
+   -> column: id ({"type":"uuid","primaryKey":true,"notNull":true})
+   -> column: email ({"type":"text","notNull":true,"unique":true})
+✔ Migration file generated: migrations/1755525514175.json
+✔ Dev database stopped
+```
+
+The dev database will:
+
+1. Start a fresh container with your specified database image
+2. Apply all existing migrations to establish the current baseline
+3. Compare your schema against this clean state
+4. Generate the migration file
+5. Automatically clean up the container
+
 ### 4. Plan Changes
 
 You can use `apply --plan` beforehand to check SQL queries that will be executed in the next time:
@@ -201,8 +227,17 @@ export default defineConfig({
     dialect: "postgres" | "cockroachdb",  // Database dialect
     connectionString: string,             // Database connection string
   },
+  // Optional: Development database configuration
+  dev: {
+    // Option 1: Use Docker container (requires Docker)
+    container: {
+      image: "postgres:17"
+    },
+    // Option 2: Use existing database connection
+    connectionString: "postgres://..."
+  },
   tables: [
-    /* table definitions */
+    // table definitions
   ],
 });
 ```
@@ -218,12 +253,22 @@ export default defineConfig({
     database: {
       dialect: "postgres",
       connectionString: "psql://dev:pass@localhost/myapp_dev"
+    },
+    // Use containerized dev database for clean migration generation
+    dev: {
+      container: {
+        image: "postgres:17"
+      }
     }
   },
   $production: {
     database: {
       dialect: "cockroachdb",
       connectionString: "psql://user:pass@prod-db.com/myapp_prod?ssl=true"
+    },
+    // Use existing staging database for dev migrations
+    dev: {
+      connectionString: "psql://staging:pass@staging-db.com/myapp_staging"
     }
   },
 
