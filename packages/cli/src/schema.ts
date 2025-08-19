@@ -15,39 +15,52 @@ const tableSchema = z.object({
   columns: z.record(z.string(), columnSchema),
 });
 
-const indexSchema = z.object({
+export const tableOpSchemaBase = {
   table: z.string(),
   name: z.string(),
+};
+export const tableColumnOpSchemaBase = {
+  table: z.string(),
+  column: z.string(),
+};
+
+const indexSchema = z.object({
+  ...tableOpSchemaBase,
   columns: z.array(z.string()),
   unique: z.boolean().default(false),
 });
 export type IndexValue = z.infer<typeof indexSchema>;
 
-const primaryKeyConstraintSchema = z.object({
-  table: z.string(),
-  name: z.string(),
+export const primaryKeyConstraintSchema = z.object({
+  ...tableOpSchemaBase,
   columns: z.array(z.string()),
 });
+export type PrimaryKeyConstraint = z.infer<typeof primaryKeyConstraintSchema>;
 
-const uniqueConstraintSchema = z.object({
-  table: z.string(),
-  name: z.string(),
+export const uniqueConstraintSchema = z.object({
+  ...tableOpSchemaBase,
   columns: z.array(z.string()),
 });
+export type UniqueConstraint = z.infer<typeof uniqueConstraintSchema>;
 
-const foreignKeyConstraintSchema = z.object({
-  table: z.string(),
-  name: z.string(),
+const referentialActionsSchema = z.enum([
+  "cascade",
+  "set null",
+  "set default",
+  "restrict",
+  "no action",
+]);
+export type ReferentialActions = z.infer<typeof referentialActionsSchema>;
+
+export const foreignKeyConstraintSchema = z.object({
+  ...tableOpSchemaBase,
   columns: z.array(z.string()),
   referencedTable: z.string(),
   referencedColumns: z.array(z.string()),
-  onDelete: z
-    .enum(["cascade", "set null", "set default", "restrict", "no action"])
-    .optional(),
-  onUpdate: z
-    .enum(["cascade", "set null", "set default", "restrict", "no action"])
-    .optional(),
+  onDelete: referentialActionsSchema.optional(),
+  onUpdate: referentialActionsSchema.optional(),
 });
+export type ForeignKeyConstraint = z.infer<typeof foreignKeyConstraintSchema>;
 
 export type ForeignKeyConstraintValue = z.infer<
   typeof foreignKeyConstraintSchema

@@ -1,7 +1,13 @@
-import { ColumnValue, DatabaseValue } from "../schema";
+import {
+  ColumnValue,
+  DatabaseValue,
+  IndexValue,
+  PrimaryKeyConstraint,
+  ReferentialActions,
+  UniqueConstraint,
+} from "../schema";
 import { ColumnDataType } from "kysely";
 import { constraintNaming } from "../naming";
-import { ReferentialActions } from "../introspection/type";
 
 /**
  * Defines a column in a table.
@@ -17,26 +23,16 @@ export const column = (
   defaultSql: options?.defaultSql,
 });
 
+type DefinedValue<T, K extends string> = Omit<T, "table"> & {
+  kind: K;
+};
 type DefinedColumn = ReturnType<typeof column>;
-
-type DefinedIndex = {
-  kind: "index";
-  name: string;
-  columns: string[];
-  unique: boolean;
-};
-
-type DefinedPrimaryKeyConstraint = {
-  kind: "primaryKey";
-  name: string;
-  columns: string[];
-};
-
-type DefinedUniqueConstraint = {
-  kind: "unique";
-  name: string;
-  columns: string[];
-};
+type DefinedIndex = DefinedValue<IndexValue, "index">;
+type DefinedPrimaryKeyConstraint = DefinedValue<
+  PrimaryKeyConstraint,
+  "primaryKey"
+>;
+type DefinedUniqueConstraint = DefinedValue<UniqueConstraint, "unique">;
 
 type DefinedForeignKeyConstraint = {
   kind: "foreignKey";

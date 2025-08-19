@@ -5,12 +5,14 @@ import {
   Tables,
   SchemaSnapshot,
   IndexDef,
-  PrimaryKeyConstraint,
-  UniqueConstraint,
-  ForeignKeyConstraint,
   ops,
 } from "./operation";
 import * as R from "ramda";
+import {
+  PrimaryKeyConstraint,
+  UniqueConstraint,
+  ForeignKeyConstraint,
+} from "./schema";
 
 // 汎用的なdiff演算子
 const createDiffOperations = <K>() => ({

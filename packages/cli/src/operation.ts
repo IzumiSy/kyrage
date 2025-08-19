@@ -1,5 +1,15 @@
 import { z } from "zod";
-import { ReferentialActions } from "./introspection/type";
+import {
+  ForeignKeyConstraint,
+  foreignKeyConstraintSchema,
+  PrimaryKeyConstraint,
+  primaryKeyConstraintSchema,
+  ReferentialActions,
+  tableColumnOpSchemaBase,
+  tableOpSchemaBase,
+  UniqueConstraint,
+  uniqueConstraintSchema,
+} from "./schema";
 
 // TableColumnAttributesのスキーマを直接定義
 const tableColumnAttributesSchema = z
@@ -25,84 +35,62 @@ export const operationSchema = z.discriminatedUnion("type", [
 
   // Column operations
   z.object({
+    ...tableColumnOpSchemaBase,
     type: z.literal("add_column"),
-    table: z.string(),
-    column: z.string(),
     attributes: tableColumnAttributesSchema,
   }),
   z.object({
+    ...tableColumnOpSchemaBase,
     type: z.literal("drop_column"),
-    table: z.string(),
-    column: z.string(),
     attributes: tableColumnAttributesSchema,
   }),
   z.object({
+    ...tableColumnOpSchemaBase,
     type: z.literal("alter_column"),
-    table: z.string(),
-    column: z.string(),
     before: tableColumnAttributesSchema,
     after: tableColumnAttributesSchema,
   }),
 
   // Index operations
   z.object({
+    ...tableOpSchemaBase,
     type: z.literal("create_index"),
-    table: z.string(),
-    name: z.string(),
     columns: z.array(z.string()),
     unique: z.boolean(),
   }),
   z.object({
+    ...tableOpSchemaBase,
     type: z.literal("drop_index"),
-    table: z.string(),
-    name: z.string(),
   }),
 
   // Primary key constraint operations
   z.object({
+    ...primaryKeyConstraintSchema.shape,
     type: z.literal("create_primary_key_constraint"),
-    table: z.string(),
-    name: z.string(),
-    columns: z.array(z.string()),
   }),
   z.object({
+    ...tableOpSchemaBase,
     type: z.literal("drop_primary_key_constraint"),
-    table: z.string(),
-    name: z.string(),
   }),
 
   // Unique constraint operations
   z.object({
+    ...uniqueConstraintSchema.shape,
     type: z.literal("create_unique_constraint"),
-    table: z.string(),
-    name: z.string(),
-    columns: z.array(z.string()),
   }),
   z.object({
+    ...tableOpSchemaBase,
     type: z.literal("drop_unique_constraint"),
-    table: z.string(),
-    name: z.string(),
   }),
 
   // Foreign key constraint operations
   z.object({
+    ...foreignKeyConstraintSchema.shape,
     type: z.literal("create_foreign_key_constraint"),
-    table: z.string(),
-    name: z.string(),
-    columns: z.array(z.string()),
-    referencedTable: z.string(),
-    referencedColumns: z.array(z.string()),
-    onDelete: z
-      .enum(["cascade", "set null", "set default", "restrict", "no action"])
-      .optional(),
-    onUpdate: z
-      .enum(["cascade", "set null", "set default", "restrict", "no action"])
-      .optional(),
   }),
   z.object({
+    ...tableOpSchemaBase,
     type: z.literal("drop_foreign_key_constraint"),
-    table: z.string(),
-    name: z.string(),
   }),
 ]);
 
@@ -117,38 +105,12 @@ export type SchemaDiff = z.infer<typeof schemaDiffSchema>;
 
 // Index定義型
 export const indexDefSchema = z.object({
-  table: z.string(),
-  name: z.string(),
+  ...tableOpSchemaBase,
   columns: z.array(z.string()),
   unique: z.boolean(),
 });
 
 export type IndexDef = z.infer<typeof indexDefSchema>;
-
-// Primary key constraint definition type
-export type PrimaryKeyConstraint = {
-  table: string;
-  name: string;
-  columns: string[];
-};
-
-// Unique constraint definition type
-export type UniqueConstraint = {
-  table: string;
-  name: string;
-  columns: string[];
-};
-
-// Foreign key constraint definition type
-export type ForeignKeyConstraint = {
-  table: string;
-  name: string;
-  columns: string[];
-  referencedTable: string;
-  referencedColumns: string[];
-  onDelete?: ReferentialActions;
-  onUpdate?: ReferentialActions;
-};
 
 // Tables型定義
 export type Tables = Array<{

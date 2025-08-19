@@ -1,6 +1,6 @@
 import { sql } from "kysely";
 import { DBClient } from "../client";
-import { ReferentialActions } from "./type";
+import { ReferentialActions } from "../schema";
 
 const nameDict = {
   bool: "boolean",

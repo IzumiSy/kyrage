@@ -1,3 +1,5 @@
+import { ReferentialActions } from "../schema";
+
 export type ColumnExtraAttribute = {
   schema?: string;
   table: string;
@@ -22,13 +24,6 @@ type ConstraintAttribute = {
   type: "PRIMARY KEY" | "UNIQUE";
   columns: string[];
 };
-
-export type ReferentialActions =
-  | "cascade"
-  | "set null"
-  | "set default"
-  | "restrict"
-  | "no action";
 
 type ForeignKeyConstraintAttribute = {
   schema?: string;
