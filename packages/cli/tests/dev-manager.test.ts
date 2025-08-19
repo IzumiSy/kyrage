@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createDevDatabaseManager } from "../src/dev/manager";
+import { createDevDatabaseManager } from "../src/dev/container";
 
 describe("Dev Database Manager", () => {
   describe("ContainerDevDatabaseManager", () => {

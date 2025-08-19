@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "fs/promises";
-import { Logger } from "../logger";
+import { Logger, nullLogger } from "../logger";
 import {
   migrationDirName,
   getPendingMigrations,
@@ -12,7 +12,7 @@ import { Tables, Operation } from "../operation";
 import { getIntrospector } from "../introspection/introspector";
 import { ConfigValue } from "../config/loader";
 import { getClient } from "../client";
-import { createDevDatabaseManager } from "../dev/manager";
+import { createDevDatabaseManager } from "../dev/container";
 import { applyBaselineToDevDatabase } from "../dev/baseline";
 
 type RunGenerateProps = {
@@ -35,7 +35,7 @@ export const runGenerate = async (props: RunGenerateProps) => {
 
   try {
     if (!props.options.ignorePending) {
-      const pm = await getPendingMigrations(props.client); // Always check against production for pending migrations
+      const pm = await getPendingMigrations(targetClient); // Always check against production for pending migrations
       if (pm.length > 0) {
         reporter.warn(
           [
@@ -119,9 +119,15 @@ const setupDatabaseClient = async (props: RunGenerateProps) => {
   const devClient = getClient({ database: devDatabase });
 
   // Apply baseline migrations to dev database
-  await applyBaselineToDevDatabase(devClient, props.logger);
+  await runApply({
+    client: devClient,
+    logger: nullLogger,
+    options: {
+      plan: false,
+      pretty: false,
+    },
+  });
 
-  // Return client and cleanup function that closes over devManager
   return {
     client: devClient,
     cleanup: async () => {
