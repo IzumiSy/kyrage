@@ -12,18 +12,19 @@ vi.mock("fs/promises", async () => {
 });
 
 const { database, client } = await setupTestDB();
+const membersTable = defineTable(
+  "members",
+  {
+    id: column("uuid", { primaryKey: true }),
+    name: column("text", { notNull: true }),
+    email: column("text", { unique: true, notNull: true }),
+  },
+  (t) => [t.index(["name", "email"], { unique: true })]
+);
 const config = defineConfigForTest({
   database,
   tables: [
-    defineTable(
-      "members",
-      {
-        id: column("uuid", { primaryKey: true }),
-        name: column("text", { notNull: true }),
-        email: column("text", { unique: true, notNull: true }),
-      },
-      (t) => [t.index(["name", "email"], { unique: true })]
-    ),
+    membersTable,
     defineTable(
       "orders",
       {
@@ -37,6 +38,11 @@ const config = defineConfigForTest({
         }),
         t.unique(["customer_id", "product_id"], {
           name: "uq_customer_product",
+        }),
+        t.reference("customer_id", membersTable, "id", {
+          onDelete: "cascade",
+          onUpdate: "cascade",
+          name: "fk_orders_customer_id",
         }),
       ]
     ),
@@ -59,7 +65,8 @@ beforeAll(async () => {
       product_id UUID NOT NULL,
       order_date DATE NOT NULL,
       CONSTRAINT pk_orders_customer_id_product_id_order_date PRIMARY KEY (customer_id, product_id, order_date),
-      CONSTRAINT uq_customer_product UNIQUE (customer_id, product_id)
+      CONSTRAINT uq_customer_product UNIQUE (customer_id, product_id),
+      CONSTRAINT fk_orders_customer_id FOREIGN KEY (customer_id) REFERENCES members (id) ON DELETE CASCADE ON UPDATE CASCADE
     );
   `.execute(db);
 });
