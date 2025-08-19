@@ -242,16 +242,9 @@ Use the `defineTable` function to define your database tables:
 import { column as c, defineTable as t } from "@izumisy/kyrage";
 
 const tableName = t(
-  // Table name
-  "table_name",
-
-  // Column definitions
-  {
-    columnName: c("type", options),
-  },
-
-  // Optional: table constraints
-  (t) => [
+  "table_name",                       // Table name 
+  { columnName: c("type", options) }, // Column definitions (record)
+  (t) => [                            // Optional: table constraints
     t.primaryKey(["col1", "col2"]),
     t.index(["col1", "col2"], { unique: true }),
     t.unique(["col1", "col2"], { name: "custom_name" }),
