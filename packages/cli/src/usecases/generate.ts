@@ -13,7 +13,6 @@ import { getIntrospector } from "../introspection/introspector";
 import { ConfigValue } from "../config/loader";
 import { getClient } from "../client";
 import { createDevDatabaseManager } from "../dev/container";
-import { applyBaselineToDevDatabase } from "../dev/baseline";
 
 type RunGenerateProps = {
   client: DBClient;
