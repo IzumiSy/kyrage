@@ -1,6 +1,7 @@
 import { ColumnValue, DatabaseValue } from "../schema";
 import { ColumnDataType } from "kysely";
 import { constraintNaming } from "../naming";
+import { ReferentialActions } from "../introspection/type";
 
 /**
  * Defines a column in a table.
@@ -43,8 +44,8 @@ type DefinedForeignKeyConstraint = {
   columns: string[];
   referencedTable: string;
   referencedColumns: string[];
-  onDelete?: "cascade" | "set null" | "set default" | "restrict" | "no action";
-  onUpdate?: "cascade" | "set null" | "set default" | "restrict" | "no action";
+  onDelete?: ReferentialActions;
+  onUpdate?: ReferentialActions;
 };
 
 type ExpressionBuilders<T extends Record<string, DefinedColumn>> = {
@@ -96,18 +97,8 @@ type ExpressionBuilders<T extends Record<string, DefinedColumn>> = {
     referencedColumns: Array<string & keyof R> | (string & keyof R),
     options?: {
       name?: string;
-      onDelete?:
-        | "cascade"
-        | "set null"
-        | "set default"
-        | "restrict"
-        | "no action";
-      onUpdate?:
-        | "cascade"
-        | "set null"
-        | "set default"
-        | "restrict"
-        | "no action";
+      onDelete?: ReferentialActions;
+      onUpdate?: ReferentialActions;
     }
   ) => DefinedForeignKeyConstraint;
 };
@@ -252,18 +243,8 @@ export const defineConfig = (config: DefineConfigProp) => {
       columns: string[];
       referencedTable: string;
       referencedColumns: string[];
-      onDelete?:
-        | "cascade"
-        | "set null"
-        | "set default"
-        | "restrict"
-        | "no action";
-      onUpdate?:
-        | "cascade"
-        | "set null"
-        | "set default"
-        | "restrict"
-        | "no action";
+      onDelete?: ReferentialActions;
+      onUpdate?: ReferentialActions;
     }
   >();
 

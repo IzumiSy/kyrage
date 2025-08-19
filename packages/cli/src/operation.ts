@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ReferentialActions } from "./introspection/type";
 
 // TableColumnAttributesのスキーマを直接定義
 const tableColumnAttributesSchema = z
@@ -145,8 +146,8 @@ export type ForeignKeyConstraint = {
   columns: string[];
   referencedTable: string;
   referencedColumns: string[];
-  onDelete?: "cascade" | "set null" | "set default" | "restrict" | "no action";
-  onUpdate?: "cascade" | "set null" | "set default" | "restrict" | "no action";
+  onDelete?: ReferentialActions;
+  onUpdate?: ReferentialActions;
 };
 
 // Tables型定義
@@ -269,13 +270,8 @@ export const ops = {
     columns: string[],
     referencedTable: string,
     referencedColumns: string[],
-    onDelete?:
-      | "cascade"
-      | "set null"
-      | "set default"
-      | "restrict"
-      | "no action",
-    onUpdate?: "cascade" | "set null" | "set default" | "restrict" | "no action"
+    onDelete?: ReferentialActions,
+    onUpdate?: ReferentialActions
   ) => ({
     type: "create_foreign_key_constraint" as const,
     table,

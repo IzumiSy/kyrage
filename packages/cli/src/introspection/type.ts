@@ -23,6 +23,13 @@ type ConstraintAttribute = {
   columns: string[];
 };
 
+export type ReferentialActions =
+  | "cascade"
+  | "set null"
+  | "set default"
+  | "restrict"
+  | "no action";
+
 type ForeignKeyConstraintAttribute = {
   schema?: string;
   table: string;
@@ -31,8 +38,8 @@ type ForeignKeyConstraintAttribute = {
   columns: string[];
   referencedTable: string;
   referencedColumns: string[];
-  onDelete?: "cascade" | "set null" | "set default" | "restrict" | "no action";
-  onUpdate?: "cascade" | "set null" | "set default" | "restrict" | "no action";
+  onDelete?: ReferentialActions;
+  onUpdate?: ReferentialActions;
 };
 
 export type ConstraintAttributes = {

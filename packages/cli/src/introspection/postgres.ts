@@ -1,5 +1,6 @@
 import { sql } from "kysely";
 import { DBClient } from "../client";
+import { ReferentialActions } from "./type";
 
 const nameDict = {
   bool: "boolean",
@@ -153,20 +154,8 @@ export const postgresExtraIntrospectorDriver = (props: {
         columns: string[];
         referenced_table: string | null;
         referenced_columns: string[] | null;
-        on_delete:
-          | "cascade"
-          | "set null"
-          | "set default"
-          | "restrict"
-          | "no action"
-          | null;
-        on_update:
-          | "cascade"
-          | "set null"
-          | "set default"
-          | "restrict"
-          | "no action"
-          | null;
+        on_delete: ReferentialActions | null;
+        on_update: ReferentialActions | null;
       }>()
       .execute(db);
 
@@ -247,8 +236,8 @@ export type PostgresForeignKeyConstraint = PostgresConstraint & {
   type: "FOREIGN KEY";
   referencedTable: string;
   referencedColumns: string[];
-  onDelete?: "cascade" | "set null" | "set default" | "restrict" | "no action";
-  onUpdate?: "cascade" | "set null" | "set default" | "restrict" | "no action";
+  onDelete?: ReferentialActions;
+  onUpdate?: ReferentialActions;
 };
 
 export type PostgresConstraints = {
