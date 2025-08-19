@@ -5,6 +5,7 @@ import {
   PrimaryKeyConstraintSchema,
   UniqueConstraintSchema,
   ReferentialActions,
+  ForeignKeyConstraintSchema,
 } from "../operation";
 
 /**
@@ -216,46 +217,15 @@ export type DefineConfigProp = {
 };
 
 export const defineConfig = (config: DefineConfigProp) => {
-  const indexMap = new Map<
-    string,
-    {
-      table: string;
-      name: string;
-      columns: ReadonlyArray<string>;
-      unique: boolean;
-    }
-  >();
-
-  const primaryKeyMap = new Map<
-    string,
-    { table: string; name: string; columns: ReadonlyArray<string> }
-  >();
-
-  const uniqueMap = new Map<
-    string,
-    { table: string; name: string; columns: ReadonlyArray<string> }
-  >();
-
-  const foreignKeyMap = new Map<
-    string,
-    {
-      table: string;
-      name: string;
-      columns: ReadonlyArray<string>;
-      referencedTable: string;
-      referencedColumns: ReadonlyArray<string>;
-      onDelete?: ReferentialActions;
-      onUpdate?: ReferentialActions;
-    }
-  >();
+  const indexMap = new Map<string, IndexSchema>();
+  const primaryKeyMap = new Map<string, PrimaryKeyConstraintSchema>();
+  const uniqueMap = new Map<string, UniqueConstraintSchema>();
+  const foreignKeyMap = new Map<string, ForeignKeyConstraintSchema>();
 
   for (const t of config.tables) {
     const tableName = t.tableName;
-    const indexes: DefinedIndex[] = t.indexes ?? [];
-    const primaryKeys: DefinedPrimaryKeyConstraint[] = t.primaryKeys ?? [];
-    const uniques: DefinedUniqueConstraint[] = t.uniques ?? [];
 
-    for (const ix of indexes) {
+    for (const ix of t.indexes ?? []) {
       indexMap.set(`${tableName}:${ix.name}`, {
         table: tableName,
         name: ix.name,
@@ -264,7 +234,7 @@ export const defineConfig = (config: DefineConfigProp) => {
       });
     }
 
-    for (const pk of primaryKeys) {
+    for (const pk of t.primaryKeys ?? []) {
       primaryKeyMap.set(`${tableName}:${pk.name}`, {
         table: tableName,
         name: pk.name,
@@ -272,7 +242,7 @@ export const defineConfig = (config: DefineConfigProp) => {
       });
     }
 
-    for (const uq of uniques) {
+    for (const uq of t.uniques ?? []) {
       uniqueMap.set(`${tableName}:${uq.name}`, {
         table: tableName,
         name: uq.name,
