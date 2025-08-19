@@ -23,7 +23,7 @@ const tableSchema = z.object({
 
 const indexSchema = z.object({
   ...tableOpSchemaBase.shape,
-  columns: z.array(z.string()),
+  columns: z.array(z.string()).readonly(),
   unique: z.boolean().default(false),
 });
 export type IndexSchema = z.infer<typeof indexSchema>;
@@ -39,11 +39,11 @@ export type DatabaseValue = z.infer<typeof databaseSchema>;
 
 export const configSchema = z.object({
   database: databaseSchema,
-  tables: z.array(tableSchema),
-  indexes: z.array(indexSchema),
-  primaryKeyConstraints: z.array(primaryKeyConstraintSchema),
-  uniqueConstraints: z.array(uniqueConstraintSchema),
-  foreignKeyConstraints: z.array(foreignKeyConstraintSchema),
+  tables: z.array(tableSchema).readonly(),
+  indexes: z.array(indexSchema).readonly(),
+  primaryKeyConstraints: z.array(primaryKeyConstraintSchema).readonly(),
+  uniqueConstraints: z.array(uniqueConstraintSchema).readonly(),
+  foreignKeyConstraints: z.array(foreignKeyConstraintSchema).readonly(),
 });
 export type ConfigValue = z.infer<typeof configSchema>;
 

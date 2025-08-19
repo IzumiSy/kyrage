@@ -35,9 +35,9 @@ type DefinedUniqueConstraint = DefinedValue<UniqueConstraintSchema, "unique">;
 type DefinedForeignKeyConstraint = {
   kind: "foreignKey";
   name: string;
-  columns: string[];
+  columns: ReadonlyArray<string>;
   referencedTable: string;
-  referencedColumns: string[];
+  referencedColumns: ReadonlyArray<string>;
   onDelete?: ReferentialActions;
   onUpdate?: ReferentialActions;
 };
@@ -126,13 +126,15 @@ export const defineTable = <T extends Record<string, DefinedColumn>>(
     | ReturnType<ExpressionBuilders<T>["reference"]>
   >
 ) => {
-  const ensureNotEmptyColumns = (columns: string[]) => {
+  const ensureNotEmptyColumns = (columns: ReadonlyArray<string>) => {
     if (columns.length === 0) {
       throw new Error("At least one column must be specified.");
     }
   };
-  const createAutogenName = (prefix: string, columnNames: string[]) =>
-    `${prefix}_${name}_${columnNames.join("_")}`;
+  const createAutogenName = (
+    prefix: string,
+    columnNames: ReadonlyArray<string>
+  ) => `${prefix}_${name}_${columnNames.join("_")}`;
 
   const builtConstraints = tableExpBuilder
     ? tableExpBuilder({
@@ -216,17 +218,22 @@ export type DefineConfigProp = {
 export const defineConfig = (config: DefineConfigProp) => {
   const indexMap = new Map<
     string,
-    { table: string; name: string; columns: string[]; unique: boolean }
+    {
+      table: string;
+      name: string;
+      columns: ReadonlyArray<string>;
+      unique: boolean;
+    }
   >();
 
   const primaryKeyMap = new Map<
     string,
-    { table: string; name: string; columns: string[] }
+    { table: string; name: string; columns: ReadonlyArray<string> }
   >();
 
   const uniqueMap = new Map<
     string,
-    { table: string; name: string; columns: string[] }
+    { table: string; name: string; columns: ReadonlyArray<string> }
   >();
 
   const foreignKeyMap = new Map<
@@ -234,9 +241,9 @@ export const defineConfig = (config: DefineConfigProp) => {
     {
       table: string;
       name: string;
-      columns: string[];
+      columns: ReadonlyArray<string>;
       referencedTable: string;
-      referencedColumns: string[];
+      referencedColumns: ReadonlyArray<string>;
       onDelete?: ReferentialActions;
       onUpdate?: ReferentialActions;
     }

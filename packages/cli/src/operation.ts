@@ -17,10 +17,10 @@ export type Tables = ReadonlyArray<{
 
 export type SchemaSnapshot = {
   tables: Tables;
-  indexes: IndexSchema[];
-  primaryKeyConstraints: PrimaryKeyConstraintSchema[];
-  uniqueConstraints: UniqueConstraintSchema[];
-  foreignKeyConstraints: ForeignKeyConstraintSchema[];
+  indexes: ReadonlyArray<IndexSchema>;
+  primaryKeyConstraints: ReadonlyArray<PrimaryKeyConstraintSchema>;
+  uniqueConstraints: ReadonlyArray<UniqueConstraintSchema>;
+  foreignKeyConstraints: ReadonlyArray<ForeignKeyConstraintSchema>;
 };
 
 export const tableOpSchemaBase = z.object({
@@ -37,7 +37,7 @@ export type TableColumnOpValue = z.infer<typeof tableColumnOpSchemaBase>;
 
 export const primaryKeyConstraintSchema = z.object({
   ...tableOpSchemaBase.shape,
-  columns: z.array(z.string()),
+  columns: z.array(z.string()).readonly(),
 });
 export type PrimaryKeyConstraintSchema = z.infer<
   typeof primaryKeyConstraintSchema
@@ -45,7 +45,7 @@ export type PrimaryKeyConstraintSchema = z.infer<
 
 export const uniqueConstraintSchema = z.object({
   ...tableOpSchemaBase.shape,
-  columns: z.array(z.string()),
+  columns: z.array(z.string()).readonly(),
 });
 export type UniqueConstraintSchema = z.infer<typeof uniqueConstraintSchema>;
 
@@ -60,9 +60,9 @@ export type ReferentialActions = z.infer<typeof referentialActionsSchema>;
 
 export const foreignKeyConstraintSchema = z.object({
   ...tableOpSchemaBase.shape,
-  columns: z.array(z.string()),
+  columns: z.array(z.string()).readonly(),
   referencedTable: z.string(),
-  referencedColumns: z.array(z.string()),
+  referencedColumns: z.array(z.string()).readonly(),
   onDelete: referentialActionsSchema.optional(),
   onUpdate: referentialActionsSchema.optional(),
 });
@@ -105,7 +105,7 @@ export const operationSchema = z.discriminatedUnion("type", [
   z.object({
     ...tableOpSchemaBase.shape,
     type: z.literal("create_index"),
-    columns: z.array(z.string()),
+    columns: z.array(z.string()).readonly(),
     unique: z.boolean(),
   }),
   z.object({
@@ -223,9 +223,9 @@ export const ops = {
   createForeignKeyConstraint: (
     tableOpValue: TableOpValue,
     options: {
-      columns: string[];
+      columns: ReadonlyArray<string>;
       referencedTable: string;
-      referencedColumns: string[];
+      referencedColumns: ReadonlyArray<string>;
       onDelete?: ReferentialActions;
       onUpdate?: ReferentialActions;
     }

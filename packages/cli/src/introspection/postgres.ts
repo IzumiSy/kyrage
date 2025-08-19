@@ -195,19 +195,19 @@ type PostgresIndexInfo = {
   table_name: string;
   index_name: string;
   is_unique: boolean;
-  column_names: string[];
+  column_names: ReadonlyArray<string>;
 };
 
 type PostgresConstraintBase = {
   schema: string;
   table: string;
   name: string;
-  columns: string[];
+  columns: ReadonlyArray<string>;
 };
 
 type PostgresForeignKeyConstraint = {
   referenced_table: string;
-  referenced_columns: string[];
+  referenced_columns: ReadonlyArray<string>;
   on_delete?: ReferentialActions;
   on_update?: ReferentialActions;
 };

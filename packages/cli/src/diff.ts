@@ -154,11 +154,11 @@ export function diffTables(props: {
 }
 
 export function diffIndexes(props: {
-  current: IndexSchema[];
-  ideal: IndexSchema[];
+  current: ReadonlyArray<IndexSchema>;
+  ideal: ReadonlyArray<IndexSchema>;
 }): Operation[] {
   const { current, ideal } = props;
-  const operations: Operation[] = [];
+  const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
   const indexKey = (i: IndexSchema) => `${i.table}:${i.name}`;
 
@@ -213,11 +213,11 @@ export function diffIndexes(props: {
 }
 
 export function diffPrimaryKeyConstraints(props: {
-  current: PrimaryKeyConstraintSchema[];
-  ideal: PrimaryKeyConstraintSchema[];
+  current: ReadonlyArray<PrimaryKeyConstraintSchema>;
+  ideal: ReadonlyArray<PrimaryKeyConstraintSchema>;
 }): Operation[] {
   const { current, ideal } = props;
-  const operations: Operation[] = [];
+  const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
   const constraintKey = (pk: PrimaryKeyConstraintSchema) =>
     `${pk.table}:${pk.name}`;
@@ -271,11 +271,11 @@ export function diffPrimaryKeyConstraints(props: {
 }
 
 export function diffUniqueConstraints(props: {
-  current: UniqueConstraintSchema[];
-  ideal: UniqueConstraintSchema[];
+  current: ReadonlyArray<UniqueConstraintSchema>;
+  ideal: ReadonlyArray<UniqueConstraintSchema>;
 }): Operation[] {
   const { current, ideal } = props;
-  const operations: Operation[] = [];
+  const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
   const constraintKey = (uq: UniqueConstraintSchema) =>
     `${uq.table}:${uq.name}`;
@@ -330,10 +330,10 @@ export function diffUniqueConstraints(props: {
 
 // Foreign Key制約のdiff計算
 function diffForeignKeyConstraints(props: {
-  current: ForeignKeyConstraintSchema[];
-  ideal: ForeignKeyConstraintSchema[];
+  current: ReadonlyArray<ForeignKeyConstraintSchema>;
+  ideal: ReadonlyArray<ForeignKeyConstraintSchema>;
 }): Operation[] {
-  const operations: Operation[] = [];
+  const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
 
   const currentNames = props.current.map(getName);

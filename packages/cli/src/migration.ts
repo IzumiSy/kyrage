@@ -15,7 +15,7 @@ import { Operation, operationSchema } from "./operation";
 
 export const migrationDirName = "migrations";
 export const schemaDiffSchema = z.object({
-  operations: z.array(operationSchema),
+  operations: z.array(operationSchema).readonly(),
 });
 export type SchemaDiff = z.infer<typeof schemaDiffSchema>;
 export const migrationSchema = z.object({
@@ -271,7 +271,7 @@ async function executeCreatePrimaryKeyConstraint(
 ): Promise<void> {
   await db.schema
     .alterTable(operation.table)
-    .addPrimaryKeyConstraint(operation.name, operation.columns)
+    .addPrimaryKeyConstraint(operation.name, operation.columns as Array<string>)
     .execute();
 }
 
@@ -291,7 +291,7 @@ async function executeCreateUniqueConstraint(
 ): Promise<void> {
   await db.schema
     .alterTable(operation.table)
-    .addUniqueConstraint(operation.name, operation.columns)
+    .addUniqueConstraint(operation.name, operation.columns as Array<string>)
     .execute();
 }
 
@@ -313,9 +313,9 @@ async function executeCreateForeignKeyConstraint(
     .alterTable(operation.table)
     .addForeignKeyConstraint(
       operation.name,
-      operation.columns,
+      operation.columns as Array<string>,
       operation.referencedTable,
-      operation.referencedColumns
+      operation.referencedColumns as Array<string>
     );
 
   if (operation.onDelete) {
@@ -378,10 +378,10 @@ const OPERATION_PRIORITY = {
  * This prevents issues like trying to alter a dropped table or
  * creating constraints before the required tables exist.
  */
-export function sortOperationsByDependency(
-  operations: Operation[]
-): Operation[] {
-  return operations.slice().sort((a, b) => {
+export const sortOperationsByDependency = (
+  operations: ReadonlyArray<Operation>
+) =>
+  operations.slice().sort((a, b) => {
     const priorityA = OPERATION_PRIORITY[a.type];
     const priorityB = OPERATION_PRIORITY[b.type];
 
@@ -389,12 +389,8 @@ export function sortOperationsByDependency(
       return priorityA - priorityB;
     }
 
-    // Same priority: sort by table name for consistent ordering
-    const tableA = getOperationTableName(a);
-    const tableB = getOperationTableName(b);
-    return tableA.localeCompare(tableB);
+    return getOperationTableName(a).localeCompare(getOperationTableName(b));
   });
-}
 
 /**
  * Extract table name from any operation type.

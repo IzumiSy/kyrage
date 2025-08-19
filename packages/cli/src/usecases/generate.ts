@@ -80,7 +80,12 @@ const generateMigrationFromIntrospection = async (props: {
   // カラム制約の判定
   const columnConstraintPredicate =
     (tableName: string, colName: string) =>
-    (constraints: ReadonlyArray<{ table: string; columns: string[] }>) =>
+    (
+      constraints: ReadonlyArray<{
+        table: string;
+        columns: ReadonlyArray<string>;
+      }>
+    ) =>
       constraints.some(
         (constraint) =>
           constraint.table === tableName &&
@@ -161,7 +166,7 @@ const generateMigrationFromIntrospection = async (props: {
 };
 
 const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
-  const diffOutputs: string[] = [];
+  const diffOutputs: Array<string> = [];
 
   diff.operations.forEach((operation: Operation) => {
     switch (operation.type) {
