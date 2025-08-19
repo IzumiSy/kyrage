@@ -33,8 +33,9 @@ export const runGenerate = async (props: RunGenerateProps) => {
   const { client: targetClient, cleanup } = await setupDatabaseClient(props);
 
   try {
-    if (!props.options.ignorePending) {
-      const pm = await getPendingMigrations(targetClient); // Always check against production for pending migrations
+    // Always check against production for pending migrations if not in dev mode
+    if (!props.options.dev && !props.options.ignorePending) {
+      const pm = await getPendingMigrations(props.client);
       if (pm.length > 0) {
         reporter.warn(
           [
@@ -90,7 +91,6 @@ const setupDatabaseClient = async (props: RunGenerateProps) => {
   const { reporter } = props.logger;
 
   if (!props.options.dev) {
-    // Production database case - no cleanup needed
     return {
       client: props.client,
       cleanup: async () => void 0,
