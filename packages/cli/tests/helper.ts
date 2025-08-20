@@ -38,9 +38,4 @@ export const setupTestDB = async () => {
 };
 
 export const defineConfigForTest = (config: DefineConfigProp) =>
-  configSchema.parse(
-    defineConfig({
-      database: config.database,
-      tables: config.tables,
-    })
-  );
+  configSchema.parse(defineConfig(config));
