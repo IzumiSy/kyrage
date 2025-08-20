@@ -1,6 +1,11 @@
 import { ColumnDataType } from "kysely";
 import { constraintNaming } from "../naming";
-import { ColumnValue, IndexSchema, DatabaseValue } from "./loader";
+import {
+  ColumnValue,
+  IndexSchema,
+  DatabaseValue,
+  DevDatabaseValue,
+} from "./loader";
 import {
   PrimaryKeyConstraintSchema,
   UniqueConstraintSchema,
@@ -213,6 +218,7 @@ export type DefinedTables = ReadonlyArray<DefinedTable>;
 
 export type DefineConfigProp = {
   database: DatabaseValue;
+  dev?: DevDatabaseValue;
   tables: DefinedTables;
 };
 
@@ -300,6 +306,7 @@ export const defineConfig = (config: DefineConfigProp) => {
 
   return {
     ...config,
+    dev: config.dev,
     indexes: Array.from(indexMap.values()),
     primaryKeyConstraints: Array.from(primaryKeyMap.values()),
     uniqueConstraints: Array.from(uniqueMap.values()),

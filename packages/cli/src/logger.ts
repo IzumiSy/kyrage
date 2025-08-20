@@ -23,3 +23,14 @@ export const defaultConsolaLogger: Logger = {
     ...consola,
   },
 };
+
+export const nullLogger: Logger = {
+  stdout: () => void 0,
+  reporter: {
+    info: () => void 0,
+    warn: () => void 0,
+    success: () => void 0,
+    log: () => void 0,
+    error: () => void 0,
+  },
+};
