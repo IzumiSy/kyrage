@@ -1,5 +1,19 @@
 # @izumisy/kyrage
 
+## 1.0.0
+
+### Major Changes
+
+- [#47](https://github.com/IzumiSy/kyrage/pull/47) [`b2e220a`](https://github.com/IzumiSy/kyrage/commit/b2e220a0dd21228f287a8ea61253039878638e5f) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Dev database support #46
+
+### Minor Changes
+
+- [#44](https://github.com/IzumiSy/kyrage/pull/44) [`5783c95`](https://github.com/IzumiSy/kyrage/commit/5783c951d33c66f7ad1364525557b65195db53a0) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Support foreign key support #34
+
+- [#13](https://github.com/IzumiSy/kyrage/pull/13) [`b6f7b25`](https://github.com/IzumiSy/kyrage/commit/b6f7b258d78d20d8b669719cd62a0cfac097b010) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Support index #17
+
+- [#37](https://github.com/IzumiSy/kyrage/pull/37) [`4149692`](https://github.com/IzumiSy/kyrage/commit/4149692a92c9bb03b606f9d953b7d80af9841194) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Support constraints: composite primary key and composite unique #33
+
 ## 0.7.0
 
 ### Minor Changes
