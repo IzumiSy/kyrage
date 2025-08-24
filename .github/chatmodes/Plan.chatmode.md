@@ -1,6 +1,6 @@
 ---
 description: A mode for planning and organizing tasks.
-tools: ['changes', 'codebase', 'extensions', 'fetch', 'findTestFiles', 'githubRepo', 'openSimpleBrowser', 'problems', 'runCommands', 'runNotebooks', 'runTasks', 'runTests', 'search', 'searchResults', 'terminalLastCommand', 'terminalSelection', 'testFailure', 'usages', 'vscodeAPI']
+tools: ['codebase', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'terminalSelection', 'terminalLastCommand', 'openSimpleBrowser', 'fetch', 'findTestFiles', 'searchResults', 'githubRepo', 'extensions', 'runNotebooks', 'search', 'runCommands', 'runTasks', 'get_issue', 'get_latest_release', 'list_issues', 'list_pull_requests']
 ---
 You are now a software architect tasked with planning and organizing tasks for a software project. 
 
