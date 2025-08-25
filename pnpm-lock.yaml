@@ -94,8 +94,8 @@ importers:
         specifier: ^0.31.0
         version: 0.31.0
       memfs:
-        specifier: ^4.36.0
-        version: 4.36.0
+        specifier: ^4.38.1
+        version: 4.38.1
       prettier:
         specifier: ^3.6.2
         version: 3.6.2
@@ -399,14 +399,14 @@ packages:
     peerDependencies:
       tslib: '2'
 
-  '@jsonjoy.com/json-pack@1.9.0':
-    resolution: {integrity: sha512-5QyhXHb/64WUvP5thqF+7oe5CErg0z9A8g2pFLONp72gK674aBk/3rXDE9ZSC8UHFfB2zoKLI3uvmqUF1CDv0A==}
+  '@jsonjoy.com/json-pack@1.11.0':
+    resolution: {integrity: sha512-nLqSTAYwpk+5ZQIoVp7pfd/oSKNWlEdvTq2LzVA4r2wtWZg6v+5u0VgBOaDJuUfNOuw/4Ysq6glN5QKSrOCgrA==}
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
 
-  '@jsonjoy.com/json-pointer@1.0.1':
-    resolution: {integrity: sha512-tJpwQfuBuxqZlyoJOSZcqf7OUmiYQ6MiPNmOv4KbZdXE/DdvBSSAwhos0zIlJU/AXxC8XpuO8p08bh2fIl+RKA==}
+  '@jsonjoy.com/json-pointer@1.0.2':
+    resolution: {integrity: sha512-Fsn6wM2zlDzY1U+v4Nc8bo3bVqgfNTGcn6dMgs6FjrEnt4ZCe60o6ByKRjOGlI2gow0aE/Q41QOigdTqkyK5fg==}
     engines: {node: '>=10.0'}
     peerDependencies:
       tslib: '2'
@@ -1235,6 +1235,12 @@ packages:
     resolution: {integrity: sha512-AOIgSQCepiJYwP3ARnGx+5VnTu2HBYdzbGP45eLw1vr3zB3vZLeyed1sC9hnbcOc9/SrMyM5RPQrkGz4aS9Zow==}
     engines: {node: '>= 6'}
 
+  glob-to-regex.js@1.0.1:
+    resolution: {integrity: sha512-CG/iEvgQqfzoVsMUbxSJcwbG2JwyZ3naEqPkeltwl0BSS8Bp83k3xlGms+0QdWFUAwV+uvo80wNswKF6FWEkKg==}
+    engines: {node: '>=10.0'}
+    peerDependencies:
+      tslib: '2'
+
   glob@10.4.5:
     resolution: {integrity: sha512-7Bv8RF0k6xjo7d4A/PxYLbUCfb6c+Vpd2/mB2yRDlew7Jb5hEXiCD9ibfO7wpk8i4sevK6DFny9h7EYbM3/sHg==}
     hasBin: true
@@ -1468,8 +1474,8 @@ packages:
   magic-string@0.30.17:
     resolution: {integrity: sha512-sNPKHvyjVf7gyjwS4xGTaW/mCnF8wnjtifKBEhxfZ7E/S8tQ0rssrwGNn6q8JH/ohItJfSQp9mBtQYuTlH5QnA==}
 
-  memfs@4.36.0:
-    resolution: {integrity: sha512-mfBfzGUdoEw5AZwG8E965ej3BbvW2F9LxEWj4uLxF6BEh1dO2N9eS3AGu9S6vfenuQYrVjsbUOOZK7y3vz4vyQ==}
+  memfs@4.38.1:
+    resolution: {integrity: sha512-exfrOkkU3m0EpbQ0iQJP93HUbkprnIBU7IUnobSNAzHkBUzsklLwENGLEm8ZwJmMuLoFEfv1pYQ54wSpkay4kQ==}
     engines: {node: '>= 4.0.0'}
 
   merge2@1.4.1:
@@ -2660,19 +2666,20 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@jsonjoy.com/json-pack@1.9.0(tslib@2.8.1)':
+  '@jsonjoy.com/json-pack@1.11.0(tslib@2.8.1)':
     dependencies:
       '@jsonjoy.com/base64': 1.1.2(tslib@2.8.1)
       '@jsonjoy.com/buffers': 1.0.0(tslib@2.8.1)
       '@jsonjoy.com/codegen': 1.0.0(tslib@2.8.1)
-      '@jsonjoy.com/json-pointer': 1.0.1(tslib@2.8.1)
+      '@jsonjoy.com/json-pointer': 1.0.2(tslib@2.8.1)
       '@jsonjoy.com/util': 1.9.0(tslib@2.8.1)
       hyperdyperid: 1.2.0
       thingies: 2.5.0(tslib@2.8.1)
       tslib: 2.8.1
 
-  '@jsonjoy.com/json-pointer@1.0.1(tslib@2.8.1)':
+  '@jsonjoy.com/json-pointer@1.0.2(tslib@2.8.1)':
     dependencies:
+      '@jsonjoy.com/codegen': 1.0.0(tslib@2.8.1)
       '@jsonjoy.com/util': 1.9.0(tslib@2.8.1)
       tslib: 2.8.1
 
@@ -3468,6 +3475,10 @@ snapshots:
     dependencies:
       is-glob: 4.0.3
 
+  glob-to-regex.js@1.0.1(tslib@2.8.1):
+    dependencies:
+      tslib: 2.8.1
+
   glob@10.4.5:
     dependencies:
       foreground-child: 3.3.1
@@ -3651,10 +3662,12 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.4
 
-  memfs@4.36.0:
+  memfs@4.38.1:
     dependencies:
-      '@jsonjoy.com/json-pack': 1.9.0(tslib@2.8.1)
+      '@jsonjoy.com/json-pack': 1.11.0(tslib@2.8.1)
       '@jsonjoy.com/util': 1.9.0(tslib@2.8.1)
+      glob-to-regex.js: 1.0.1(tslib@2.8.1)
+      thingies: 2.5.0(tslib@2.8.1)
       tree-dump: 1.0.3(tslib@2.8.1)
       tslib: 2.8.1
 
