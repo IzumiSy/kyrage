@@ -110,9 +110,9 @@ const setupDatabaseClient = async (props: RunGenerateProps) => {
   // Check if reuse is enabled and container is already running
   const isReuse =
     "container" in props.config.dev && props.config.dev.container.reuse;
-  const isRunning = devManager.isRunning();
+  const status = await devManager.getStatus();
 
-  if (isReuse && isRunning) {
+  if (isReuse && status?.type === "container") {
     reporter.info("🔄 Reusing existing dev database...");
     const connectionString = devManager.getConnectionString();
     if (connectionString) {

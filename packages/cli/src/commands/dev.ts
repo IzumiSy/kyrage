@@ -3,10 +3,10 @@ import { loadConfigFile } from "../config/loader";
 import { createDevDatabaseManager } from "../dev/container";
 import { defaultConsolaLogger } from "../logger";
 
-const devListCmd = defineCommand({
+const devStatusCmd = defineCommand({
   meta: {
-    name: "list",
-    description: "List all kyrage dev containers",
+    name: "status",
+    description: "Show status of kyrage dev container",
   },
   run: async () => {
     try {
@@ -20,16 +20,15 @@ const devListCmd = defineCommand({
         config.dev,
         config.database.dialect
       );
-      const isRunning = await manager.isRunning();
 
-      if (isRunning) {
-        const connectionString = await manager.getConnectionString();
-        console.log(
-          `Running: ${config.dev.container.name || "kyrage-dev"} (${connectionString})`
-        );
-      } else {
+      const status = await manager.getStatus();
+      if (status?.type !== "container") {
         console.log("No running dev containers found");
+        return;
       }
+
+      await manager.start();
+      console.log(`Running: ${status.containerID} (${status.imageName})`);
     } catch (error) {
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
@@ -56,6 +55,14 @@ const devGetUrlCmd = defineCommand({
         config.dev,
         config.database.dialect
       );
+
+      const status = await manager.getStatus();
+      if (status?.type !== "container") {
+        console.log("No running dev containers found");
+        return;
+      }
+
+      await manager.start();
       const connectionString = manager.getConnectionString();
 
       if (connectionString) {
@@ -91,6 +98,13 @@ const devCleanCmd = defineCommand({
         config.database.dialect
       );
 
+      const status = await manager.getStatus();
+      if (status?.type !== "container") {
+        console.log("No running dev containers found");
+        return;
+      }
+
+      await manager.start();
       await manager.stop();
       defaultConsolaLogger.reporter.success(
         "Cleaned up stopped dev containers"
@@ -108,7 +122,7 @@ export const devCmd = defineCommand({
     description: "Manage development database containers",
   },
   subCommands: {
-    list: devListCmd,
+    status: devStatusCmd,
     "get-url": devGetUrlCmd,
     clean: devCleanCmd,
   },
