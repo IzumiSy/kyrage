@@ -1,26 +1,49 @@
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { CockroachDbContainer } from "@testcontainers/cockroachdb";
-import { DatabaseValue, DevDatabaseValue, DialectEnum } from "../config/loader";
+import { GenericContainer, StartedTestContainer } from "testcontainers";
+import { DevDatabaseValue, DialectEnum } from "../config/loader";
 
-export interface DevDatabaseManager {
-  start(): Promise<DatabaseValue>;
-  stop(): Promise<void>;
-  getConnectionString(): Promise<string | null>;
-  isRunning(): Promise<boolean>;
+export type DevDatabaseManager = {
+  start: () => Promise<void>;
+  stop: () => Promise<void>;
+  getConnectionString: () => string | null;
+  isRunning: () => boolean;
+  clean: () => Promise<void>;
+};
+
+export interface ContainerOptions {
+  image: string;
+  reuse?: boolean;
+  containerName?: string;
 }
 
-export class ContainerDevDatabaseManager implements DevDatabaseManager {
-  private startedContainer: any = null;
+type ConnectableStartedContainer = StartedTestContainer & {
+  getConnectionUri: () => string;
+};
 
-  constructor(
-    private image: string,
-    private dialect: DialectEnum,
-    private reuse: boolean = false,
-    private containerName?: string
-  ) {}
+type StartableContainer = Omit<GenericContainer, "start"> & {
+  start: () => Promise<ConnectableStartedContainer>;
+};
 
-  async start(): Promise<DatabaseValue> {
-    const container = this.getContainer();
+export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
+  implements DevDatabaseManager
+{
+  protected startedContainer: ConnectableStartedContainer | null = null;
+
+  protected image: string;
+  protected reuse: boolean;
+  protected containerName?: string;
+
+  constructor(options: ContainerOptions) {
+    this.image = options.image;
+    this.reuse = options.reuse || false;
+    this.containerName = options.containerName;
+  }
+
+  abstract createContainer(): C;
+
+  async start() {
+    const container = this.createContainer();
 
     if (this.reuse) {
       container.withReuse();
@@ -31,11 +54,13 @@ export class ContainerDevDatabaseManager implements DevDatabaseManager {
     }
 
     this.startedContainer = await container.start();
+  }
 
-    return {
-      dialect: this.dialect,
-      connectionString: this.startedContainer.getConnectionUri(),
-    };
+  getConnectionString() {
+    if (this.startedContainer) {
+      return this.startedContainer.getConnectionUri();
+    }
+    return null;
   }
 
   async stop(): Promise<void> {
@@ -44,52 +69,69 @@ export class ContainerDevDatabaseManager implements DevDatabaseManager {
     // persistent container management here.
   }
 
-  async getConnectionString(): Promise<string | null> {
-    if (this.startedContainer) {
-      return this.startedContainer.getConnectionUri();
-    }
-    return null;
-  }
-
-  async isRunning(): Promise<boolean> {
+  isRunning() {
     return this.startedContainer !== null;
   }
 
-  private getContainer() {
-    if (this.image.includes("postgres")) {
-      return new PostgreSqlContainer(this.image);
+  async clean(): Promise<void> {
+    // TestContainers doesn't provide a direct API to clean up containers
+    // We can implement this by using Docker API directly or leave it as no-op
+    // since TestContainers handles cleanup automatically on process exit
+    if (this.startedContainer) {
+      await this.startedContainer.stop();
+      this.startedContainer = null;
     }
-    if (this.image.includes("cockroach")) {
-      return new CockroachDbContainer(this.image);
-    }
-    throw new Error(`Unsupported container image: ${this.image}`);
+  }
+}
+
+export class PostgreSqlDevDatabaseManager extends ContainerDevDatabaseManager<PostgreSqlContainer> {
+  public readonly container: PostgreSqlContainer;
+
+  constructor(props: ContainerOptions) {
+    super(props);
+    this.container = new PostgreSqlContainer(this.image);
+  }
+
+  createContainer() {
+    return this.container;
+  }
+}
+
+export class CockroachDbDevDatabaseManager extends ContainerDevDatabaseManager<CockroachDbContainer> {
+  public readonly container: CockroachDbContainer;
+
+  constructor(props: ContainerOptions) {
+    super(props);
+    this.container = new CockroachDbContainer(this.image);
+  }
+
+  createContainer() {
+    return this.container;
   }
 }
 
 export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
-  constructor(
-    private connectionString: string,
-    private dialect: DialectEnum
-  ) {}
+  constructor(private connectionString: string) {}
 
-  async start(): Promise<DatabaseValue> {
-    return {
-      dialect: this.dialect,
-      connectionString: this.connectionString,
-    };
+  async start() {
+    // No-op for connection string
   }
 
   async stop(): Promise<void> {
     // No-op for connection string
   }
 
-  async getConnectionString(): Promise<string | null> {
+  getConnectionString() {
     return this.connectionString;
   }
 
-  async isRunning(): Promise<boolean> {
+  isRunning() {
     // Always considered "running" for connection string based setup
     return true;
+  }
+
+  async clean(): Promise<void> {
+    // No-op for connection string based setup
   }
 }
 
@@ -98,17 +140,22 @@ export const createDevDatabaseManager = (
   dialect: DialectEnum
 ): DevDatabaseManager => {
   if ("connectionString" in devConfig) {
-    return new ConnectionStringDevDatabaseManager(
-      devConfig.connectionString,
-      dialect
-    );
+    return new ConnectionStringDevDatabaseManager(devConfig.connectionString);
   } else if ("container" in devConfig) {
-    return new ContainerDevDatabaseManager(
-      devConfig.container.image,
-      dialect,
-      devConfig.container.reuse || false,
-      devConfig.container.name
-    );
+    const containerOptions: ContainerOptions = {
+      image: devConfig.container.image,
+      reuse: devConfig.container.reuse || false,
+      containerName: devConfig.container.name,
+    };
+
+    switch (dialect) {
+      case "postgres":
+        return new PostgreSqlDevDatabaseManager(containerOptions);
+      case "cockroachdb":
+        return new CockroachDbDevDatabaseManager(containerOptions);
+      default:
+        throw new Error(`Unsupported dialect for container: ${dialect}`);
+    }
   } else {
     throw new Error("Invalid dev database configuration");
   }

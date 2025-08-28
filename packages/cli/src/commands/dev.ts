@@ -78,8 +78,23 @@ const devCleanCmd = defineCommand({
   },
   run: async () => {
     try {
-      // For now, this is a placeholder
-      // In the future, we could implement container cleanup logic
+      const config = await loadConfigFile();
+      if (!config.dev || !("container" in config.dev)) {
+        defaultConsolaLogger.reporter.warn(
+          "No dev database container configuration found"
+        );
+        return;
+      }
+
+      const manager = createDevDatabaseManager(
+        config.dev,
+        config.database.dialect
+      );
+
+      defaultConsolaLogger.reporter.info(
+        "Cleaning up stopped dev containers..."
+      );
+      await manager.clean();
       defaultConsolaLogger.reporter.success(
         "Cleaned up stopped dev containers"
       );
