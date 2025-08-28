@@ -48,6 +48,7 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   protected container: C;
 
   private DialectKey = "kyrage.dialect";
+  private ManagedKey = "kyrage.managed";
 
   constructor(
     private options: ContainerOptions,
@@ -56,6 +57,7 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
     const container = createContainer();
     container.withLabels({
       [this.DialectKey]: this.options.dialect,
+      [this.ManagedKey]: "true",
     });
 
     if (this.options.reuse) {
@@ -81,27 +83,15 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   }
 
   /**
-   * 全てのコンテナ（実行中・停止中）を取得する共通処理
+   * kyrage管理の全てのコンテナIDを取得する共通処理
    */
-  private async findAllContainers() {
+  private async findAllKyrageManagedContainerIds() {
     const runtime = await getContainerRuntimeClient();
-    // 実行中と停止中のコンテナを分けて取得
-    const runningContainers = await runtime.container.fetchByLabel(
-      this.DialectKey,
-      this.options.dialect,
-      { status: ["running"] }
-    );
-    const stoppedContainers = await runtime.container.fetchByLabel(
-      this.DialectKey,
-      this.options.dialect,
-      { status: ["exited", "created"] }
-    );
+    const allContainers = await runtime.container.list();
 
-    const containers = [];
-    if (runningContainers) containers.push(runningContainers);
-    if (stoppedContainers) containers.push(stoppedContainers);
-
-    return containers;
+    return allContainers
+      .filter((container) => container.Labels[this.ManagedKey] === "true")
+      .map((container) => container.Id);
   }
 
   async exists(): Promise<boolean> {
@@ -129,24 +119,30 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   }
 
   async remove(): Promise<void> {
-    // 停止済み・実行中問わず、ラベルで検索して削除
-    const containers = await this.findAllContainers();
+    const containerIds = await this.findAllKyrageManagedContainerIds();
+    const runtime = await getContainerRuntimeClient();
 
-    for (const container of containers) {
-      try {
-        await container.remove({ force: true }); // force=trueで実行中でも削除
-      } catch (error) {
-        // 既に削除済みなどのエラーは無視
-        console.warn(`Failed to remove container: ${error}`);
+    // 並列でコンテナを削除
+    const results = await Promise.allSettled(
+      containerIds.map(async (id) =>
+        runtime.container.getById(id).remove({ force: true })
+      )
+    );
+
+    // エラーをログ出力
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.warn(
+          `Failed to remove container ${containerIds[index]}: ${result.reason}`
+        );
       }
-    }
+    });
 
     this.startedContainer = null;
   }
 
   async getStatus() {
     const runningContainer = await this.findRunningContainer();
-
     if (!runningContainer) {
       return null;
     }
