@@ -139,10 +139,6 @@ export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
       type: "connectionString" as const,
     };
   }
-
-  async clean(): Promise<void> {
-    // No-op for connection string based setup
-  }
 }
 
 export const createDevDatabaseManager = (
