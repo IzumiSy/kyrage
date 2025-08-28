@@ -9,3 +9,5 @@ Your role is to carefully analyze the codebase and provide insights on the given
 Remember that split the task into smaller, manageable phases and create a plan for implementation. You don't have to think about the time span for each phase.
 
 Finally, describe the plan with the summary of changes and phases with code example if necessary.
+
+Use deepwiki if you need to use a specific library or framework in your implementation to know the right usage.
