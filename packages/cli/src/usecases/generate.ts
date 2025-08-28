@@ -110,29 +110,11 @@ const setupDatabaseClient = async (props: RunGenerateProps) => {
   // Check if reuse is enabled and container is already running
   const isReuse =
     "container" in props.config.dev && props.config.dev.container.reuse;
-  const status = await devManager.getStatus();
-
-  if (isReuse && status?.type === "container") {
+  if (isReuse) {
     reporter.info("🔄 Reusing existing dev database...");
-    const connectionString = devManager.getConnectionString();
-    if (connectionString) {
-      const devDatabase = {
-        dialect,
-        connectionString,
-      };
-      const devClient = getClient({ database: devDatabase });
-
-      return {
-        client: devClient,
-        cleanup: async () => {
-          reporter.success("✨ Persistent dev database ready: " + dialect);
-        },
-      };
-    }
+  } else {
+    reporter.info("🚀 Starting dev database for migration generation...");
   }
-
-  // Start new dev database (existing logic)
-  reporter.info("🚀 Starting dev database for migration generation...");
 
   await devManager.start();
   reporter.success(`Dev database started: ${dialect}`);
