@@ -5,6 +5,7 @@ import { runApply } from "./usecases/apply";
 import { defaultConsolaLogger } from "./logger";
 import { runGenerate } from "./usecases/generate";
 import { loadConfigFile } from "./config/loader";
+import { devCmd } from "./commands/dev";
 
 const logger = defaultConsolaLogger;
 
@@ -108,6 +109,7 @@ const mainCmd = defineCommand({
   subCommands: {
     apply: applyCmd,
     generate: generateCmd,
+    dev: devCmd,
   },
 });
 

@@ -103,13 +103,40 @@ const setupDatabaseClient = async (props: RunGenerateProps) => {
     );
   }
 
-  reporter.info("🚀 Starting dev database for migration generation...");
-
-  // Create dev database manager (closure)
+  // Create dev database manager
   const devManager = createDevDatabaseManager(
     props.config.dev,
     props.config.database.dialect
   );
+
+  // Check if reuse is enabled and container is already running
+  const isReuse =
+    "container" in props.config.dev && props.config.dev.container.reuse;
+  const isRunning = await devManager.isRunning();
+
+  if (isReuse && isRunning) {
+    reporter.info("🔄 Reusing existing dev database...");
+    const connectionString = await devManager.getConnectionString();
+    if (connectionString) {
+      const devDatabase = {
+        dialect: props.config.database.dialect,
+        connectionString,
+      };
+      const devClient = getClient({ database: devDatabase });
+
+      return {
+        client: devClient,
+        cleanup: async () => {
+          reporter.success(
+            "✨ Persistent dev database ready: " + devDatabase.dialect
+          );
+        },
+      };
+    }
+  }
+
+  // Start new dev database (existing logic)
+  reporter.info("🚀 Starting dev database for migration generation...");
 
   const devDatabase = await devManager.start();
   reporter.success(`Dev database started: ${devDatabase.dialect}`);
@@ -130,8 +157,14 @@ const setupDatabaseClient = async (props: RunGenerateProps) => {
   return {
     client: devClient,
     cleanup: async () => {
-      await devManager.stop();
-      reporter.success("Dev database stopped");
+      if (!isReuse) {
+        await devManager.stop();
+        reporter.success("Dev database stopped");
+      } else {
+        reporter.success(
+          "✨ Persistent dev database ready: " + devDatabase.dialect
+        );
+      }
     },
   };
 };

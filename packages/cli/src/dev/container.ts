@@ -5,21 +5,36 @@ import { DatabaseValue, DevDatabaseValue, DialectEnum } from "../config/loader";
 export interface DevDatabaseManager {
   start(): Promise<DatabaseValue>;
   stop(): Promise<void>;
+  getConnectionString(): Promise<string | null>;
+  isRunning(): Promise<boolean>;
 }
 
 export class ContainerDevDatabaseManager implements DevDatabaseManager {
+  private startedContainer: any = null;
+
   constructor(
     private image: string,
-    private dialect: DialectEnum
+    private dialect: DialectEnum,
+    private reuse: boolean = false,
+    private containerName?: string
   ) {}
 
   async start(): Promise<DatabaseValue> {
     const container = this.getContainer();
-    const startedContainer = await container.start();
+
+    if (this.reuse) {
+      container.withReuse();
+    }
+
+    if (this.containerName) {
+      container.withName(this.containerName);
+    }
+
+    this.startedContainer = await container.start();
 
     return {
       dialect: this.dialect,
-      connectionString: startedContainer.getConnectionUri(),
+      connectionString: this.startedContainer.getConnectionUri(),
     };
   }
 
@@ -27,6 +42,17 @@ export class ContainerDevDatabaseManager implements DevDatabaseManager {
     // For now, TestContainers will handle cleanup automatically
     // when the process exits. In the future, we might implement
     // persistent container management here.
+  }
+
+  async getConnectionString(): Promise<string | null> {
+    if (this.startedContainer) {
+      return this.startedContainer.getConnectionUri();
+    }
+    return null;
+  }
+
+  async isRunning(): Promise<boolean> {
+    return this.startedContainer !== null;
   }
 
   private getContainer() {
@@ -56,6 +82,15 @@ export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
   async stop(): Promise<void> {
     // No-op for connection string
   }
+
+  async getConnectionString(): Promise<string | null> {
+    return this.connectionString;
+  }
+
+  async isRunning(): Promise<boolean> {
+    // Always considered "running" for connection string based setup
+    return true;
+  }
 }
 
 export const createDevDatabaseManager = (
@@ -68,7 +103,12 @@ export const createDevDatabaseManager = (
       dialect
     );
   } else if ("container" in devConfig) {
-    return new ContainerDevDatabaseManager(devConfig.container.image, dialect);
+    return new ContainerDevDatabaseManager(
+      devConfig.container.image,
+      dialect,
+      devConfig.container.reuse || false,
+      devConfig.container.name
+    );
   } else {
     throw new Error("Invalid dev database configuration");
   }
