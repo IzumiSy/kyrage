@@ -22,12 +22,11 @@ const devStatusCmd = defineCommand({
       );
 
       const status = await manager.getStatus();
-      if (status?.type !== "container") {
+      if (!status || status.type !== "container") {
         console.log("No running dev containers found");
         return;
       }
 
-      await manager.start();
       console.log(`Running: ${status.containerID} (${status.imageName})`);
     } catch (error) {
       defaultConsolaLogger.reporter.error(error as Error);
@@ -56,19 +55,19 @@ const devGetUrlCmd = defineCommand({
         config.database.dialect
       );
 
-      const status = await manager.getStatus();
-      if (status?.type !== "container") {
+      if (!(await manager.exists())) {
         console.log("No running dev containers found");
         return;
       }
 
+      // TestContainersのreuseによって既存コンテナに自動接続
       await manager.start();
       const connectionString = manager.getConnectionString();
 
       if (connectionString) {
         console.log(connectionString);
       } else {
-        defaultConsolaLogger.reporter.error("No running dev container found");
+        defaultConsolaLogger.reporter.error("Failed to get connection string");
         process.exit(1);
       }
     } catch (error) {
@@ -81,7 +80,7 @@ const devGetUrlCmd = defineCommand({
 const devCleanCmd = defineCommand({
   meta: {
     name: "clean",
-    description: "Remove all stopped kyrage dev containers",
+    description: "Remove all kyrage dev containers",
   },
   run: async () => {
     try {
@@ -98,17 +97,14 @@ const devCleanCmd = defineCommand({
         config.database.dialect
       );
 
-      const status = await manager.getStatus();
-      if (status?.type !== "container") {
-        console.log("No running dev containers found");
+      if (!(await manager.exists())) {
+        console.log("No dev containers found");
         return;
       }
 
-      await manager.start();
-      await manager.stop();
-      defaultConsolaLogger.reporter.success(
-        "Cleaned up stopped dev containers"
-      );
+      // 直接remove - semantics的に完全に自然
+      await manager.remove();
+      defaultConsolaLogger.reporter.success("Cleaned up dev containers");
     } catch (error) {
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
