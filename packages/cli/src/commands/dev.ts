@@ -56,7 +56,7 @@ const devGetUrlCmd = defineCommand({
         config.dev,
         config.database.dialect
       );
-      const connectionString = await manager.getConnectionString();
+      const connectionString = manager.getConnectionString();
 
       if (connectionString) {
         console.log(connectionString);
@@ -91,10 +91,7 @@ const devCleanCmd = defineCommand({
         config.database.dialect
       );
 
-      defaultConsolaLogger.reporter.info(
-        "Cleaning up stopped dev containers..."
-      );
-      await manager.clean();
+      await manager.stop();
       defaultConsolaLogger.reporter.success(
         "Cleaned up stopped dev containers"
       );

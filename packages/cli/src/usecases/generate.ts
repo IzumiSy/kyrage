@@ -104,22 +104,20 @@ const setupDatabaseClient = async (props: RunGenerateProps) => {
   }
 
   // Create dev database manager
-  const devManager = createDevDatabaseManager(
-    props.config.dev,
-    props.config.database.dialect
-  );
+  const dialect = props.config.database.dialect;
+  const devManager = createDevDatabaseManager(props.config.dev, dialect);
 
   // Check if reuse is enabled and container is already running
   const isReuse =
     "container" in props.config.dev && props.config.dev.container.reuse;
-  const isRunning = await devManager.isRunning();
+  const isRunning = devManager.isRunning();
 
   if (isReuse && isRunning) {
     reporter.info("🔄 Reusing existing dev database...");
-    const connectionString = await devManager.getConnectionString();
+    const connectionString = devManager.getConnectionString();
     if (connectionString) {
       const devDatabase = {
-        dialect: props.config.database.dialect,
+        dialect,
         connectionString,
       };
       const devClient = getClient({ database: devDatabase });
@@ -127,9 +125,7 @@ const setupDatabaseClient = async (props: RunGenerateProps) => {
       return {
         client: devClient,
         cleanup: async () => {
-          reporter.success(
-            "✨ Persistent dev database ready: " + devDatabase.dialect
-          );
+          reporter.success("✨ Persistent dev database ready: " + dialect);
         },
       };
     }
@@ -138,11 +134,21 @@ const setupDatabaseClient = async (props: RunGenerateProps) => {
   // Start new dev database (existing logic)
   reporter.info("🚀 Starting dev database for migration generation...");
 
-  const devDatabase = await devManager.start();
-  reporter.success(`Dev database started: ${devDatabase.dialect}`);
+  await devManager.start();
+  reporter.success(`Dev database started: ${dialect}`);
+
+  const connectionString = devManager.getConnectionString();
+  if (!connectionString) {
+    throw new Error("Failed to get connection string for dev database");
+  }
 
   // Create client for dev database
-  const devClient = getClient({ database: devDatabase });
+  const devClient = getClient({
+    database: {
+      dialect,
+      connectionString,
+    },
+  });
 
   // Apply baseline migrations to dev database
   await runApply({
@@ -161,9 +167,7 @@ const setupDatabaseClient = async (props: RunGenerateProps) => {
         await devManager.stop();
         reporter.success("Dev database stopped");
       } else {
-        reporter.success(
-          "✨ Persistent dev database ready: " + devDatabase.dialect
-        );
+        reporter.success("✨ Persistent dev database ready: " + dialect);
       }
     },
   };
