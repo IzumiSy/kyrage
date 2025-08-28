@@ -95,8 +95,7 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   }
 
   async exists(): Promise<boolean> {
-    const container = await this.findRunningContainer();
-    return container !== null;
+    return !!(await this.findRunningContainer());
   }
 
   async start() {
