@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { Operation } from "./operation";
 import { sortOperationsByDependency } from "./migration";
 
 describe("sortOperationsByDependency", () => {
