@@ -1,10 +1,8 @@
 import { DBClient } from "../client";
 import { postgresExtraIntrospectorDriver } from "./postgres";
-import { ColumnExtraAttribute, ExtraIntrospectorDriver } from "./type";
+import { ColumnExtraAttribute } from "./type";
 
-const getExtraIntrospectorDriver = (
-  client: DBClient
-): ExtraIntrospectorDriver => {
+const getExtraIntrospectorDriver = (client: DBClient) => {
   const dialect = client.getDialect();
 
   switch (dialect) {

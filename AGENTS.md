@@ -10,6 +10,9 @@
 
 - Always avoid `any`, but use `unknown` instead if unavoidable
 - Use functional pattern where possible
+- Use arrow to define functions instead of `function` syntax
+- Omit return types of a function as much as possible to let callees infer the return types
+- Use `ReadonlyArray` type explicitly if the corresponding value is not expected to be mutable
 
 ## Docs
 

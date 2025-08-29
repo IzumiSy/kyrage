@@ -10,7 +10,7 @@ class CockroachDBAdapter extends PostgresAdapter {
   override async acquireMigrationLock(
     db: Kysely<any>,
     options: MigrationLockOptions
-  ): Promise<void> {
+  ) {
     await db.selectFrom(options.lockTable).selectAll().forUpdate().execute();
   }
 }

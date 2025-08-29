@@ -1,7 +1,6 @@
 import { sql } from "kysely";
 import { DBClient } from "../client";
 import { ReferentialActions } from "../operation";
-import { ExtraIntrospectorDriver } from "./type";
 
 const nameDict = {
   bool: "boolean",
@@ -15,7 +14,7 @@ const convertTypeName = (typeName: string) =>
 
 export const postgresExtraIntrospectorDriver = (props: {
   client: DBClient;
-}): ExtraIntrospectorDriver => {
+}) => {
   const introspectTables = async () => {
     const client = props.client;
     await using db = client.getDB();

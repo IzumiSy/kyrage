@@ -103,7 +103,7 @@ export const createMigrationProvider = (
 export async function buildMigrationFromDiff(
   db: Kysely<any>,
   diff: SchemaDiff
-): Promise<void> {
+) {
   // Sort operations by dependency to ensure correct execution order
   const sortedOperations = sortOperationsByDependency(diff.operations);
 
@@ -112,10 +112,7 @@ export async function buildMigrationFromDiff(
   }
 }
 
-async function executeOperation(
-  db: Kysely<any>,
-  operation: Operation
-): Promise<void> {
+async function executeOperation(db: Kysely<any>, operation: Operation) {
   switch (operation.type) {
     case "create_table":
       return executeCreateTable(db, operation);
@@ -151,7 +148,7 @@ async function executeOperation(
 async function executeCreateTable(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "create_table" }>
-): Promise<void> {
+) {
   let builder: CreateTableBuilder<string, any> = db.schema.createTable(
     operation.table
   );
@@ -175,14 +172,14 @@ async function executeCreateTable(
 async function executeDropTable(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "drop_table" }>
-): Promise<void> {
+) {
   await db.schema.dropTable(operation.table).execute();
 }
 
 async function executeAddColumn(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "add_column" }>
-): Promise<void> {
+) {
   const dataType = operation.attributes.type;
   assertDataType(dataType);
 
@@ -202,7 +199,7 @@ async function executeAddColumn(
 async function executeDropColumn(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "drop_column" }>
-): Promise<void> {
+) {
   await db.schema
     .alterTable(operation.table)
     .dropColumn(operation.column)
@@ -212,7 +209,7 @@ async function executeDropColumn(
 async function executeAlterColumn(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "alter_column" }>
-): Promise<void> {
+) {
   const { table, column, before, after } = operation;
 
   // dataType
@@ -244,7 +241,7 @@ async function executeAlterColumn(
 async function executeCreateIndex(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "create_index" }>
-): Promise<void> {
+) {
   let builder = db.schema.createIndex(operation.name).on(operation.table);
 
   for (const column of operation.columns) {
@@ -261,14 +258,14 @@ async function executeCreateIndex(
 async function executeDropIndex(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "drop_index" }>
-): Promise<void> {
+) {
   await db.schema.dropIndex(operation.name).execute();
 }
 
 async function executeCreatePrimaryKeyConstraint(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "create_primary_key_constraint" }>
-): Promise<void> {
+) {
   await db.schema
     .alterTable(operation.table)
     .addPrimaryKeyConstraint(operation.name, operation.columns as Array<string>)
@@ -278,7 +275,7 @@ async function executeCreatePrimaryKeyConstraint(
 async function executeDropPrimaryKeyConstraint(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "drop_primary_key_constraint" }>
-): Promise<void> {
+) {
   await db.schema
     .alterTable(operation.table)
     .dropConstraint(operation.name)
@@ -288,7 +285,7 @@ async function executeDropPrimaryKeyConstraint(
 async function executeCreateUniqueConstraint(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "create_unique_constraint" }>
-): Promise<void> {
+) {
   await db.schema
     .alterTable(operation.table)
     .addUniqueConstraint(operation.name, operation.columns as Array<string>)
@@ -298,7 +295,7 @@ async function executeCreateUniqueConstraint(
 async function executeDropUniqueConstraint(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "drop_unique_constraint" }>
-): Promise<void> {
+) {
   await db.schema
     .alterTable(operation.table)
     .dropConstraint(operation.name)
@@ -308,7 +305,7 @@ async function executeDropUniqueConstraint(
 async function executeCreateForeignKeyConstraint(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "create_foreign_key_constraint" }>
-): Promise<void> {
+) {
   let builder = db.schema
     .alterTable(operation.table)
     .addForeignKeyConstraint(
@@ -331,7 +328,7 @@ async function executeCreateForeignKeyConstraint(
 async function executeDropForeignKeyConstraint(
   db: Kysely<any>,
   operation: Extract<Operation, { type: "drop_foreign_key_constraint" }>
-): Promise<void> {
+) {
   await db.schema
     .alterTable(operation.table)
     .dropConstraint(operation.name)
@@ -389,12 +386,5 @@ export const sortOperationsByDependency = (
       return priorityA - priorityB;
     }
 
-    return getOperationTableName(a).localeCompare(getOperationTableName(b));
+    return a.table.localeCompare(b.table);
   });
-
-/**
- * Extract table name from any operation type.
- */
-function getOperationTableName(operation: Operation): string {
-  return operation.table;
-}
