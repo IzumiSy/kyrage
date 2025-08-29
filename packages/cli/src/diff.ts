@@ -10,20 +10,25 @@ import {
 } from "./operation";
 import * as R from "ramda";
 import { IndexSchema } from "./config/loader";
-import { SchemaDiff } from "./migration";
 
 // 汎用的なdiff演算子
 const createDiffOperations = <K>() => ({
-  added: <T>(currentKeys: K[], idealKeys: K[], mapper: (key: K) => T): T[] =>
-    R.pipe(R.difference(idealKeys), R.map(mapper))(currentKeys),
-  removed: <T>(currentKeys: K[], idealKeys: K[], mapper: (key: K) => T): T[] =>
-    R.pipe(R.difference(currentKeys), R.map(mapper))(idealKeys),
+  added: <T>(
+    currentKeys: ReadonlyArray<K>,
+    idealKeys: ReadonlyArray<K>,
+    mapper: (key: K) => T
+  ) => R.pipe(R.difference(idealKeys), R.map(mapper))(currentKeys),
+  removed: <T>(
+    currentKeys: ReadonlyArray<K>,
+    idealKeys: ReadonlyArray<K>,
+    mapper: (key: K) => T
+  ) => R.pipe(R.difference(currentKeys), R.map(mapper))(idealKeys),
   changed: <T>(
-    currentKeys: K[],
-    idealKeys: K[],
+    currentKeys: ReadonlyArray<K>,
+    idealKeys: ReadonlyArray<K>,
     predicate: (key: K) => boolean,
     mapper: (key: K) => T
-  ): T[] =>
+  ) =>
     R.pipe(
       R.intersection(currentKeys),
       R.filter(predicate),
@@ -45,8 +50,8 @@ const columnsEqual = R.eqBy((col: TableColumnAttributes) => [
 function computeTableColumnOperations(
   currentTable: Tables[0],
   idealTable: Tables[0]
-): Operation[] {
-  const operations: Operation[] = [];
+) {
+  const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
   const dbCols = currentTable.columns;
   const configCols = idealTable.columns;
@@ -117,12 +122,9 @@ function computeTableColumnOperations(
   return operations;
 }
 
-export function diffTables(props: {
-  current: Tables;
-  ideal: Tables;
-}): Operation[] {
+export function diffTables(props: { current: Tables; ideal: Tables }) {
   const { current, ideal } = props;
-  const operations: Operation[] = [];
+  const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
   const currentNames = R.map(getName, current);
   const idealNames = R.map(getName, ideal);
@@ -156,7 +158,7 @@ export function diffTables(props: {
 export function diffIndexes(props: {
   current: ReadonlyArray<IndexSchema>;
   ideal: ReadonlyArray<IndexSchema>;
-}): Operation[] {
+}) {
   const { current, ideal } = props;
   const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
@@ -215,7 +217,7 @@ export function diffIndexes(props: {
 export function diffPrimaryKeyConstraints(props: {
   current: ReadonlyArray<PrimaryKeyConstraintSchema>;
   ideal: ReadonlyArray<PrimaryKeyConstraintSchema>;
-}): Operation[] {
+}) {
   const { current, ideal } = props;
   const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
@@ -273,7 +275,7 @@ export function diffPrimaryKeyConstraints(props: {
 export function diffUniqueConstraints(props: {
   current: ReadonlyArray<UniqueConstraintSchema>;
   ideal: ReadonlyArray<UniqueConstraintSchema>;
-}): Operation[] {
+}) {
   const { current, ideal } = props;
   const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
@@ -332,7 +334,7 @@ export function diffUniqueConstraints(props: {
 function diffForeignKeyConstraints(props: {
   current: ReadonlyArray<ForeignKeyConstraintSchema>;
   ideal: ReadonlyArray<ForeignKeyConstraintSchema>;
-}): Operation[] {
+}) {
   const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
 
@@ -403,7 +405,7 @@ function diffForeignKeyConstraints(props: {
 export function diffSchema(props: {
   current: SchemaSnapshot;
   ideal: SchemaSnapshot;
-}): SchemaDiff {
+}) {
   const tableOperations = diffTables({
     current: props.current.tables,
     ideal: props.ideal.tables,

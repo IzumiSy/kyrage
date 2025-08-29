@@ -10,7 +10,7 @@ export class SQLCollectingDriver extends DummyDriver {
     super();
   }
 
-  async acquireConnection(): Promise<DatabaseConnection> {
+  async acquireConnection() {
     return new CollectorConnection(this.queries);
   }
 }

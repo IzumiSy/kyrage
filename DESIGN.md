@@ -108,7 +108,7 @@ function diffSchema(props: {
 async function buildMigrationFromDiff(
   db: Kysely<any>, 
   diff: SchemaDiff
-): Promise<void> {
+) {
   for (const operation of diff.operations) {
     await executeOperation(db, operation);
   }
@@ -117,7 +117,7 @@ async function buildMigrationFromDiff(
 async function executeOperation(
   db: Kysely<any>, 
   operation: Operation
-): Promise<void> {
+) {
   switch (operation.type) {
     case "create_table": return executeCreateTable(db, operation);
     case "drop_table": return executeDropTable(db, operation);

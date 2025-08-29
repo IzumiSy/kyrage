@@ -12,12 +12,10 @@
 export const generatePrimaryKeyConstraintName = (
   tableName: string,
   columns: ReadonlyArray<string>
-): string => {
-  if (columns.length === 1) {
-    return `${tableName}_${columns[0]}_primary_key`;
-  }
-  return `pk_${tableName}_${columns.join("_")}`;
-};
+) =>
+  columns.length === 1
+    ? `${tableName}_${columns[0]}_primary_key`
+    : `pk_${tableName}_${columns.join("_")}`;
 
 /**
  * Generates a unique constraint name
@@ -26,12 +24,10 @@ export const generatePrimaryKeyConstraintName = (
 export const generateUniqueConstraintName = (
   tableName: string,
   columns: ReadonlyArray<string>
-): string => {
-  if (columns.length === 1) {
-    return `${tableName}_${columns[0]}_unique`;
-  }
-  return `uq_${tableName}_${columns.join("_")}`;
-};
+) =>
+  columns.length === 1
+    ? `${tableName}_${columns[0]}_unique`
+    : `uq_${tableName}_${columns.join("_")}`;
 
 /**
  * Generates an index name
@@ -40,9 +36,7 @@ export const generateUniqueConstraintName = (
 export const generateIndexName = (
   tableName: string,
   columns: ReadonlyArray<string>
-): string => {
-  return `idx_${tableName}_${columns.join("_")}`;
-};
+) => `idx_${tableName}_${columns.join("_")}`;
 
 /**
  * Generates a foreign key constraint name
@@ -51,9 +45,7 @@ export const generateIndexName = (
 export const generateForeignKeyConstraintName = (
   tableName: string,
   columns: ReadonlyArray<string>
-): string => {
-  return `fk_${tableName}_${columns.join("_")}`;
-};
+) => `fk_${tableName}_${columns.join("_")}`;
 
 /**
  * All constraint name generators
