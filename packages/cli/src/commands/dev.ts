@@ -3,12 +3,10 @@ import { createCommonDependencies, type CommonDependencies } from "./common";
 import { createDevDatabaseManager } from "../dev/container";
 import type { DevDatabaseManager } from "../dev/container";
 
-// dev固有の依存関係（共通依存関係を拡張）
 export interface DevDependencies extends CommonDependencies {
   manager: DevDatabaseManager;
 }
 
-// ビジネスロジック関数群
 export async function executeDevStatus(dependencies: DevDependencies) {
   const { manager } = dependencies;
 
@@ -48,7 +46,6 @@ export async function executeDevClean(dependencies: DevDependencies) {
     return;
   }
 
-  // 直接remove - semantics的に完全に自然
   await manager.remove();
   logger.reporter.success("Cleaned up dev containers");
 }

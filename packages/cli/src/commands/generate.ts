@@ -22,7 +22,6 @@ export interface GenerateOptions {
   dev: boolean;
 }
 
-// 実際のビジネスロジック
 export async function executeGenerate(
   dependencies: CommonDependencies,
   options: GenerateOptions

@@ -13,7 +13,6 @@ export interface ApplyOptions {
   pretty: boolean;
 }
 
-// 実際のビジネスロジック
 export async function executeApply(
   dependencies: CommonDependencies,
   options: ApplyOptions

@@ -122,20 +122,11 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
     const runtime = await getContainerRuntimeClient();
 
     // 並列でコンテナを削除
-    const results = await Promise.allSettled(
+    Promise.allSettled(
       containerIds.map(async (id) =>
         runtime.container.getById(id).remove({ force: true })
       )
     );
-
-    // エラーをログ出力
-    results.forEach((result, index) => {
-      if (result.status === "rejected") {
-        console.warn(
-          `Failed to remove container ${containerIds[index]}: ${result.reason}`
-        );
-      }
-    });
 
     this.startedContainer = null;
   }
