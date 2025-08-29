@@ -9,9 +9,7 @@ export interface DevDependencies extends CommonDependencies {
 }
 
 // ビジネスロジック関数群
-export async function executeDevStatus(
-  dependencies: DevDependencies
-): Promise<void> {
+export async function executeDevStatus(dependencies: DevDependencies) {
   const { manager } = dependencies;
 
   const status = await manager.getStatus();
@@ -23,9 +21,7 @@ export async function executeDevStatus(
   console.log(`Running: ${status.containerID} (${status.imageName})`);
 }
 
-export async function executeDevGetUrl(
-  dependencies: DevDependencies
-): Promise<void> {
+export async function executeDevGetUrl(dependencies: DevDependencies) {
   const { manager } = dependencies;
 
   if (!(await manager.exists())) {
@@ -44,9 +40,7 @@ export async function executeDevGetUrl(
   }
 }
 
-export async function executeDevClean(
-  dependencies: DevDependencies
-): Promise<void> {
+export async function executeDevClean(dependencies: DevDependencies) {
   const { manager, logger } = dependencies;
 
   if (!(await manager.exists())) {
@@ -60,7 +54,7 @@ export async function executeDevClean(
 }
 
 // dev専用の依存関係作成関数
-async function createDevDependencies(): Promise<DevDependencies> {
+async function createDevDependencies() {
   const commonDeps = await createCommonDependencies();
 
   if (!commonDeps.config.dev || !("container" in commonDeps.config.dev)) {

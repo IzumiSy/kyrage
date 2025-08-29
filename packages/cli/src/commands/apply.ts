@@ -17,7 +17,7 @@ export interface ApplyOptions {
 export async function executeApply(
   dependencies: CommonDependencies,
   options: ApplyOptions
-): Promise<void> {
+) {
   const { client, logger } = dependencies;
   const { reporter } = logger;
 

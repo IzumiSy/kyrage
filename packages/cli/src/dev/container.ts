@@ -94,7 +94,7 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
       .map((container) => container.Id);
   }
 
-  async exists(): Promise<boolean> {
+  async exists() {
     return !!(await this.findRunningContainer());
   }
 
@@ -110,14 +110,14 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
     return null;
   }
 
-  async stop(): Promise<void> {
+  async stop() {
     if (this.startedContainer) {
       await this.startedContainer.stop();
       this.startedContainer = null;
     }
   }
 
-  async remove(): Promise<void> {
+  async remove() {
     const containerIds = await this.findAllKyrageManagedContainerIds();
     const runtime = await getContainerRuntimeClient();
 
@@ -174,15 +174,15 @@ export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
     // No-op for connection string
   }
 
-  async stop(): Promise<void> {
+  async stop() {
     // No-op for connection string
   }
 
-  async remove(): Promise<void> {
+  async remove() {
     // No-op for connection string (外部の接続文字列は削除できない)
   }
 
-  async exists(): Promise<boolean> {
+  async exists() {
     // 常に存在すると仮定（外部接続文字列なので）
     return true;
   }

@@ -13,7 +13,7 @@ export interface CommonDependencies {
 }
 
 // CLI専用の共通依存関係作成関数
-export async function createCommonDependencies(): Promise<CommonDependencies> {
+export async function createCommonDependencies() {
   const config = await loadConfigFile();
   const client = getClient({ database: config.database });
 

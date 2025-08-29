@@ -26,7 +26,7 @@ export interface GenerateOptions {
 export async function executeGenerate(
   dependencies: CommonDependencies,
   options: GenerateOptions
-): Promise<void> {
+) {
   const { client, logger, config } = dependencies;
   const { reporter } = logger;
 
