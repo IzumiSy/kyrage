@@ -1,5 +1,15 @@
 # @izumisy/kyrage
 
+## 1.1.0
+
+### Minor Changes
+
+- [#58](https://github.com/IzumiSy/kyrage/pull/58) [`2890e7c`](https://github.com/IzumiSy/kyrage/commit/2890e7cb44a0ad15e9e319033ed66c5950222ac8) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Add reuse API #52
+
+### Patch Changes
+
+- [#60](https://github.com/IzumiSy/kyrage/pull/60) [`5fefb21`](https://github.com/IzumiSy/kyrage/commit/5fefb21cafc6a1e958fcd74f816c4a5134348087) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Fix implicit non-null marks by composite primary key #48
+
 ## 1.0.0
 
 ### Major Changes
