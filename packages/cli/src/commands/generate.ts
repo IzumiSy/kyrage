@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
 import { mkdir, writeFile } from "fs/promises";
-import { nullLogger } from "../logger";
+import { nullLogger, type Logger } from "../logger";
 import {
   migrationDirName,
   getPendingMigrations,
@@ -11,8 +11,9 @@ import { executeApply } from "./apply";
 import { diffSchema } from "../diff";
 import { Tables, Operation } from "../operation";
 import { getIntrospector } from "../introspection/introspector";
-import { getClient } from "../client";
+import { getClient, type DBClient } from "../client";
 import { createDevDatabaseManager } from "../dev/container";
+import { type ConfigValue } from "../config/loader";
 
 export interface GenerateOptions {
   ignorePending: boolean;
@@ -161,8 +162,8 @@ const setupDatabaseClient = async (
 };
 
 const generateMigrationFromIntrospection = async (props: {
-  client: any;
-  config: any;
+  client: DBClient;
+  config: ConfigValue;
 }) => {
   const { client, config } = props;
   const introspector = getIntrospector(client);
@@ -208,10 +209,10 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const configTables: Tables = config.tables.map((table: any) => ({
+  const configTables: Tables = config.tables.map((table) => ({
     name: table.tableName,
     columns: Object.fromEntries(
-      Object.entries(table.columns).map(([colName, colDef]: [string, any]) => [
+      Object.entries(table.columns).map(([colName, colDef]) => [
         colName,
         {
           ...colDef,
@@ -233,7 +234,7 @@ const generateMigrationFromIntrospection = async (props: {
     },
     ideal: {
       tables: configTables,
-      indexes: config.indexes.map((i: any) => ({
+      indexes: config.indexes.map((i) => ({
         table: i.table,
         name: i.name,
         columns: i.columns,
@@ -257,7 +258,7 @@ const generateMigrationFromIntrospection = async (props: {
   };
 };
 
-const printPrettyDiff = (logger: any, diff: SchemaDiff) => {
+const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
   const diffOutputs: Array<string> = [];
 
   diff.operations.forEach((operation: Operation) => {
