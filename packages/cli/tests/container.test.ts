@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { PostgreSqlDevDatabaseManager } from "../src/dev/container";
+import {
+  findAllKyrageManagedContainerIDs,
+  PostgreSqlDevDatabaseManager,
+} from "../src/dev/container";
 
 describe("DevDatabaseManager", () => {
   const expected = {
@@ -29,9 +32,6 @@ describe("DevDatabaseManager", () => {
     await manager.stop();
 
     expect(manager.getConnectionString()).toBeNull();
-
-    const kyrageManagerContainerIds =
-      await manager.findAllKyrageManagedContainerIds();
-    expect(kyrageManagerContainerIds).toEqual([]);
+    expect(await findAllKyrageManagedContainerIDs()).toEqual([]);
   });
 });
