@@ -4,7 +4,7 @@ import { sortOperationsByDependency } from "./migration";
 
 describe("sortOperationsByDependency", () => {
   it("should sort operations by dependency priority", () => {
-    const operations: Operation[] = [
+    const operations = [
       {
         type: "create_unique_constraint",
         table: "users",
@@ -35,7 +35,7 @@ describe("sortOperationsByDependency", () => {
         table: "users",
         name: "uk_users_old",
       },
-    ];
+    ] as const;
 
     const sorted = sortOperationsByDependency(operations);
 
@@ -54,7 +54,7 @@ describe("sortOperationsByDependency", () => {
   });
 
   it("should sort operations with same priority by table name", () => {
-    const operations: Operation[] = [
+    const operations = [
       {
         type: "create_table",
         table: "zebra_table",
@@ -65,7 +65,7 @@ describe("sortOperationsByDependency", () => {
         table: "alpha_table",
         columns: { id: { type: "integer" } },
       },
-    ];
+    ] as const;
 
     const sorted = sortOperationsByDependency(operations);
 
@@ -75,7 +75,7 @@ describe("sortOperationsByDependency", () => {
   });
 
   it("should handle comprehensive operation ordering", () => {
-    const operations: Operation[] = [
+    const operations = [
       {
         type: "create_index",
         table: "users",
@@ -97,7 +97,7 @@ describe("sortOperationsByDependency", () => {
         name: "pk_users_new",
         columns: ["id"],
       },
-    ];
+    ] as const;
 
     const sorted = sortOperationsByDependency(operations);
     const types = sorted.map((op) => op.type);
@@ -118,14 +118,14 @@ describe("sortOperationsByDependency", () => {
   });
 
   it("should not mutate original operations array", () => {
-    const operations: Operation[] = [
+    const operations = [
       {
         type: "create_table",
         table: "test",
         columns: { id: { type: "integer" } },
       },
       { type: "drop_table", table: "old" },
-    ];
+    ] as const;
 
     const original = [...operations];
     const sorted = sortOperationsByDependency(operations);

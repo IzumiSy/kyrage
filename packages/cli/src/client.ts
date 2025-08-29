@@ -92,7 +92,7 @@ export class DBClient {
  * A Kysely instance that can be used to capture queries without executing them.
  */
 class PlannableKysely extends Kysely<any> {
-  private plannedQueries: CompiledQuery[] = [];
+  private plannedQueries: Array<CompiledQuery> = [];
 
   constructor(
     args: KyselyConfig | KyselyProps,
@@ -100,7 +100,7 @@ class PlannableKysely extends Kysely<any> {
       isPlan: boolean;
     }
   ) {
-    const plannedQueries: CompiledQuery[] = [];
+    const plannedQueries: Array<CompiledQuery> = [];
 
     super({
       dialect: {

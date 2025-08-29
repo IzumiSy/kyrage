@@ -209,10 +209,10 @@ export const defineTable = <T extends Record<string, DefinedColumn>>(
 };
 
 export type DefinedTable = ReturnType<typeof defineTable> & {
-  indexes: DefinedIndex[];
-  primaryKeys: DefinedPrimaryKeyConstraint[];
-  uniques: DefinedUniqueConstraint[];
-  foreignKeys: DefinedForeignKeyConstraint[];
+  indexes: ReadonlyArray<DefinedIndex>;
+  primaryKeys: ReadonlyArray<DefinedPrimaryKeyConstraint>;
+  uniques: ReadonlyArray<DefinedUniqueConstraint>;
+  foreignKeys: ReadonlyArray<DefinedForeignKeyConstraint>;
 };
 export type DefinedTables = ReadonlyArray<DefinedTable>;
 

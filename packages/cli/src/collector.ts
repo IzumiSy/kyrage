@@ -6,7 +6,7 @@ import {
 } from "kysely";
 
 export class SQLCollectingDriver extends DummyDriver {
-  constructor(private queries: CompiledQuery[]) {
+  constructor(private queries: Array<CompiledQuery>) {
     super();
   }
 
@@ -16,7 +16,7 @@ export class SQLCollectingDriver extends DummyDriver {
 }
 
 class CollectorConnection implements DatabaseConnection {
-  constructor(private queries: CompiledQuery[]) {}
+  constructor(private queries: Array<CompiledQuery>) {}
 
   async executeQuery<R>(query: CompiledQuery): Promise<QueryResult<R>> {
     const queryKind = query.query.kind;
