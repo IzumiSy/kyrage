@@ -234,14 +234,14 @@ const generateMigrationFromIntrospection = async (props: {
         );
 
         // 単一カラムの主キーまたは明示的な notNull、または複合主キーに含まれる場合
-        const shouldBeNotNull =
+        const effectiveNotNull =
           colDef.primaryKey || colDef.notNull || isInCompositePrimaryKey;
 
         return [
           colName,
           {
             ...colDef,
-            notNull: shouldBeNotNull,
+            notNull: effectiveNotNull,
           },
         ];
       })
