@@ -37,8 +37,31 @@ type ConnectableStartedContainer = StartedTestContainer & {
   getConnectionUri: () => string;
 };
 
-type StartableContainer = Omit<GenericContainer, "start"> & {
+export type StartableContainer = Omit<GenericContainer, "start"> & {
   start: () => Promise<ConnectableStartedContainer>;
+};
+
+const DialectKey = "kyrage.dialect";
+const ManagedKey = "kyrage.managed";
+
+/**
+ * kyrage管理の全てのコンテナIDを取得する共通処理
+ */
+export const findAllKyrageManagedContainerIDs = async () => {
+  const runtime = await getContainerRuntimeClient();
+  const allContainers = await runtime.container.list();
+
+  return allContainers
+    .filter((container) => container.Labels[ManagedKey] === "true")
+    .map((container) => container.Id);
+};
+
+export const removeContainersByIDs = async (ids: ReadonlyArray<string>) => {
+  const runtime = await getContainerRuntimeClient();
+
+  await Promise.allSettled(
+    ids.map(async (id) => runtime.container.getById(id).remove({ force: true }))
+  );
 };
 
 export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
@@ -47,17 +70,14 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   protected startedContainer: ConnectableStartedContainer | null = null;
   protected container: C;
 
-  private DialectKey = "kyrage.dialect";
-  private ManagedKey = "kyrage.managed";
-
   constructor(
     private options: ContainerOptions,
     createContainer: () => C
   ) {
     const container = createContainer();
     container.withLabels({
-      [this.DialectKey]: this.options.dialect,
-      [this.ManagedKey]: "true",
+      [DialectKey]: this.options.dialect,
+      [ManagedKey]: "true",
     });
 
     if (this.options.reuse) {
@@ -75,23 +95,9 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
    */
   private async findRunningContainer() {
     const runtime = await getContainerRuntimeClient();
-    return runtime.container.fetchByLabel(
-      this.DialectKey,
-      this.options.dialect,
-      { status: ["running"] }
-    );
-  }
-
-  /**
-   * kyrage管理の全てのコンテナIDを取得する共通処理
-   */
-  private async findAllKyrageManagedContainerIds() {
-    const runtime = await getContainerRuntimeClient();
-    const allContainers = await runtime.container.list();
-
-    return allContainers
-      .filter((container) => container.Labels[this.ManagedKey] === "true")
-      .map((container) => container.Id);
+    return runtime.container.fetchByLabel(DialectKey, this.options.dialect, {
+      status: ["running"],
+    });
   }
 
   async exists() {
@@ -99,7 +105,6 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   }
 
   async start() {
-    // TestContainersのreuseが既存コンテナを自動検出・再利用してくれる
     this.startedContainer = await this.container.start();
   }
 
@@ -118,15 +123,9 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   }
 
   async remove() {
-    const containerIds = await this.findAllKyrageManagedContainerIds();
-    const runtime = await getContainerRuntimeClient();
+    const containerIds = await findAllKyrageManagedContainerIDs();
 
-    // 並列でコンテナを削除
-    Promise.allSettled(
-      containerIds.map(async (id) =>
-        runtime.container.getById(id).remove({ force: true })
-      )
-    );
+    await removeContainersByIDs(containerIds);
 
     this.startedContainer = null;
   }
