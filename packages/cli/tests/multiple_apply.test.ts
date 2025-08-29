@@ -1,7 +1,7 @@
 import { vi, it, describe, expect } from "vitest";
 import { defineTable, column } from "../src";
 import { setupTestDB, defineConfigForTest } from "./helper";
-import { runGenerate } from "../src/usecases/generate";
+import { executeGenerate } from "../src/commands/generate";
 import { defaultConsolaLogger } from "../src/logger";
 
 vi.mock("fs/promises", async () => {
@@ -24,16 +24,19 @@ describe("apply migrations in multiple times", () => {
   it("should update DB in multiple times by the schema in config", async () => {
     await using db = client.getDB();
 
-    await runGenerate({
-      client,
-      logger: defaultConsolaLogger,
-      config,
-      options: {
+    await executeGenerate(
+      {
+        client,
+        logger: defaultConsolaLogger,
+        config,
+      },
+      {
         ignorePending: false,
         apply: true,
         plan: false,
-      },
-    });
+        dev: false,
+      }
+    );
 
     const tables = await db.introspection.getTables();
     expect(tables).toHaveLength(1);
@@ -50,16 +53,19 @@ describe("apply migrations in multiple times", () => {
       ],
     });
 
-    await runGenerate({
-      client,
-      logger: defaultConsolaLogger,
-      config: updateConfig,
-      options: {
+    await executeGenerate(
+      {
+        client,
+        logger: defaultConsolaLogger,
+        config: updateConfig,
+      },
+      {
         ignorePending: false,
         apply: true,
         plan: false,
-      },
-    });
+        dev: false,
+      }
+    );
 
     const updatedTables = await db.introspection.getTables();
     expect(updatedTables[0].name).toBe("posts");

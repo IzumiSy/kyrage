@@ -1,60 +1,190 @@
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { CockroachDbContainer } from "@testcontainers/cockroachdb";
-import { DatabaseValue, DevDatabaseValue, DialectEnum } from "../config/loader";
+import {
+  GenericContainer,
+  getContainerRuntimeClient,
+  StartedTestContainer,
+} from "testcontainers";
+import { DevDatabaseValue, DialectEnum } from "../config/loader";
 
-export interface DevDatabaseManager {
-  start(): Promise<DatabaseValue>;
-  stop(): Promise<void>;
+type DevStatus =
+  | {
+      type: "container";
+      imageName: string;
+      containerID: string;
+    }
+  | {
+      type: "connectionString";
+    };
+
+export type DevDatabaseManager = {
+  start: () => Promise<void>;
+  stop: () => Promise<void>;
+  remove: () => Promise<void>;
+  exists: () => Promise<boolean>;
+  getConnectionString: () => string | null;
+  getStatus: () => Promise<DevStatus | null>;
+};
+
+export interface ContainerOptions {
+  image: string;
+  dialect: DialectEnum;
+  reuse?: boolean;
+  containerName?: string;
 }
 
-export class ContainerDevDatabaseManager implements DevDatabaseManager {
+type ConnectableStartedContainer = StartedTestContainer & {
+  getConnectionUri: () => string;
+};
+
+export type StartableContainer = Omit<GenericContainer, "start"> & {
+  start: () => Promise<ConnectableStartedContainer>;
+};
+
+const DialectKey = "kyrage.dialect";
+const ManagedKey = "kyrage.managed";
+
+/**
+ * kyrage管理の全てのコンテナIDを取得する共通処理
+ */
+export const findAllKyrageManagedContainerIDs = async () => {
+  const runtime = await getContainerRuntimeClient();
+  const allContainers = await runtime.container.list();
+
+  return allContainers
+    .filter((container) => container.Labels[ManagedKey] === "true")
+    .map((container) => container.Id);
+};
+
+export const removeContainersByIDs = async (ids: ReadonlyArray<string>) => {
+  const runtime = await getContainerRuntimeClient();
+
+  await Promise.allSettled(
+    ids.map(async (id) => runtime.container.getById(id).remove({ force: true }))
+  );
+};
+
+export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
+  implements DevDatabaseManager
+{
+  protected startedContainer: ConnectableStartedContainer | null = null;
+  protected container: C;
+
   constructor(
-    private image: string,
-    private dialect: DialectEnum
-  ) {}
+    private options: ContainerOptions,
+    createContainer: () => C
+  ) {
+    const container = createContainer();
+    container.withLabels({
+      [DialectKey]: this.options.dialect,
+      [ManagedKey]: "true",
+    });
 
-  async start(): Promise<DatabaseValue> {
-    const container = this.getContainer();
-    const startedContainer = await container.start();
+    if (this.options.reuse) {
+      container.withReuse();
+    }
+    if (this.options.containerName) {
+      container.withName(this.options.containerName);
+    }
 
+    this.container = container;
+  }
+
+  /**
+   * 実行中のコンテナを取得する共通処理
+   */
+  private async findRunningContainer() {
+    const runtime = await getContainerRuntimeClient();
+    return runtime.container.fetchByLabel(DialectKey, this.options.dialect, {
+      status: ["running"],
+    });
+  }
+
+  async exists() {
+    return !!(await this.findRunningContainer());
+  }
+
+  async start() {
+    this.startedContainer = await this.container.start();
+  }
+
+  getConnectionString() {
+    if (this.startedContainer) {
+      return this.startedContainer.getConnectionUri();
+    }
+    return null;
+  }
+
+  async stop() {
+    if (this.startedContainer) {
+      await this.startedContainer.stop();
+      this.startedContainer = null;
+    }
+  }
+
+  async remove() {
+    const containerIds = await findAllKyrageManagedContainerIDs();
+
+    await removeContainersByIDs(containerIds);
+
+    this.startedContainer = null;
+  }
+
+  async getStatus() {
+    const runningContainer = await this.findRunningContainer();
+    if (!runningContainer) {
+      return null;
+    }
+
+    const r = await runningContainer.inspect();
     return {
-      dialect: this.dialect,
-      connectionString: startedContainer.getConnectionUri(),
+      type: "container" as const,
+      imageName: r.Config.Image,
+      containerID: r.Id,
     };
   }
+}
 
-  async stop(): Promise<void> {
-    // For now, TestContainers will handle cleanup automatically
-    // when the process exits. In the future, we might implement
-    // persistent container management here.
+export class PostgreSqlDevDatabaseManager extends ContainerDevDatabaseManager<PostgreSqlContainer> {
+  constructor(props: ContainerOptions) {
+    super(props, () => new PostgreSqlContainer(props.image));
   }
+}
 
-  private getContainer() {
-    if (this.image.includes("postgres")) {
-      return new PostgreSqlContainer(this.image);
-    }
-    if (this.image.includes("cockroach")) {
-      return new CockroachDbContainer(this.image);
-    }
-    throw new Error(`Unsupported container image: ${this.image}`);
+export class CockroachDbDevDatabaseManager extends ContainerDevDatabaseManager<CockroachDbContainer> {
+  constructor(props: ContainerOptions) {
+    super(props, () => new CockroachDbContainer(props.image));
   }
 }
 
 export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
-  constructor(
-    private connectionString: string,
-    private dialect: DialectEnum
-  ) {}
+  constructor(private connectionString: string) {}
 
-  async start(): Promise<DatabaseValue> {
-    return {
-      dialect: this.dialect,
-      connectionString: this.connectionString,
-    };
+  async start() {
+    // No-op for connection string
   }
 
-  async stop(): Promise<void> {
+  async stop() {
     // No-op for connection string
+  }
+
+  async remove() {
+    // No-op for connection string (外部の接続文字列は削除できない)
+  }
+
+  async exists() {
+    // 常に存在すると仮定（外部接続文字列なので）
+    return true;
+  }
+
+  getConnectionString() {
+    return this.connectionString;
+  }
+
+  async getStatus() {
+    return {
+      type: "connectionString" as const,
+    };
   }
 }
 
@@ -63,12 +193,23 @@ export const createDevDatabaseManager = (
   dialect: DialectEnum
 ): DevDatabaseManager => {
   if ("connectionString" in devConfig) {
-    return new ConnectionStringDevDatabaseManager(
-      devConfig.connectionString,
-      dialect
-    );
+    return new ConnectionStringDevDatabaseManager(devConfig.connectionString);
   } else if ("container" in devConfig) {
-    return new ContainerDevDatabaseManager(devConfig.container.image, dialect);
+    const containerOptions = {
+      dialect,
+      image: devConfig.container.image,
+      reuse: devConfig.container.reuse || false,
+      containerName: devConfig.container.name,
+    };
+
+    switch (dialect) {
+      case "postgres":
+        return new PostgreSqlDevDatabaseManager(containerOptions);
+      case "cockroachdb":
+        return new CockroachDbDevDatabaseManager(containerOptions);
+      default:
+        throw new Error(`Unsupported dialect for container: ${dialect}`);
+    }
   } else {
     throw new Error("Invalid dev database configuration");
   }

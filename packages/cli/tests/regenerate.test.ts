@@ -2,7 +2,7 @@ import { describe, beforeAll, expect, it, vi } from "vitest";
 import { defineTable, column } from "../src/config/builder";
 import { defineConfigForTest, setupTestDB } from "./helper";
 import { sql } from "kysely";
-import { runGenerate } from "../src/usecases/generate";
+import { executeGenerate } from "../src/commands/generate";
 import { vol } from "memfs";
 import { defaultConsolaLogger } from "../src/logger";
 
@@ -75,16 +75,19 @@ describe("generate", () => {
   it("should not generate a new migration", async () => {
     const beforeVol = vol.toJSON();
 
-    await runGenerate({
-      client,
-      logger: defaultConsolaLogger,
-      config,
-      options: {
+    await executeGenerate(
+      {
+        client,
+        logger: defaultConsolaLogger,
+        config,
+      },
+      {
         ignorePending: false,
         apply: false,
         plan: false,
-      },
-    });
+        dev: false,
+      }
+    );
 
     expect(vol.toJSON()).toEqual(beforeVol);
   });

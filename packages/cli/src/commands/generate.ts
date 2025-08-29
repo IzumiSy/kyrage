@@ -1,41 +1,44 @@
+import { defineCommand } from "citty";
+import { createCommonDependencies, type CommonDependencies } from "./common";
 import { mkdir, writeFile } from "fs/promises";
-import { Logger, nullLogger } from "../logger";
+import { nullLogger, type Logger } from "../logger";
 import {
   migrationDirName,
   getPendingMigrations,
   SchemaDiff,
 } from "../migration";
-import { runApply } from "./apply";
-import { DBClient } from "../client";
+import { executeApply } from "./apply";
 import { diffSchema } from "../diff";
 import { Tables, Operation } from "../operation";
 import { getIntrospector } from "../introspection/introspector";
-import { ConfigValue } from "../config/loader";
-import { getClient } from "../client";
+import { getClient, type DBClient } from "../client";
 import { createDevDatabaseManager } from "../dev/container";
+import { type ConfigValue } from "../config/loader";
 
-type RunGenerateProps = {
-  client: DBClient;
-  logger: Logger;
-  config: ConfigValue;
-  options: {
-    ignorePending: boolean;
-    apply: boolean;
-    plan: boolean;
-    dev?: boolean;
-  };
-};
+export interface GenerateOptions {
+  ignorePending: boolean;
+  apply: boolean;
+  plan: boolean;
+  dev: boolean;
+}
 
-export const runGenerate = async (props: RunGenerateProps) => {
-  const { reporter } = props.logger;
+export async function executeGenerate(
+  dependencies: CommonDependencies,
+  options: GenerateOptions
+) {
+  const { client, logger, config } = dependencies;
+  const { reporter } = logger;
 
   // Create the appropriate client (dev or production)
-  const { client: targetClient, cleanup } = await setupDatabaseClient(props);
+  const { client: targetClient, cleanup } = await setupDatabaseClient(
+    dependencies,
+    options
+  );
 
   try {
     // Always check against production for pending migrations if not in dev mode
-    if (!props.options.dev && !props.options.ignorePending) {
-      const pm = await getPendingMigrations(props.client);
+    if (!options.dev && !options.ignorePending) {
+      const pm = await getPendingMigrations(client);
       if (pm.length > 0) {
         reporter.warn(
           [
@@ -50,7 +53,7 @@ export const runGenerate = async (props: RunGenerateProps) => {
 
     const newMigration = await generateMigrationFromIntrospection({
       client: targetClient,
-      config: props.config,
+      config,
     });
 
     if (!newMigration) {
@@ -58,7 +61,7 @@ export const runGenerate = async (props: RunGenerateProps) => {
       return;
     }
 
-    printPrettyDiff(props.logger, newMigration.diff);
+    printPrettyDiff(logger, newMigration.diff);
 
     const migrationFilePath = `${migrationDirName}/${newMigration.id}.json`;
     await mkdir(migrationDirName, { recursive: true });
@@ -66,72 +69,93 @@ export const runGenerate = async (props: RunGenerateProps) => {
 
     reporter.success(`Migration file generated: ${migrationFilePath}`);
 
-    if (props.options.apply) {
-      if (props.options.dev) {
+    if (options.apply) {
+      if (options.dev) {
         reporter.warn(
           "--apply flag is ignored when using --dev. Use 'kyrage apply' to apply to production database."
         );
       } else {
-        await runApply({
-          client: props.client,
-          logger: props.logger,
-          options: {
-            plan: props.options.plan,
-            pretty: false,
-          },
+        await executeApply(dependencies, {
+          plan: options.plan,
+          pretty: false,
         });
       }
     }
   } finally {
     await cleanup();
   }
-};
+}
 
-const setupDatabaseClient = async (props: RunGenerateProps) => {
-  const { reporter } = props.logger;
+const setupDatabaseClient = async (
+  dependencies: CommonDependencies,
+  options: GenerateOptions
+) => {
+  const { client, logger, config } = dependencies;
+  const { reporter } = logger;
 
-  if (!props.options.dev) {
+  if (!options.dev) {
     return {
-      client: props.client,
+      client,
       cleanup: async () => void 0,
     };
   }
 
-  if (!props.config.dev) {
+  if (!config.dev) {
     throw new Error(
       "Dev database configuration is required when using --dev flag"
     );
   }
 
-  reporter.info("🚀 Starting dev database for migration generation...");
+  // Create dev database manager
+  const dialect = config.database.dialect;
+  const devManager = createDevDatabaseManager(config.dev, dialect);
 
-  // Create dev database manager (closure)
-  const devManager = createDevDatabaseManager(
-    props.config.dev,
-    props.config.database.dialect
-  );
+  // Check if reuse is enabled and container is already running
+  const isReuse = "container" in config.dev && config.dev.container.reuse;
+  if (isReuse && (await devManager.exists())) {
+    reporter.info("🔄 Reusing existing dev database...");
+  } else {
+    reporter.info("🚀 Starting dev database for migration generation...");
+  }
 
-  const devDatabase = await devManager.start();
-  reporter.success(`Dev database started: ${devDatabase.dialect}`);
+  await devManager.start();
+  reporter.success(`Dev database started: ${dialect}`);
+
+  const connectionString = devManager.getConnectionString();
+  if (!connectionString) {
+    throw new Error("Failed to get connection string for dev database");
+  }
 
   // Create client for dev database
-  const devClient = getClient({ database: devDatabase });
-
-  // Apply baseline migrations to dev database
-  await runApply({
-    client: devClient,
-    logger: nullLogger,
-    options: {
-      plan: false,
-      pretty: false,
+  const devClient = getClient({
+    database: {
+      dialect,
+      connectionString,
     },
   });
+
+  // Apply baseline migrations to dev database
+  await executeApply(
+    {
+      client: devClient,
+      logger: nullLogger,
+      config,
+    },
+    {
+      plan: false,
+      pretty: false,
+    }
+  );
 
   return {
     client: devClient,
     cleanup: async () => {
-      await devManager.stop();
-      reporter.success("Dev database stopped");
+      if (!isReuse) {
+        await devManager.stop();
+        reporter.success("Dev database stopped");
+      } else {
+        reporter.success("✨ Persistent dev database ready: " + dialect);
+      }
     },
   };
 };
@@ -329,3 +353,47 @@ const printPrettyDiff = (logger: Logger, diff: SchemaDiff) => {
 
   logger.reporter.log(diffOutputs.join("\n"));
 };
+
+export const generateCmd = defineCommand({
+  meta: {
+    name: "generate",
+    description: "Generate migration files based on the current schema",
+  },
+  args: {
+    apply: {
+      type: "boolean",
+      description: "Apply the migration after generating it",
+      default: false,
+    },
+    plan: {
+      type: "boolean",
+      description: "Plan the migration without applying it (only for --apply)",
+      default: false,
+    },
+    "ignore-pending": {
+      type: "boolean",
+      description: "Ignore pending migrations and generate a new one",
+      default: false,
+    },
+    dev: {
+      type: "boolean",
+      description: "Use dev database for safe migration generation",
+      default: false,
+    },
+  },
+  run: async (ctx) => {
+    try {
+      const dependencies = await createCommonDependencies();
+      await executeGenerate(dependencies, {
+        ignorePending: ctx.args["ignore-pending"],
+        apply: ctx.args.apply,
+        plan: ctx.args.plan,
+        dev: ctx.args.dev,
+      });
+    } catch (error) {
+      const { defaultConsolaLogger } = await import("../logger");
+      defaultConsolaLogger.reporter.error(error as Error);
+      process.exit(1);
+    }
+  },
+});
