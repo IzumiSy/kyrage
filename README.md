@@ -156,13 +156,80 @@ $ kyrage generate --dev
 ✔ Dev database stopped
 ```
 
+#### Container Reuse Feature
+
+You can enable container reuse to maintain persistent development databases across multiple operations:
+
+```typescript
+// kyrage.config.ts
+export default defineConfig({
+  dev: {
+    container: {
+      image: "postgres:17",
+      reuse: true,  // Enable container reuse
+      name: "kyrage-dev-db"  // Optional custom name
+    }
+  },
+  // ... other config
+});
+```
+
+With container reuse enabled:
+
+```bash
+# First run - starts new container
+$ kyrage generate --dev
+🚀 Starting dev database for migration generation...
+✔ Dev database started: postgres
+✔ Migration file generated: migrations/1755525514175.json
+✨ Persistent dev database ready: postgres
+
+# Subsequent runs - reuses existing container
+$ kyrage generate --dev  
+🔄 Reusing existing dev database...
+✔ Dev database started: postgres
+✔ Migration file generated: migrations/1755525514176.json
+✨ Persistent dev database ready: postgres
+```
+
+#### Development Database Management
+
+kyrage provides commands to manage your development database containers:
+
+```bash
+# Check status of dev containers
+$ kyrage dev status
+Running: abc123def456 (postgres:17)
+
+# Get connection URL for running dev container
+$ kyrage dev get-url
+postgresql://postgres:password@localhost:32768/test
+
+# Connect directly to dev database using psql
+$ psql $(kyrage dev get-url)
+psql (17.0)
+Type "help" for help.
+
+test=# \dt
+          List of relations
+ Schema |  Name   | Type  |  Owner   
+--------+---------+-------+----------
+ public | members | table | postgres
+ public | posts   | table | postgres
+(2 rows)
+
+# Clean up all kyrage dev containers
+$ kyrage dev clean
+✔ Cleaned up dev containers
+```
+
 The dev database will:
 
-1. Start a fresh container with your specified database image
+1. Start a fresh container with your specified database image (or reuse existing one)
 2. Apply all existing migrations to establish the current baseline
 3. Compare your schema against this clean state
 4. Generate the migration file
-5. Automatically clean up the container
+5. Optionally maintain the container for subsequent operations (with `reuse: true`)
 
 ### 4. Plan Changes
 
@@ -212,6 +279,9 @@ $ kyrage apply
 |---------|-------------|
 | `kyrage generate` | Compare schema with database and generate migration file |
 | `kyrage apply` | Apply all pending migrations to the database |
+| `kyrage dev status` | Show status of running development database containers |
+| `kyrage dev get-url` | Print connection URL for running development database (use with `psql $(kyrage dev get-url)`) |
+| `kyrage dev clean` | Remove all kyrage-managed development database containers |
 
 ### Configuration
 
@@ -231,7 +301,9 @@ export default defineConfig({
   dev: {
     // Option 1: Use Docker container (requires Docker)
     container: {
-      image: "postgres:17"
+      image: "postgres:17",
+      reuse: true,  // Enable container reuse for persistent dev databases
+      name: "kyrage-dev-db"  // Optional custom container name
     },
     // Option 2: Use existing database connection
     connectionString: "postgres://..."
@@ -257,7 +329,8 @@ export default defineConfig({
     // Use containerized dev database for clean migration generation
     dev: {
       container: {
-        image: "postgres:17"
+        image: "postgres:17",
+        reuse: true  // Keep container running between operations
       }
     }
   },

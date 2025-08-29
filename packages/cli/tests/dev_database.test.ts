@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { defineConfigForTest, setupTestDB } from "./helper";
 import { defineTable, column } from "../src/config/builder";
-import { runGenerate } from "../src/usecases/generate";
+import { executeGenerate } from "../src/commands/generate";
 import { defaultConsolaLogger } from "../src/logger";
 import { readdir } from "fs/promises";
 
@@ -25,45 +25,49 @@ describe("generate with dev database", () => {
       },
     };
 
-    await runGenerate({
-      client,
-      logger: defaultConsolaLogger,
-      config: defineConfigForTest({
-        ...configBase,
-        tables: [
-          defineTable("members", {
-            id: column("uuid", { primaryKey: true }),
-            name: column("text"),
-          }),
-        ],
-      }),
-      options: {
+    await executeGenerate(
+      {
+        client,
+        logger: defaultConsolaLogger,
+        config: defineConfigForTest({
+          ...configBase,
+          tables: [
+            defineTable("members", {
+              id: column("uuid", { primaryKey: true }),
+              name: column("text"),
+            }),
+          ],
+        }),
+      },
+      {
         ignorePending: false,
         apply: false,
         plan: false,
         dev: true,
-      },
-    });
+      }
+    );
 
-    await runGenerate({
-      client,
-      logger: defaultConsolaLogger,
-      config: defineConfigForTest({
-        ...configBase,
-        tables: [
-          defineTable("members", {
-            id: column("uuid", { primaryKey: true }),
-            age: column("integer"),
-          }),
-        ],
-      }),
-      options: {
+    await executeGenerate(
+      {
+        client,
+        logger: defaultConsolaLogger,
+        config: defineConfigForTest({
+          ...configBase,
+          tables: [
+            defineTable("members", {
+              id: column("uuid", { primaryKey: true }),
+              age: column("integer"),
+            }),
+          ],
+        }),
+      },
+      {
         ignorePending: false,
         apply: false,
         plan: false,
         dev: true,
-      },
-    });
+      }
+    );
 
     expect(await readdir("migrations")).toHaveLength(2);
   });

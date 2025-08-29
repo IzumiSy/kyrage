@@ -1,9 +1,9 @@
 import { expect, it, vi } from "vitest";
 import { defineTable, column } from "../src";
 import { setupTestDB, defineConfigForTest } from "./helper";
-import { runGenerate } from "../src/usecases/generate";
+import { executeGenerate } from "../src/commands/generate";
 import { defaultConsolaLogger } from "../src/logger";
-import { runApply } from "../src/usecases/apply";
+import { executeApply } from "../src/commands/apply";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");
@@ -29,45 +29,54 @@ it("generate with planned apply", async () => {
       (t) => [t.index(["name", "email"]), t.unique(["name", "email"])]
     );
 
-    await runGenerate({
-      client,
-      logger: defaultConsolaLogger,
-      config: defineConfigForTest({
-        database,
-        tables: [
-          membersTable,
-          defineTable(
-            "category",
-            {
-              id: column("uuid"),
-              member_id: column("uuid"),
-              name: column("text", { unique: true }),
-            },
-            (t) => [
-              t.primaryKey(["id", "member_id"]),
-              t.reference("member_id", membersTable, "id", {
-                onDelete: "cascade",
-                name: "category_member_fk",
-              }),
-            ]
-          ),
-        ],
-      }),
-      options: {
+    await executeGenerate(
+      {
+        client,
+        logger: defaultConsolaLogger,
+        config: defineConfigForTest({
+          database,
+          tables: [
+            membersTable,
+            defineTable(
+              "category",
+              {
+                id: column("uuid"),
+                member_id: column("uuid"),
+                name: column("text", { unique: true }),
+              },
+              (t) => [
+                t.primaryKey(["id", "member_id"]),
+                t.reference("member_id", membersTable, "id", {
+                  onDelete: "cascade",
+                  name: "category_member_fk",
+                }),
+              ]
+            ),
+          ],
+        }),
+      },
+      {
         ignorePending: false,
         apply: true,
         plan: true,
-      },
-    });
+        dev: false,
+      }
+    );
 
-    await runApply({
-      client,
-      logger: defaultConsolaLogger,
-      options: {
+    await executeApply(
+      {
+        client,
+        logger: defaultConsolaLogger,
+        config: defineConfigForTest({
+          database,
+          tables: [],
+        }),
+      },
+      {
         plan: false,
         pretty: false,
-      },
-    });
+      }
+    );
   }
 
   // 2nd phase
@@ -82,36 +91,39 @@ it("generate with planned apply", async () => {
       (t) => [t.index(["id", "email"], { unique: true })]
     );
 
-    await runGenerate({
-      client,
-      logger: defaultConsolaLogger,
-      config: defineConfigForTest({
-        database,
-        tables: [
-          membersTable,
-          defineTable(
-            "posts",
-            {
-              id: column("uuid", { primaryKey: true }),
-              content: column("text"),
-              author_id: column("uuid", { notNull: true }),
-            },
-            (t) => [
-              t.reference("author_id", membersTable, "id", {
-                onDelete: "set null",
-                onUpdate: "cascade",
-                name: "posts_author_fk",
-              }),
-            ]
-          ),
-        ],
-      }),
-      options: {
+    await executeGenerate(
+      {
+        client,
+        logger: defaultConsolaLogger,
+        config: defineConfigForTest({
+          database,
+          tables: [
+            membersTable,
+            defineTable(
+              "posts",
+              {
+                id: column("uuid", { primaryKey: true }),
+                content: column("text"),
+                author_id: column("uuid", { notNull: true }),
+              },
+              (t) => [
+                t.reference("author_id", membersTable, "id", {
+                  onDelete: "set null",
+                  onUpdate: "cascade",
+                  name: "posts_author_fk",
+                }),
+              ]
+            ),
+          ],
+        }),
+      },
+      {
         ignorePending: false,
         apply: true,
         plan: true,
-      },
-    });
+        dev: false,
+      }
+    );
   }
 
   [

@@ -1,7 +1,7 @@
 import { describe, it, vi, expect } from "vitest";
-import { runGenerate } from "../src/usecases/generate";
+import { executeGenerate } from "../src/commands/generate";
 import { readdir } from "fs/promises";
-import { runApply } from "../src/usecases/apply";
+import { executeApply } from "../src/commands/apply";
 import { defineConfigForTest, setupTestDB } from "./helper";
 import { defineTable, column } from "../src/config/builder";
 import { defaultConsolaLogger } from "../src/logger";
@@ -23,16 +23,19 @@ const config = defineConfigForTest({
 
 describe("generate and apply", () => {
   it("should generate a migration file", async () => {
-    await runGenerate({
-      client,
-      logger: defaultConsolaLogger,
-      config,
-      options: {
+    await executeGenerate(
+      {
+        client,
+        logger: defaultConsolaLogger,
+        config,
+      },
+      {
         ignorePending: false,
         apply: false,
         plan: false,
-      },
-    });
+        dev: false,
+      }
+    );
 
     const files = await readdir("migrations");
 
@@ -40,14 +43,17 @@ describe("generate and apply", () => {
   });
 
   it("should apply the migration", async () => {
-    await runApply({
-      client,
-      logger: defaultConsolaLogger,
-      options: {
+    await executeApply(
+      {
+        client,
+        logger: defaultConsolaLogger,
+        config,
+      },
+      {
         plan: false,
         pretty: false,
-      },
-    });
+      }
+    );
 
     await using db = client.getDB();
     const tables = await db.introspection.getTables();

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { runGenerate } from "../src/usecases/generate";
+import { executeGenerate } from "../src/commands/generate";
 import { defineTable, column } from "../src/config/builder";
 import { defineConfigForTest, setupTestDB } from "./helper";
 import { defaultConsolaLogger } from "../src/logger";
@@ -21,16 +21,19 @@ const config = defineConfigForTest({
 
 describe("generate and apply", () => {
   it("should update DB immediately with generate command with apply option", async () => {
-    await runGenerate({
-      client,
-      logger: defaultConsolaLogger,
-      config,
-      options: {
+    await executeGenerate(
+      {
+        client,
+        logger: defaultConsolaLogger,
+        config,
+      },
+      {
         ignorePending: false,
         apply: true,
         plan: false,
-      },
-    });
+        dev: false,
+      }
+    );
 
     await using db = client.getDB();
     const tables = await db.introspection.getTables();
