@@ -128,7 +128,7 @@ it("generate with planned apply", async () => {
 
   [
     // 1st phase
-    `create table "category" ("id" uuid, "member_id" uuid, "name" text)`,
+    `create table "category" ("id" uuid not null, "member_id" uuid not null, "name" text)`,
     `create table "members" ("id" uuid not null, "name" text, "email" text)`,
     `create index "idx_members_name_email" on "members" ("name", "email")`,
     `alter table "category" add constraint "pk_category_id_member_id" primary key ("id", "member_id")`,

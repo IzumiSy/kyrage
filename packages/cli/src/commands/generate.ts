@@ -194,11 +194,25 @@ const generateMigrationFromIntrospection = async (props: {
           colName
         );
 
+        // このカラムが複合主キーに含まれているかチェック
+        const isInCompositePrimaryKey = constraintAttributes.primaryKey.some(
+          (pk) =>
+            pk.table === table.name &&
+            pk.columns.length > 1 &&
+            pk.columns.includes(colName)
+        );
+
+        // 複合主キーに含まれるカラムの場合、データベースの NOT NULL 状態を無視し、
+        // configと同じ論理を適用（複合主キーのカラムは暗黙的にNOT NULL）
+        const effectiveNotNull = isInCompositePrimaryKey
+          ? true // 複合主キーに含まれるカラムは暗黙的にNOT NULL
+          : colDef.notNull;
+
         return [
           colName,
           {
             type: colDef.dataType,
-            notNull: colDef.notNull,
+            notNull: effectiveNotNull,
             primaryKey: hasColumnConstraint(constraintAttributes.primaryKey),
             unique: hasColumnConstraint(constraintAttributes.unique),
             defaultSql: colDef.default ?? undefined,
@@ -211,13 +225,26 @@ const generateMigrationFromIntrospection = async (props: {
   const configTables: Tables = config.tables.map((table) => ({
     name: table.tableName,
     columns: Object.fromEntries(
-      Object.entries(table.columns).map(([colName, colDef]) => [
-        colName,
-        {
-          ...colDef,
-          notNull: colDef.primaryKey || colDef.notNull,
-        },
-      ])
+      Object.entries(table.columns).map(([colName, colDef]) => {
+        // 複合主キー制約に含まれるカラムかチェック
+        const isInCompositePrimaryKey = (
+          config.primaryKeyConstraints ?? []
+        ).some(
+          (pk) => pk.table === table.tableName && pk.columns.includes(colName)
+        );
+
+        // 単一カラムの主キーまたは明示的な notNull、または複合主キーに含まれる場合
+        const effectiveNotNull =
+          colDef.primaryKey || colDef.notNull || isInCompositePrimaryKey;
+
+        return [
+          colName,
+          {
+            ...colDef,
+            notNull: effectiveNotNull,
+          },
+        ];
+      })
     ),
   }));
 
