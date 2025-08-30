@@ -21,7 +21,7 @@ export interface GenerateOptions {
   apply: boolean;
   plan: boolean;
   dev: boolean;
-  squash: boolean;
+  squash?: boolean;
 }
 
 export async function executeGenerate(
