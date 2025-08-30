@@ -1,6 +1,7 @@
 import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, unlink } from "fs/promises";
+import { join } from "path";
 import { nullLogger, type Logger } from "../logger";
 import {
   migrationDirName,
@@ -20,6 +21,7 @@ export interface GenerateOptions {
   apply: boolean;
   plan: boolean;
   dev: boolean;
+  squash: boolean;
 }
 
 export async function executeGenerate(
@@ -36,6 +38,11 @@ export async function executeGenerate(
   );
 
   try {
+    // Handle squash mode
+    if (options.squash) {
+      return await handleSquashMode(dependencies, options);
+    }
+
     // Always check against production for pending migrations if not in dev mode
     if (!options.dev && !options.ignorePending) {
       const pm = await getPendingMigrations(client);
@@ -85,6 +92,85 @@ export async function executeGenerate(
     await cleanup();
   }
 }
+
+const handleSquashMode = async (
+  dependencies: CommonDependencies,
+  options: GenerateOptions
+) => {
+  const { client, logger } = dependencies;
+  const { reporter } = logger;
+
+  // Validation: --squash cannot be used with --ignore-pending
+  if (options.ignorePending) {
+    throw new Error("--squash and --ignore-pending cannot be used together. Use --squash to consolidate pending migrations.");
+  }
+
+  // Get pending migrations
+  const pendingMigrations = await getPendingMigrations(client);
+  
+  if (pendingMigrations.length === 0) {
+    reporter.info("No pending migrations found, nothing to squash.");
+    return;
+  }
+
+  reporter.info(`Found ${pendingMigrations.length} pending migrations to squash:`);
+  pendingMigrations.forEach((migration) => {
+    reporter.info(`  - ${migration.id}.json`);
+  });
+
+  // Remove all pending migration files
+  const filesToRemove = pendingMigrations.map((migration) => 
+    join(migrationDirName, `${migration.id}.json`)
+  );
+
+  try {
+    await Promise.all(filesToRemove.map((filePath) => unlink(filePath)));
+    reporter.success(`🗑️  Removed ${filesToRemove.length} pending migration files`);
+  } catch (error) {
+    throw new Error(`Failed to remove pending migration files: ${error}`);
+  }
+
+  // Now generate a single consolidated migration using the normal flow
+  const { client: targetClient, cleanup } = await setupDatabaseClient(
+    dependencies,
+    options
+  );
+
+  try {
+    const newMigration = await generateMigrationFromIntrospection({
+      client: targetClient,
+      config: dependencies.config,
+    });
+
+    if (!newMigration) {
+      reporter.info("No changes detected after squashing, no migration needed.");
+      return;
+    }
+
+    printPrettyDiff(logger, newMigration.diff);
+
+    const migrationFilePath = `${migrationDirName}/${newMigration.id}.json`;
+    await mkdir(migrationDirName, { recursive: true });
+    await writeFile(migrationFilePath, JSON.stringify(newMigration, null, 2));
+
+    reporter.success(`✔️  Generated squashed migration: ${migrationFilePath}`);
+
+    if (options.apply) {
+      if (options.dev) {
+        reporter.warn(
+          "--apply flag is ignored when using --dev. Use 'kyrage apply' to apply to production database."
+        );
+      } else {
+        await executeApply(dependencies, {
+          plan: options.plan,
+          pretty: false,
+        });
+      }
+    }
+  } finally {
+    await cleanup();
+  }
+};
 
 const setupDatabaseClient = async (
   dependencies: CommonDependencies,
@@ -407,6 +493,11 @@ export const generateCmd = defineCommand({
       description: "Use dev database for safe migration generation",
       default: false,
     },
+    squash: {
+      type: "boolean", 
+      description: "Consolidate pending migrations into a single migration file",
+      default: false,
+    },
   },
   run: async (ctx) => {
     try {
@@ -416,6 +507,7 @@ export const generateCmd = defineCommand({
         apply: ctx.args.apply,
         plan: ctx.args.plan,
         dev: ctx.args.dev,
+        squash: ctx.args.squash,
       });
     } catch (error) {
       const { defaultConsolaLogger } = await import("../logger");
