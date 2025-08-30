@@ -138,6 +138,38 @@ $ kyrage generate
 
 `generate` command will fail if there is a pending migration. Use `--ignore-pending` option in that case.
 
+#### Squash Migrations
+
+During feature development, you may generate multiple pending migration files. Use the `--squash` option to consolidate them into a single migration:
+
+```bash
+# Before squashing
+$ ls migrations/
+1755525514175.json  # ✅ applied
+1755525514180.json  # ⏳ pending  
+1755525514185.json  # ⏳ pending
+1755525514190.json  # ⏳ pending
+
+$ kyrage generate --squash
+Found 3 pending migrations to squash:
+  - 1755525514180.json
+  - 1755525514185.json
+  - 1755525514190.json
+🗑️  Removed 3 pending migration files
+-- create_table: users
+   -> column: id ({"type": "uuid", "primaryKey": true, "notNull": true})
+   -> column: email ({"type": "text", "notNull": true, "unique": true})
+   -> column: name ({"type": "text", "notNull": false})
+✔️  Generated squashed migration: migrations/1755525514200.json
+
+# After squashing  
+$ ls migrations/
+1755525514175.json  # ✅ applied (preserved)
+1755525514200.json  # ⏳ pending (squashed)
+```
+
+This consolidates multiple pending migrations into a single migration representing the final desired state. Applied migrations are never touched.
+
 #### Development Database Support
 
 kyrage supports generating migrations against ephemeral development databases using Docker containers that is pretty much similar to the concept of [Atlas's Dev Database](https://atlasgo.io/concepts/dev-database).
@@ -278,6 +310,9 @@ $ kyrage apply
 | Command | Description |
 |---------|-------------|
 | `kyrage generate` | Compare schema with database and generate migration file |
+| `kyrage generate --squash` | Consolidate pending migrations into a single migration file |
+| `kyrage generate --dev` | Generate migration using ephemeral dev database |
+| `kyrage generate --apply` | Generate and immediately apply migration |
 | `kyrage apply` | Apply all pending migrations to the database |
 | `kyrage dev status` | Show status of running development database containers |
 | `kyrage dev get-url` | Print connection URL for running development database (use with `psql $(kyrage dev get-url)`) |
