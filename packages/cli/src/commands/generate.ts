@@ -31,6 +31,12 @@ export async function executeGenerate(
   const { client, logger, config } = dependencies;
   const { reporter } = logger;
 
+  // Handle squash mode - do squash-specific work then continue with normal flow
+  if (options.squash) {
+    await handleSquashMode(dependencies, options);
+    // After squashing, continue with normal migration generation
+  }
+
   // Create the appropriate client (dev or production)
   const { client: targetClient, cleanup } = await setupDatabaseClient(
     dependencies,
@@ -38,13 +44,8 @@ export async function executeGenerate(
   );
 
   try {
-    // Handle squash mode
-    if (options.squash) {
-      return await handleSquashMode(dependencies, options);
-    }
-
-    // Always check against production for pending migrations if not in dev mode
-    if (!options.dev && !options.ignorePending) {
+    // Always check against production for pending migrations if not in dev mode and not squashing
+    if (!options.dev && !options.ignorePending && !options.squash) {
       const pm = await getPendingMigrations(client);
       if (pm.length > 0) {
         reporter.warn(
@@ -64,7 +65,10 @@ export async function executeGenerate(
     });
 
     if (!newMigration) {
-      reporter.info("No changes detected, no migration needed.");
+      const message = options.squash 
+        ? "No changes detected after squashing, no migration needed."
+        : "No changes detected, no migration needed.";
+      reporter.info(message);
       return;
     }
 
@@ -74,7 +78,10 @@ export async function executeGenerate(
     await mkdir(migrationDirName, { recursive: true });
     await writeFile(migrationFilePath, JSON.stringify(newMigration, null, 2));
 
-    reporter.success(`Migration file generated: ${migrationFilePath}`);
+    const successMessage = options.squash
+      ? `✔️  Generated squashed migration: ${migrationFilePath}`
+      : `Migration file generated: ${migrationFilePath}`;
+    reporter.success(successMessage);
 
     if (options.apply) {
       if (options.dev) {
@@ -130,46 +137,7 @@ const handleSquashMode = async (
     throw new Error(`Failed to remove pending migration files: ${error}`);
   }
 
-  // Now generate a single consolidated migration using the normal flow
-  const { client: targetClient, cleanup } = await setupDatabaseClient(
-    dependencies,
-    options
-  );
-
-  try {
-    const newMigration = await generateMigrationFromIntrospection({
-      client: targetClient,
-      config: dependencies.config,
-    });
-
-    if (!newMigration) {
-      reporter.info("No changes detected after squashing, no migration needed.");
-      return;
-    }
-
-    printPrettyDiff(logger, newMigration.diff);
-
-    const migrationFilePath = `${migrationDirName}/${newMigration.id}.json`;
-    await mkdir(migrationDirName, { recursive: true });
-    await writeFile(migrationFilePath, JSON.stringify(newMigration, null, 2));
-
-    reporter.success(`✔️  Generated squashed migration: ${migrationFilePath}`);
-
-    if (options.apply) {
-      if (options.dev) {
-        reporter.warn(
-          "--apply flag is ignored when using --dev. Use 'kyrage apply' to apply to production database."
-        );
-      } else {
-        await executeApply(dependencies, {
-          plan: options.plan,
-          pretty: false,
-        });
-      }
-    }
-  } finally {
-    await cleanup();
-  }
+  // Return to continue with normal migration generation flow in executeGenerate
 };
 
 const setupDatabaseClient = async (
