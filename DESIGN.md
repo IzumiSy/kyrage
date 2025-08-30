@@ -237,7 +237,7 @@ export function createCommonDependencies(
 
 **Command Implementations**:
 - `commands/apply.ts`: `executeApply(dependencies, options)` - Migration execution
-- `commands/generate.ts`: `executeGenerate(dependencies, options)` - Migration generation with dev database support
+- `commands/generate.ts`: `executeGenerate(dependencies, options)` - Migration generation with dev database support and migration squashing capability
 - `commands/dev.ts`: `executeDevStatus`, `executeDevGetUrl`, `executeDevClean` - Development database management
 - `commands/common.ts`: Shared dependency injection infrastructure
 
@@ -263,7 +263,7 @@ export function createCommonDependencies(
   - `commands/`: Unified command implementations with dependency injection.
     - `common.ts`: Shared dependency injection infrastructure (`CommonDependencies`, `createCommonDependencies`).
     - `apply.ts`: Migration application command (`executeApply`).
-    - `generate.ts`: Migration generation command with dev database support (`executeGenerate`, `printPrettyDiff`).
+    - `generate.ts`: Migration generation command with dev database support and migration squashing (`executeGenerate`, `handleSquashMode`, `printPrettyDiff`).
     - `dev.ts`: Development database container management commands (`executeDevStatus`, `executeDevGetUrl`, `executeDevClean`).
   - `config/`: Configuration loading and validation.
   - `dev/container.ts`: Development database container lifecycle management with reuse capabilities.
