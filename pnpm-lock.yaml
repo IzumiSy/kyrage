@@ -94,8 +94,8 @@ importers:
         specifier: ^0.31.0
         version: 0.31.0
       memfs:
-        specifier: ^4.38.1
-        version: 4.38.1
+        specifier: ^4.38.2
+        version: 4.38.2
       prettier:
         specifier: ^3.6.2
         version: 3.6.2
@@ -1474,8 +1474,8 @@ packages:
   magic-string@0.30.17:
     resolution: {integrity: sha512-sNPKHvyjVf7gyjwS4xGTaW/mCnF8wnjtifKBEhxfZ7E/S8tQ0rssrwGNn6q8JH/ohItJfSQp9mBtQYuTlH5QnA==}
 
-  memfs@4.38.1:
-    resolution: {integrity: sha512-exfrOkkU3m0EpbQ0iQJP93HUbkprnIBU7IUnobSNAzHkBUzsklLwENGLEm8ZwJmMuLoFEfv1pYQ54wSpkay4kQ==}
+  memfs@4.38.2:
+    resolution: {integrity: sha512-FpWsVHpAkoSh/LfY1BgAl72BVd374ooMRtDi2VqzBycX4XEfvC0XKACCe0C9VRZoYq5viuoyTv6lYXZ/Q7TrLQ==}
     engines: {node: '>= 4.0.0'}
 
   merge2@1.4.1:
@@ -3662,7 +3662,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.4
 
-  memfs@4.38.1:
+  memfs@4.38.2:
     dependencies:
       '@jsonjoy.com/json-pack': 1.11.0(tslib@2.8.1)
       '@jsonjoy.com/util': 1.9.0(tslib@2.8.1)
