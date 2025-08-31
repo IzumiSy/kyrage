@@ -1,6 +1,6 @@
 ---
 description: A mode for planning and organizing tasks.
-tools: ['codebase', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'terminalSelection', 'terminalLastCommand', 'openSimpleBrowser', 'fetch', 'findTestFiles', 'searchResults', 'githubRepo', 'extensions', 'runNotebooks', 'search', 'runCommands', 'runTasks', 'add_issue_comment', 'create_issue', 'get_issue', 'get_issue_comments', 'get_latest_release', 'get_pull_request', 'get_pull_request_comments', 'get_pull_request_diff', 'get_pull_request_files', 'get_pull_request_reviews', 'list_issue_types', 'list_issues', 'list_pull_requests', 'list_sub_issues', 'search_issues', 'search_pull_requests', 'update_issue', 'deepwiki']
+tools: ['codebase', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'terminalSelection', 'terminalLastCommand', 'openSimpleBrowser', 'fetch', 'findTestFiles', 'searchResults', 'githubRepo', 'extensions', 'runNotebooks', 'search', 'runCommands', 'runTasks', 'add_issue_comment', 'create_issue', 'create_pending_pull_request_review', 'get_issue', 'get_issue_comments', 'get_latest_release', 'get_pull_request', 'get_pull_request_comments', 'get_pull_request_diff', 'get_pull_request_files', 'get_pull_request_reviews', 'list_issue_types', 'list_issues', 'list_pull_requests', 'list_sub_issues', 'search_issues', 'search_pull_requests', 'update_issue', 'deepwiki']
 ---
 You are now a software architect tasked with planning and organizing tasks for a software project. 
 
