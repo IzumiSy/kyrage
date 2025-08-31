@@ -138,11 +138,61 @@ $ kyrage generate
 
 `generate` command will fail if there is a pending migration. Use `--ignore-pending` option in that case.
 
-#### Development Database Support
+**PROTIP:** Kyrage has built-in mechanism to spin up ephemeral database for development as Docker container that can be used as `kyrage generate --dev` command. See [Dev Database](#dev-database) for more detail.
+
+### 4. Plan Changes
+
+You can use `apply --plan` beforehand to check SQL queries that will be executed in the next time:
+
+```bash
+$ kyrage apply --plan --pretty
+create table "members" (
+  "id" uuid not null,
+  "email" text not null,
+  "name" text,
+  "age" integer,
+  "createdAt" timestamptz default now ()
+)
+create table "posts" (
+  "id" uuid,
+  "author_id" uuid,
+  "slug" text not null,
+  "title" text,
+  "content" text not null
+)
+create unique index "idx_members_name_email" on "members" ("name", "email")
+alter table "members" add constraint "members_id_primary_key" primary key ("id")
+alter table "posts" add constraint "pk_posts_id_author_id" primary key ("id", "author_id")
+alter table "members" add constraint "members_email_unique" unique ("email")
+alter table "members" add constraint "members_name_unique" unique ("name")
+alter table "posts" add constraint "unique_author_slug" unique ("author_id", "slug")
+alter table "posts" add constraint "posts_author_fk" foreign key ("author_id") references "members" ("id") on delete cascade
+```
+
+### 5. Apply
+
+If everything looks good, execute the generated migrations:
+
+```bash
+$ kyrage apply
+✔ Migration applied: 1755525514175
+```
+
+**PROTIP**: You can also apply the changes immediately on generating migration: `kyrage generate --apply`
+
+## Dev Database
 
 kyrage supports generating migrations against ephemeral development databases using Docker containers that is pretty much similar to the concept of [Atlas's Dev Database](https://atlasgo.io/concepts/dev-database).
 
 This is useful when you want to generate migrations without affecting your production database state.
+
+The dev database will:
+
+1. Start a fresh container with your specified database image (or reuse existing one)
+2. Apply all existing migrations to establish the current baseline
+3. Compare your schema against this clean state
+4. Generate the migration file
+5. Optionally maintain the container for subsequent operations (with `reuse: true`)
 
 ```bash
 # Generate migration against a clean dev database
@@ -194,7 +244,7 @@ $ kyrage generate --dev
 
 #### Development Database Management
 
-kyrage provides commands to manage your development database containers:
+kyrage also provides handy commands to manage your development database containers without Docker CLI:
 
 ```bash
 # Check status of dev containers
@@ -222,54 +272,6 @@ test=# \dt
 $ kyrage dev clean
 ✔ Cleaned up dev containers
 ```
-
-The dev database will:
-
-1. Start a fresh container with your specified database image (or reuse existing one)
-2. Apply all existing migrations to establish the current baseline
-3. Compare your schema against this clean state
-4. Generate the migration file
-5. Optionally maintain the container for subsequent operations (with `reuse: true`)
-
-### 4. Plan Changes
-
-You can use `apply --plan` beforehand to check SQL queries that will be executed in the next time:
-
-```bash
-$ kyrage apply --plan --pretty
-create table "members" (
-  "id" uuid not null,
-  "email" text not null,
-  "name" text,
-  "age" integer,
-  "createdAt" timestamptz default now ()
-)
-create table "posts" (
-  "id" uuid,
-  "author_id" uuid,
-  "slug" text not null,
-  "title" text,
-  "content" text not null
-)
-create unique index "idx_members_name_email" on "members" ("name", "email")
-alter table "members" add constraint "members_id_primary_key" primary key ("id")
-alter table "posts" add constraint "pk_posts_id_author_id" primary key ("id", "author_id")
-alter table "members" add constraint "members_email_unique" unique ("email")
-alter table "members" add constraint "members_name_unique" unique ("name")
-alter table "posts" add constraint "unique_author_slug" unique ("author_id", "slug")
-alter table "posts" add constraint "posts_author_fk" foreign key ("author_id") references "members" ("id") on delete cascade
-```
-
-### 5. Apply
-
-If everything looks good, execute the generated migrations:
-
-```bash
-$ kyrage apply
-✔ Migration applied: 1755525514175
-```
-
-**PROTIP**: You can also apply the changes immediately on generating migration: `kyrage generate --apply`
 
 ## 📚 API Reference
 
@@ -302,7 +304,7 @@ export default defineConfig({
     // Option 1: Use Docker container (requires Docker)
     container: {
       image: "postgres:17",
-      reuse: true,  // Enable container reuse for persistent dev databases
+      reuse: true,           // Enable container reuse for persistent dev databases
       name: "kyrage-dev-db"  // Optional custom container name
     },
     // Option 2: Use existing database connection
