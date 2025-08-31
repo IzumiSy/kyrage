@@ -138,98 +138,7 @@ $ kyrage generate
 
 `generate` command will fail if there is a pending migration. Use `--ignore-pending` option in that case.
 
-#### Development Database Support
-
-kyrage supports generating migrations against ephemeral development databases using Docker containers that is pretty much similar to the concept of [Atlas's Dev Database](https://atlasgo.io/concepts/dev-database).
-
-This is useful when you want to generate migrations without affecting your production database state.
-
-```bash
-# Generate migration against a clean dev database
-$ kyrage generate --dev
-🚀 Starting dev database for migration generation...
-✔ Dev database started: postgres
--- create_table: users
-   -> column: id ({"type":"uuid","primaryKey":true,"notNull":true})
-   -> column: email ({"type":"text","notNull":true,"unique":true})
-✔ Migration file generated: migrations/1755525514175.json
-✔ Dev database stopped
-```
-
-#### Container Reuse Feature
-
-You can enable container reuse to maintain persistent development databases across multiple operations:
-
-```typescript
-// kyrage.config.ts
-export default defineConfig({
-  dev: {
-    container: {
-      image: "postgres:17",
-      reuse: true,  // Enable container reuse
-      name: "kyrage-dev-db"  // Optional custom name
-    }
-  },
-  // ... other config
-});
-```
-
-With container reuse enabled:
-
-```bash
-# First run - starts new container
-$ kyrage generate --dev
-🚀 Starting dev database for migration generation...
-✔ Dev database started: postgres
-✔ Migration file generated: migrations/1755525514175.json
-✨ Persistent dev database ready: postgres
-
-# Subsequent runs - reuses existing container
-$ kyrage generate --dev  
-🔄 Reusing existing dev database...
-✔ Dev database started: postgres
-✔ Migration file generated: migrations/1755525514176.json
-✨ Persistent dev database ready: postgres
-```
-
-#### Development Database Management
-
-kyrage provides commands to manage your development database containers:
-
-```bash
-# Check status of dev containers
-$ kyrage dev status
-Running: abc123def456 (postgres:17)
-
-# Get connection URL for running dev container
-$ kyrage dev get-url
-postgresql://postgres:password@localhost:32768/test
-
-# Connect directly to dev database using psql
-$ psql $(kyrage dev get-url)
-psql (17.0)
-Type "help" for help.
-
-test=# \dt
-          List of relations
- Schema |  Name   | Type  |  Owner   
---------+---------+-------+----------
- public | members | table | postgres
- public | posts   | table | postgres
-(2 rows)
-
-# Clean up all kyrage dev containers
-$ kyrage dev clean
-✔ Cleaned up dev containers
-```
-
-The dev database will:
-
-1. Start a fresh container with your specified database image (or reuse existing one)
-2. Apply all existing migrations to establish the current baseline
-3. Compare your schema against this clean state
-4. Generate the migration file
-5. Optionally maintain the container for subsequent operations (with `reuse: true`)
+**PROTIP:** Kyrage has built-in mechanism to spin up ephemeral database for development as Docker container that can be used as `kyrage generate --dev` command. See [Dev Database](#dev-database) for more detail.
 
 ### 4. Plan Changes
 
@@ -271,6 +180,101 @@ $ kyrage apply
 
 **PROTIP**: You can also apply the changes immediately on generating migration: `kyrage generate --apply`
 
+## Dev Database
+
+kyrage supports generating migrations against ephemeral development databases using Docker containers that is pretty much similar to the concept of [Atlas's Dev Database](https://atlasgo.io/concepts/dev-database).
+
+The dev database will:
+
+1. Start a fresh container with your specified database image (or reuse existing one)
+2. Apply all existing migrations to establish the current baseline
+3. Compare your schema against this clean state
+4. Generate the migration file
+5. Optionally maintain the container for subsequent operations (with `reuse: true`)
+
+```bash
+# Generate migration against a clean dev database
+$ kyrage generate --dev
+🚀 Starting dev database for migration generation...
+✔ Dev database started: postgres
+-- create_table: users
+   -> column: id ({"type":"uuid","primaryKey":true,"notNull":true})
+   -> column: email ({"type":"text","notNull":true,"unique":true})
+✔ Migration file generated: migrations/1755525514175.json
+✔ Dev database stopped
+```
+
+This is useful when you want to generate migrations without affecting your production database state.
+
+#### Container Reuse Feature
+
+You can enable container reuse to maintain persistent development databases across multiple operations:
+
+```typescript
+// kyrage.config.ts
+export default defineConfig({
+  dev: {
+    container: {
+      image: "postgres:17",
+      reuse: true,           // Enable container reuse
+      name: "kyrage-dev-db"  // Container name (optional)
+    }
+  },
+  // ... other config
+});
+```
+
+With container reuse enabled:
+
+```bash
+# First run - starts new container
+$ kyrage generate --dev
+🚀 Starting dev database for migration generation...
+✔ Dev database started: postgres
+✔ Migration file generated: migrations/1755525514175.json
+✨ Persistent dev database ready: postgres
+
+# Subsequent runs - reuses existing container
+$ kyrage generate --dev  
+🔄 Reusing existing dev database...
+✔ Dev database started: postgres
+✔ Migration file generated: migrations/1755525514176.json
+✨ Persistent dev database ready: postgres
+```
+
+This feature is expected to be used in steamlined development cycle to make multiple schema changes with the populated data on your database kept, which will help debug or test your latest schema with the developing app that uses the database.
+
+#### Development Database Management
+
+kyrage also provides handy commands to manage your development database containers without Docker CLI:
+
+```bash
+# Check status of dev containers
+$ kyrage dev status
+Running: abc123def456 (postgres:17)
+
+# Get connection URL for running dev container
+$ kyrage dev get-url
+postgresql://postgres:password@localhost:32768/test
+
+# Connect directly to dev database using psql
+$ psql $(kyrage dev get-url)
+psql (17.0)
+Type "help" for help.
+
+test=# \dt
+          List of relations
+ Schema |  Name   | Type  |  Owner   
+--------+---------+-------+----------
+ public | members | table | postgres
+ public | posts   | table | postgres
+(2 rows)
+
+# Clean up all kyrage dev containers
+$ kyrage dev clean
+✔ Cleaned up dev containers
+```
+
 ## 📚 API Reference
 
 ### Commands
@@ -302,7 +306,7 @@ export default defineConfig({
     // Option 1: Use Docker container (requires Docker)
     container: {
       image: "postgres:17",
-      reuse: true,  // Enable container reuse for persistent dev databases
+      reuse: true,           // Enable container reuse for persistent dev databases
       name: "kyrage-dev-db"  // Optional custom container name
     },
     // Option 2: Use existing database connection
