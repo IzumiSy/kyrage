@@ -216,8 +216,8 @@ export default defineConfig({
   dev: {
     container: {
       image: "postgres:17",
-      reuse: true,  // Enable container reuse
-      name: "kyrage-dev-db"  // Optional custom name
+      reuse: true,           // Enable container reuse
+      name: "kyrage-dev-db"  // Container name (optional)
     }
   },
   // ... other config
@@ -241,6 +241,8 @@ $ kyrage generate --dev
 ✔ Migration file generated: migrations/1755525514176.json
 ✨ Persistent dev database ready: postgres
 ```
+
+This feature is expected to be used in steamlined development cycle to make multiple schema changes with the populated data on your database kept, which will help debug or test your latest schema with the developing app that uses the database.
 
 #### Development Database Management
 
