@@ -49,7 +49,7 @@
     "ramda": "^0.31.3",
     "sql-formatter": "^15.6.6",
     "testcontainers": "^11.5.1",
-    "zod": "^4.1.1"
+    "zod": "^4.1.5"
   },
   "devDependencies": {
     "@swc/core": "^1.13.5",
