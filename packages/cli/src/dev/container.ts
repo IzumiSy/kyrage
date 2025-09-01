@@ -79,24 +79,30 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   protected container: C;
 
   constructor(
-    private options: ContainerOptions,
-    createContainer: () => C
+    protected options: ContainerOptions,
+    forceReuse: boolean = false
   ) {
-    const container = createContainer();
+    const container = this.createContainer();
+
     container.withLabels({
       [DialectKey]: this.options.dialect,
       [ManagedKey]: "true",
     });
 
-    if (this.options.reuse) {
+    // 元の設定またはforceReuseが有効な場合にreuseを適用
+    if (this.options.reuse || forceReuse) {
       container.withReuse();
     }
+
     if (this.options.containerName) {
       container.withName(this.options.containerName);
     }
 
     this.container = container;
   }
+
+  // サブクラスで実装するファクトリメソッド
+  protected abstract createContainer(): C;
 
   /**
    * 実行中のコンテナを取得する共通処理
@@ -154,14 +160,14 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
 }
 
 export class PostgreSqlDevDatabaseManager extends ContainerDevDatabaseManager<PostgreSqlContainer> {
-  constructor(props: ContainerOptions) {
-    super(props, () => new PostgreSqlContainer(props.image));
+  protected createContainer() {
+    return new PostgreSqlContainer(this.options.image);
   }
 }
 
 export class CockroachDbDevDatabaseManager extends ContainerDevDatabaseManager<CockroachDbContainer> {
-  constructor(props: ContainerOptions) {
-    super(props, () => new CockroachDbContainer(props.image));
+  protected createContainer() {
+    return new CockroachDbContainer(this.options.image);
   }
 }
 
@@ -198,7 +204,8 @@ export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
 
 export const createDevDatabaseManager = (
   devConfig: NonNullable<DevDatabaseValue>,
-  dialect: DialectEnum
+  dialect: DialectEnum,
+  forceReuse: boolean = false
 ) => {
   if ("connectionString" in devConfig) {
     return new ConnectionStringDevDatabaseManager(devConfig.connectionString);
@@ -212,9 +219,9 @@ export const createDevDatabaseManager = (
 
     switch (dialect) {
       case "postgres":
-        return new PostgreSqlDevDatabaseManager(containerOptions);
+        return new PostgreSqlDevDatabaseManager(containerOptions, forceReuse);
       case "cockroachdb":
-        return new CockroachDbDevDatabaseManager(containerOptions);
+        return new CockroachDbDevDatabaseManager(containerOptions, forceReuse);
       default:
         throw new Error(`Unsupported dialect for container: ${dialect}`);
     }
@@ -255,23 +262,11 @@ export async function startDevDatabase(
   }
 
   const dialect = config.database.dialect;
+  const devManager = createDevDatabaseManager(config.dev, dialect, forceReuse);
 
-  // forceReuseが有効な場合、一時的にreuse設定を上書き
-  let devConfig = config.dev;
-  if (forceReuse && "container" in config.dev) {
-    devConfig = {
-      ...config.dev,
-      container: {
-        ...config.dev.container,
-        reuse: true,
-      },
-    };
-  }
-
-  const devManager = createDevDatabaseManager(devConfig, dialect);
-
-  // Check if reuse is enabled and container is already running
-  const isReuse = "container" in devConfig && devConfig.container.reuse;
+  // 元の設定でのreuse判定（forceReuseも考慮）
+  const isReuse =
+    ("container" in config.dev && config.dev.container.reuse) || forceReuse;
   if (isReuse && (await devManager.exists())) {
     reporter.info("🔄 Reusing existing dev database...");
   } else {
