@@ -46,7 +46,13 @@ describe("generate --squash", () => {
 
     await executeGenerate(
       { client, logger: defaultConsolaLogger, config: configStep1 },
-      { ignorePending: false, apply: false, plan: false, dev: false, squash: false }
+      {
+        ignorePending: false,
+        apply: false,
+        plan: false,
+        dev: false,
+        squash: false,
+      }
     );
 
     // Generate second migration - add email
@@ -62,13 +68,25 @@ describe("generate --squash", () => {
 
     await executeGenerate(
       { client, logger: defaultConsolaLogger, config: configStep2 },
-      { ignorePending: true, apply: false, plan: false, dev: false, squash: false }
+      {
+        ignorePending: true,
+        apply: false,
+        plan: false,
+        dev: false,
+        squash: false,
+      }
     );
 
     // Generate third migration - make email unique
     await executeGenerate(
       { client, logger: defaultConsolaLogger, config },
-      { ignorePending: true, apply: false, plan: false, dev: false, squash: false }
+      {
+        ignorePending: true,
+        apply: false,
+        plan: false,
+        dev: false,
+        squash: false,
+      }
     );
 
     // At this point we should have 3 pending migrations
@@ -78,7 +96,13 @@ describe("generate --squash", () => {
     // Now squash them
     await executeGenerate(
       { client, logger: defaultConsolaLogger, config },
-      { ignorePending: false, apply: false, plan: false, dev: false, squash: true }
+      {
+        ignorePending: false,
+        apply: false,
+        plan: false,
+        dev: false,
+        squash: true,
+      }
     );
 
     // After squash, we should have 1 migration
@@ -94,7 +118,11 @@ describe("generate --squash", () => {
           table: "users",
           columns: expect.objectContaining({
             id: expect.objectContaining({ type: "uuid", primaryKey: true }),
-            email: expect.objectContaining({ type: "text", notNull: true, unique: true }),
+            email: expect.objectContaining({
+              type: "text",
+              notNull: true,
+              unique: true,
+            }),
             name: expect.objectContaining({ type: "text" }),
           }),
         }),
@@ -110,18 +138,17 @@ describe("generate --squash", () => {
 
     await executeGenerate(
       { client, logger: defaultConsolaLogger, config },
-      { ignorePending: false, apply: false, plan: false, dev: false, squash: true }
+      {
+        ignorePending: false,
+        apply: false,
+        plan: false,
+        dev: false,
+        squash: true,
+      }
     );
 
-    expect(consoleSpy).toHaveBeenCalledWith("No pending migrations found, nothing to squash.");
-  });
-
-  it("should reject conflicting options", async () => {
-    await expect(
-      executeGenerate(
-        { client, logger: defaultConsolaLogger, config },
-        { ignorePending: true, apply: false, plan: false, dev: false, squash: true }
-      )
-    ).rejects.toThrow("--squash and --ignore-pending cannot be used together");
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "No pending migrations found, nothing to squash."
+    );
   });
 });

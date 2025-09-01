@@ -32,9 +32,9 @@ export async function executeGenerate(
   const { reporter } = logger;
 
   // Handle squash mode - do squash-specific work then continue with normal flow
+  // Squashing is just removing all pending migrations and creating a new one that combines their changes.
   if (options.squash) {
-    await handleSquashMode(dependencies, options);
-    // After squashing, continue with normal migration generation
+    await removePendingMigrations(dependencies);
   }
 
   // Create the appropriate client (dev or production)
@@ -44,8 +44,8 @@ export async function executeGenerate(
   );
 
   try {
-    // Always check against production for pending migrations if not in dev mode and not squashing
-    if (!options.dev && !options.ignorePending && !options.squash) {
+    // Always check against production for pending migrations if not in dev mode
+    if (!options.dev && !options.ignorePending) {
       const pm = await getPendingMigrations(client);
       if (pm.length > 0) {
         reporter.warn(
@@ -63,12 +63,8 @@ export async function executeGenerate(
       client: targetClient,
       config,
     });
-
     if (!newMigration) {
-      const message = options.squash 
-        ? "No changes detected after squashing, no migration needed."
-        : "No changes detected, no migration needed.";
-      reporter.info(message);
+      reporter.info("No changes detected, no migration needed.");
       return;
     }
 
@@ -79,7 +75,7 @@ export async function executeGenerate(
     await writeFile(migrationFilePath, JSON.stringify(newMigration, null, 2));
 
     const successMessage = options.squash
-      ? `✔️  Generated squashed migration: ${migrationFilePath}`
+      ? `Generated squashed migration: ${migrationFilePath}`
       : `Migration file generated: ${migrationFilePath}`;
     reporter.success(successMessage);
 
@@ -100,44 +96,40 @@ export async function executeGenerate(
   }
 }
 
-const handleSquashMode = async (
-  dependencies: CommonDependencies,
-  options: GenerateOptions
-) => {
+/**
+ * Remove all pending migrations from the migration directory.
+ */
+const removePendingMigrations = async (dependencies: CommonDependencies) => {
   const { client, logger } = dependencies;
   const { reporter } = logger;
 
-  // Validation: --squash cannot be used with --ignore-pending
-  if (options.ignorePending) {
-    throw new Error("--squash and --ignore-pending cannot be used together. Use --squash to consolidate pending migrations.");
-  }
-
   // Get pending migrations
   const pendingMigrations = await getPendingMigrations(client);
-  
   if (pendingMigrations.length === 0) {
     reporter.info("No pending migrations found, nothing to squash.");
     return;
   }
 
-  reporter.info(`Found ${pendingMigrations.length} pending migrations to squash:`);
+  reporter.info(
+    `Found ${pendingMigrations.length} pending migrations to squash:`
+  );
   pendingMigrations.forEach((migration) => {
     reporter.info(`  - ${migration.id}.json`);
   });
 
   // Remove all pending migration files
-  const filesToRemove = pendingMigrations.map((migration) => 
+  const filesToRemove = pendingMigrations.map((migration) =>
     join(migrationDirName, `${migration.id}.json`)
   );
 
   try {
     await Promise.all(filesToRemove.map((filePath) => unlink(filePath)));
-    reporter.success(`🗑️  Removed ${filesToRemove.length} pending migration files`);
+    reporter.success(
+      `🗑️  Removed ${filesToRemove.length} pending migration files`
+    );
   } catch (error) {
     throw new Error(`Failed to remove pending migration files: ${error}`);
   }
-
-  // Return to continue with normal migration generation flow in executeGenerate
 };
 
 const setupDatabaseClient = async (
@@ -462,8 +454,9 @@ export const generateCmd = defineCommand({
       default: false,
     },
     squash: {
-      type: "boolean", 
-      description: "Consolidate pending migrations into a single migration file",
+      type: "boolean",
+      description:
+        "Consolidate pending migrations into a single migration file",
       default: false,
     },
   },
