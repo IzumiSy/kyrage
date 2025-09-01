@@ -75,14 +75,21 @@ export async function executeDevStart(
     if (!isReuse) {
       // Foreground mode: set up cleanup handlers and keep process alive
       const cleanup = async () => {
-        reporter.info("🧹 Cleaning up temporary dev database...");
         try {
-          await result.manager.stop();
-          reporter.success("✔ Dev database stopped");
+          reporter.info("🧹 Cleaning up temporary dev database...");
+
+          const exists = await result.manager.exists();
+          if (!exists) {
+            reporter.info("Dev database already stopped by some reason");
+          } else {
+            await result.manager.stop();
+            reporter.success("Dev database stopped");
+          }
         } catch (error) {
           reporter.error(`Failed to stop database: ${error}`);
+        } finally {
+          process.exit(0);
         }
-        process.exit(0);
       };
 
       // シグナルハンドラーを設定
