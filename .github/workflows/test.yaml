@@ -3,7 +3,7 @@ name: Test
 on:
   push:
     paths-ignore:
-      - '**/*.*md'
+      - '**/*.md'
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
