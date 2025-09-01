@@ -1,6 +1,7 @@
 import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, unlink } from "fs/promises";
+import { join } from "path";
 import { nullLogger, type Logger } from "../logger";
 import {
   migrationDirName,
@@ -20,6 +21,7 @@ export interface GenerateOptions {
   apply: boolean;
   plan: boolean;
   dev: boolean;
+  squash?: boolean;
 }
 
 export async function executeGenerate(
@@ -28,6 +30,12 @@ export async function executeGenerate(
 ) {
   const { client, logger, config } = dependencies;
   const { reporter } = logger;
+
+  // Handle squash mode - do squash-specific work then continue with normal flow
+  // Squashing is just removing all pending migrations and creating a new one that combines their changes.
+  if (options.squash) {
+    await removePendingMigrations(dependencies);
+  }
 
   // Create the appropriate client (dev or production)
   const { client: targetClient, cleanup } = await setupDatabaseClient(
@@ -55,7 +63,6 @@ export async function executeGenerate(
       client: targetClient,
       config,
     });
-
     if (!newMigration) {
       reporter.info("No changes detected, no migration needed.");
       return;
@@ -67,7 +74,10 @@ export async function executeGenerate(
     await mkdir(migrationDirName, { recursive: true });
     await writeFile(migrationFilePath, JSON.stringify(newMigration, null, 2));
 
-    reporter.success(`Migration file generated: ${migrationFilePath}`);
+    const successMessage = options.squash
+      ? `Generated squashed migration: ${migrationFilePath}`
+      : `Migration file generated: ${migrationFilePath}`;
+    reporter.success(successMessage);
 
     if (options.apply) {
       if (options.dev) {
@@ -85,6 +95,42 @@ export async function executeGenerate(
     await cleanup();
   }
 }
+
+/**
+ * Remove all pending migrations from the migration directory.
+ */
+const removePendingMigrations = async (dependencies: CommonDependencies) => {
+  const { client, logger } = dependencies;
+  const { reporter } = logger;
+
+  // Get pending migrations
+  const pendingMigrations = await getPendingMigrations(client);
+  if (pendingMigrations.length === 0) {
+    reporter.info("No pending migrations found, nothing to squash.");
+    return;
+  }
+
+  reporter.info(
+    `Found ${pendingMigrations.length} pending migrations to squash:`
+  );
+  pendingMigrations.forEach((migration) => {
+    reporter.info(`  - ${migration.id}.json`);
+  });
+
+  // Remove all pending migration files
+  const filesToRemove = pendingMigrations.map((migration) =>
+    join(migrationDirName, `${migration.id}.json`)
+  );
+
+  try {
+    await Promise.all(filesToRemove.map((filePath) => unlink(filePath)));
+    reporter.success(
+      `🗑️  Removed ${filesToRemove.length} pending migration files`
+    );
+  } catch (error) {
+    throw new Error(`Failed to remove pending migration files: ${error}`);
+  }
+};
 
 const setupDatabaseClient = async (
   dependencies: CommonDependencies,
@@ -407,6 +453,12 @@ export const generateCmd = defineCommand({
       description: "Use dev database for safe migration generation",
       default: false,
     },
+    squash: {
+      type: "boolean",
+      description:
+        "Consolidate pending migrations into a single migration file",
+      default: false,
+    },
   },
   run: async (ctx) => {
     try {
@@ -416,6 +468,7 @@ export const generateCmd = defineCommand({
         apply: ctx.args.apply,
         plan: ctx.args.plan,
         dev: ctx.args.dev,
+        squash: ctx.args.squash,
       });
     } catch (error) {
       const { defaultConsolaLogger } = await import("../logger");

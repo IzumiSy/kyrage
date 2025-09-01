@@ -138,7 +138,10 @@ $ kyrage generate
 
 `generate` command will fail if there is a pending migration. Use `--ignore-pending` option in that case.
 
-**PROTIP:** Kyrage has built-in mechanism to spin up ephemeral database for development as Docker container that can be used as `kyrage generate --dev` command. See [Dev Database](#dev-database) for more detail.
+**PROTIPS:** 
+
+* Kyrage has built-in mechanism to spin up ephemeral database for development as Docker container that can be used as `kyrage generate --dev` command. See [Dev Database](#dev-database) for more detail.
+* If you iterate multiple schema changes during feature development and want to organize them before applying, kyrage can squash migrations by `kyrage generate --squash`. See [Squash Migrations](#squash-migrations) for more detail.
 
 ### 4. Plan Changes
 
@@ -275,6 +278,62 @@ $ kyrage dev clean
 ✔ Cleaned up dev containers
 ```
 
+## Squash Migrations
+
+During feature development, you may generate multiple pending migration files. Use the `--squash` option to consolidate them into a single migration:
+
+```bash
+# Before squashing
+$ ls migrations/
+1755525514175.json  # ✅ applied
+1755525514180.json  # ⏳ pending  
+1755525514185.json  # ⏳ pending
+1755525514190.json  # ⏳ pending
+
+$ kyrage generate --squash
+Found 3 pending migrations to squash:
+  - 1755525514180.json
+  - 1755525514185.json
+  - 1755525514190.json
+🗑️  Removed 3 pending migration files
+-- create_table: users
+   -> column: id ({"type": "uuid", "primaryKey": true, "notNull": true})
+   -> column: email ({"type": "text", "notNull": true, "unique": true})
+   -> column: name ({"type": "text", "notNull": false})
+✔️  Generated squashed migration: migrations/1755525514200.json
+
+# After squashing  
+$ ls migrations/
+1755525514175.json  # ✅ applied (preserved)
+1755525514200.json  # ⏳ pending (squashed)
+```
+
+This consolidates multiple pending migrations into a single migration representing the final desired state. Applied migrations are never touched.
+
+### Typical Development Workflow
+
+A common pattern is to use dev databases for iterative development, then squash migrations before deploying to staging/production:
+
+```bash
+# Development phase - multiple iterations with dev database
+$ kyrage generate --dev --apply  # 1st iteration - adds users table
+$ kyrage generate --dev --apply  # 2nd iteration - adds posts table
+$ kyrage generate --dev --apply  # 3rd iteration - adds indexes
+
+# Development complete - consolidate pending migrations
+$ kyrage generate --squash  # Squash all pending migrations into one
+
+# Deploy to staging/production
+$ kyrage apply  # Apply the single squashed migration
+```
+
+In this workflow:
+- **Dev database** acts like a feature branch - rapid iteration with immediate application
+- **Squashing** consolidates the development history into a clean, single migration
+- **Production deployment** applies one cohesive migration instead of multiple incremental changes
+
+This approach keeps your production migration history clean while allowing flexible development iterations.
+
 ## 📚 API Reference
 
 ### Commands
@@ -282,6 +341,9 @@ $ kyrage dev clean
 | Command | Description |
 |---------|-------------|
 | `kyrage generate` | Compare schema with database and generate migration file |
+| `kyrage generate --squash` | Consolidate pending migrations into a single migration file |
+| `kyrage generate --dev` | Generate migration using ephemeral dev database |
+| `kyrage generate --apply` | Generate and immediately apply migration |
 | `kyrage apply` | Apply all pending migrations to the database |
 | `kyrage dev status` | Show status of running development database containers |
 | `kyrage dev get-url` | Print connection URL for running development database (use with `psql $(kyrage dev get-url)`) |
