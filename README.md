@@ -138,7 +138,10 @@ $ kyrage generate
 
 `generate` command will fail if there is a pending migration. Use `--ignore-pending` option in that case.
 
-**PROTIP:** Kyrage has built-in mechanism to spin up ephemeral database for development as Docker container that can be used as `kyrage generate --dev` command. See [Dev Database](#dev-database) for more detail.
+**PROTIPS:** 
+
+* Kyrage has built-in mechanism to spin up ephemeral database for development as Docker container that can be used as `kyrage generate --dev` command. See [Dev Database](#dev-database) for more detail.
+* If you iterate multiple schema changes during feature development and want to organize them before applying, kyrage can squash migrations by `kyrage generate --squash`. See [Squash Migrations](#squash-migrations) for more detail.
 
 ### 4. Plan Changes
 
