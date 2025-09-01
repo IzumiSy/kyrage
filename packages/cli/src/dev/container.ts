@@ -227,6 +227,7 @@ export interface DevDatabaseStartOptions {
   applyMigrations?: boolean;
   config: ConfigValue;
   logger: Logger;
+  forceReuse?: boolean; // dev start コマンド用：設定に関係なくreuseを強制
 }
 
 export interface DevDatabaseStartResult {
@@ -241,7 +242,12 @@ export interface DevDatabaseStartResult {
 export async function startDevDatabase(
   options: DevDatabaseStartOptions
 ): Promise<DevDatabaseStartResult> {
-  const { config, logger, applyMigrations = true } = options;
+  const {
+    config,
+    logger,
+    applyMigrations = true,
+    forceReuse = false,
+  } = options;
   const { reporter } = logger;
 
   if (!config.dev) {
@@ -249,10 +255,23 @@ export async function startDevDatabase(
   }
 
   const dialect = config.database.dialect;
-  const devManager = createDevDatabaseManager(config.dev, dialect);
+
+  // forceReuseが有効な場合、一時的にreuse設定を上書き
+  let devConfig = config.dev;
+  if (forceReuse && "container" in config.dev) {
+    devConfig = {
+      ...config.dev,
+      container: {
+        ...config.dev.container,
+        reuse: true,
+      },
+    };
+  }
+
+  const devManager = createDevDatabaseManager(devConfig, dialect);
 
   // Check if reuse is enabled and container is already running
-  const isReuse = "container" in config.dev && config.dev.container.reuse;
+  const isReuse = "container" in devConfig && devConfig.container.reuse;
   if (isReuse && (await devManager.exists())) {
     reporter.info("🔄 Reusing existing dev database...");
   } else {

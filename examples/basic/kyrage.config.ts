@@ -9,7 +9,7 @@ export default defineConfig({
   dev: {
     container: {
       image: "postgres:16",
-      reuse: true,
+      // reuse: true,
     },
   },
   tables: [members, posts],
