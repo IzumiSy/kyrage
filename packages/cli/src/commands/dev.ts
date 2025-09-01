@@ -64,13 +64,7 @@ export async function executeDevStart(
     forceReuse: true, // dev start では常にreuseモードでコンテナを維持
   });
 
-  if (!options.noApply && result.appliedMigrations > 0) {
-    reporter.success(`${result.appliedMigrations} migrations applied`);
-  }
-
-  // 元の設定でのreuse判定（ユーザーの意図を保持）
   const isReuse = "container" in config.dev! && config.dev!.container.reuse;
-
   if (!isReuse) {
     // Foreground mode: set up cleanup handlers and keep process alive
     const cleanup = async () => {
@@ -98,7 +92,6 @@ export async function executeDevStart(
     reporter.success(
       `✨ ${options.noApply ? "Empty " : ""}dev database ready: ${result.connectionString}`
     );
-    reporter.info("🔄 Container will auto-cleanup on process exit");
     reporter.info("Press Ctrl+C to stop the database");
 
     // プロセスを維持するためのシンプルな方法
