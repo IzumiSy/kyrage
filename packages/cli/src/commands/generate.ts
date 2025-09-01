@@ -2,7 +2,7 @@ import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
 import { mkdir, writeFile, unlink } from "fs/promises";
 import { join } from "path";
-import { nullLogger, type Logger } from "../logger";
+import { type Logger } from "../logger";
 import {
   migrationDirName,
   getPendingMigrations,
@@ -13,7 +13,7 @@ import { diffSchema } from "../diff";
 import { Tables, Operation } from "../operation";
 import { getIntrospector } from "../introspection/introspector";
 import { getClient, type DBClient } from "../client";
-import { createDevDatabaseManager } from "../dev/container";
+import { startDevDatabase } from "../dev/container";
 import { type ConfigValue } from "../config/loader";
 
 export interface GenerateOptions {
@@ -145,7 +145,6 @@ const setupDatabaseClient = async (
   options: GenerateOptions
 ) => {
   const { client, logger, config } = dependencies;
-  const { reporter } = logger;
 
   if (!options.dev) {
     return {
@@ -160,55 +159,30 @@ const setupDatabaseClient = async (
     );
   }
 
-  // Create dev database manager
-  const dialect = config.database.dialect;
-  const devManager = createDevDatabaseManager(config.dev, dialect);
-
-  // Check if reuse is enabled and container is already running
-  const isReuse = "container" in config.dev && config.dev.container.reuse;
-  if (isReuse && (await devManager.exists())) {
-    reporter.info("🔄 Reusing existing dev database...");
-  } else {
-    reporter.info("🚀 Starting dev database for migration generation...");
-  }
-
-  await devManager.start();
-  reporter.success(`Dev database started: ${dialect}`);
-
-  const connectionString = devManager.getConnectionString();
-  if (!connectionString) {
-    throw new Error("Failed to get connection string for dev database");
-  }
-
-  // Create client for dev database
-  const devClient = getClient({
-    database: {
-      dialect,
-      connectionString,
-    },
+  // Use new startDevDatabase function
+  const result = await startDevDatabase({
+    config,
+    logger,
+    applyMigrations: true,
   });
 
-  // Apply baseline migrations to dev database
-  await executeApply(
-    {
-      client: devClient,
-      logger: nullLogger,
-      config,
-    },
-    {
-      plan: false,
-      pretty: false,
-    }
-  );
+  const isReuse = "container" in config.dev && config.dev.container.reuse;
 
   return {
-    client: devClient,
+    client: getClient({
+      database: {
+        dialect: config.database.dialect,
+        connectionString: result.connectionString,
+      },
+    }),
     cleanup: async () => {
       if (!isReuse) {
-        await devManager.stop();
-        reporter.success("Dev database stopped");
+        await result.manager.stop();
+        logger.reporter.success("Dev database stopped");
       } else {
-        reporter.success("✨ Persistent dev database ready: " + dialect);
+        logger.reporter.success(
+          "✨ Persistent dev database ready: " + config.database.dialect
+        );
       }
     },
   };

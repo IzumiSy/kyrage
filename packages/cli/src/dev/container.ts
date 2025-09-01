@@ -5,7 +5,15 @@ import {
   getContainerRuntimeClient,
   StartedTestContainer,
 } from "testcontainers";
-import { DevDatabaseValue, DialectEnum } from "../config/loader";
+import {
+  DevDatabaseValue,
+  DialectEnum,
+  type ConfigValue,
+} from "../config/loader";
+import { getClient } from "../client";
+import { executeApply } from "../commands/apply";
+import { getPendingMigrations } from "../migration";
+import { nullLogger, type Logger } from "../logger";
 
 type DevStatus =
   | {
@@ -214,3 +222,76 @@ export const createDevDatabaseManager = (
     throw new Error("Invalid dev database configuration");
   }
 };
+
+export interface DevDatabaseStartOptions {
+  applyMigrations?: boolean;
+  config: ConfigValue;
+  logger: Logger;
+}
+
+export interface DevDatabaseStartResult {
+  manager: DevDatabaseManager;
+  connectionString: string;
+  appliedMigrations: number;
+}
+
+/**
+ * Start development database and optionally apply migrations
+ */
+export async function startDevDatabase(
+  options: DevDatabaseStartOptions
+): Promise<DevDatabaseStartResult> {
+  const { config, logger, applyMigrations = true } = options;
+  const { reporter } = logger;
+
+  if (!config.dev) {
+    throw new Error("Dev database configuration is required");
+  }
+
+  const dialect = config.database.dialect;
+  const devManager = createDevDatabaseManager(config.dev, dialect);
+
+  // Check if reuse is enabled and container is already running
+  const isReuse = "container" in config.dev && config.dev.container.reuse;
+  if (isReuse && (await devManager.exists())) {
+    reporter.info("🔄 Reusing existing dev database...");
+  } else {
+    reporter.info("🚀 Starting dev database...");
+  }
+
+  await devManager.start();
+  reporter.success(`✔ Dev database started: ${dialect}`);
+
+  const connectionString = devManager.getConnectionString();
+  if (!connectionString) {
+    throw new Error("Failed to get connection string for dev database");
+  }
+
+  let appliedMigrations = 0;
+
+  if (applyMigrations) {
+    const devClient = getClient({
+      database: { dialect, connectionString },
+    });
+
+    const pendingMigrations = await getPendingMigrations(devClient);
+    if (pendingMigrations.length > 0) {
+      reporter.info(
+        `🔄 Applying ${pendingMigrations.length} pending migrations...`
+      );
+
+      await executeApply(
+        { client: devClient, logger: nullLogger, config },
+        { plan: false, pretty: false }
+      );
+
+      appliedMigrations = pendingMigrations.length;
+    }
+  }
+
+  return {
+    manager: devManager,
+    connectionString,
+    appliedMigrations,
+  };
+}

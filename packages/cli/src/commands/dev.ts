@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
-import { createDevDatabaseManager } from "../dev/container";
+import { createDevDatabaseManager, startDevDatabase } from "../dev/container";
 import type { DevDatabaseManager } from "../dev/container";
 
 export interface DevDependencies extends CommonDependencies {
@@ -48,6 +48,59 @@ export async function executeDevClean(dependencies: DevDependencies) {
 
   await manager.remove();
   logger.reporter.success("Cleaned up dev containers");
+}
+
+export async function executeDevStart(
+  dependencies: DevDependencies,
+  options: { noApply: boolean }
+) {
+  const { config, logger } = dependencies;
+  const { reporter } = logger;
+
+  try {
+    const result = await startDevDatabase({
+      config,
+      logger,
+      applyMigrations: !options.noApply,
+    });
+
+    if (!options.noApply && result.appliedMigrations > 0) {
+      reporter.success(`✔ ${result.appliedMigrations} migrations applied`);
+    }
+
+    // Check if reuse is enabled to determine foreground/background behavior
+    const isReuse = "container" in config.dev! && config.dev!.container.reuse;
+
+    if (!isReuse) {
+      // Foreground mode: set up cleanup handlers and keep process alive
+      const cleanup = async () => {
+        reporter.info("🧹 Cleaning up temporary dev database...");
+        await result.manager.stop();
+        reporter.success("✔ Dev database stopped");
+        process.exit(0);
+      };
+
+      process.on("SIGINT", cleanup);
+      process.on("SIGTERM", cleanup);
+
+      reporter.success(
+        `✨ ${options.noApply ? "Empty " : ""}dev database ready: ${result.connectionString}`
+      );
+      reporter.info("🔄 Container will auto-cleanup on process exit");
+      reporter.info("Press Ctrl+C to stop the database");
+
+      // Keep process alive
+      await new Promise<never>(() => {});
+    } else {
+      // Background mode: command exits immediately
+      reporter.success(
+        `✨ ${options.noApply ? "Empty " : ""}dev database ready: ${result.connectionString}`
+      );
+    }
+  } catch (error) {
+    reporter.error("Failed to start dev database");
+    throw error;
+  }
 }
 
 // dev専用の依存関係作成関数
@@ -120,12 +173,39 @@ const devCleanCmd = defineCommand({
   },
 });
 
+const devStartCmd = defineCommand({
+  meta: {
+    name: "start",
+    description: "Start development database with migrations applied",
+  },
+  args: {
+    "no-apply": {
+      type: "boolean",
+      description: "Skip migration application (start empty database)",
+      default: false,
+    },
+  },
+  run: async (ctx) => {
+    try {
+      const dependencies = await createDevDependencies();
+      await executeDevStart(dependencies, {
+        noApply: ctx.args["no-apply"],
+      });
+    } catch (error) {
+      const { defaultConsolaLogger } = await import("../logger");
+      defaultConsolaLogger.reporter.error(error as Error);
+      process.exit(1);
+    }
+  },
+});
+
 export const devCmd = defineCommand({
   meta: {
     name: "dev",
     description: "Manage development database containers",
   },
   subCommands: {
+    start: devStartCmd,
     status: devStatusCmd,
     "get-url": devGetUrlCmd,
     clean: devCleanCmd,
