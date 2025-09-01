@@ -160,24 +160,25 @@ const setupDatabaseClient = async (
   }
 
   // Use new startDevDatabase function
-  const result = await startDevDatabase({
+  const manager = await startDevDatabase({
     config,
     logger,
     applyMigrations: true,
   });
 
   const isReuse = "container" in config.dev && config.dev.container.reuse;
+  const connectionString = manager.getConnectionString();
 
   return {
     client: getClient({
       database: {
         dialect: config.database.dialect,
-        connectionString: result.connectionString,
+        connectionString,
       },
     }),
     cleanup: async () => {
       if (!isReuse) {
-        await result.manager.stop();
+        await manager.stop();
         logger.reporter.success("Dev database stopped");
       } else {
         logger.reporter.success(

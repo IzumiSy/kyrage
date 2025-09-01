@@ -30,7 +30,7 @@ export type DevDatabaseManager = {
   stop: () => Promise<void>;
   remove: () => Promise<void>;
   exists: () => Promise<boolean>;
-  getConnectionString: () => string | null;
+  getConnectionString: () => string;
   getStatus: () => Promise<DevStatus | null>;
 };
 
@@ -123,10 +123,10 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   }
 
   getConnectionString() {
-    if (this.startedContainer) {
-      return this.startedContainer.getConnectionUri();
+    if (!this.startedContainer) {
+      throw new Error("Container is not started or unavailable");
     }
-    return null;
+    return this.startedContainer.getConnectionUri();
   }
 
   async stop() {
@@ -237,18 +237,10 @@ export interface DevDatabaseStartOptions {
   forceReuse?: boolean; // dev start コマンド用：設定に関係なくreuseを強制
 }
 
-export interface DevDatabaseStartResult {
-  manager: DevDatabaseManager;
-  connectionString: string;
-  appliedMigrations: number;
-}
-
 /**
  * Start development database and optionally apply migrations
  */
-export async function startDevDatabase(
-  options: DevDatabaseStartOptions
-): Promise<DevDatabaseStartResult> {
+export async function startDevDatabase(options: DevDatabaseStartOptions) {
   const {
     config,
     logger,
@@ -281,8 +273,6 @@ export async function startDevDatabase(
     throw new Error("Failed to get connection string for dev database");
   }
 
-  let appliedMigrations = 0;
-
   if (applyMigrations) {
     const devClient = getClient({
       database: { dialect, connectionString },
@@ -298,14 +288,8 @@ export async function startDevDatabase(
         { client: devClient, logger: nullLogger, config },
         { plan: false, pretty: false }
       );
-
-      appliedMigrations = pendingMigrations.length;
     }
   }
 
-  return {
-    manager: devManager,
-    connectionString,
-    appliedMigrations,
-  };
+  return devManager;
 }

@@ -31,7 +31,7 @@ describe("DevDatabaseManager", () => {
 
     await manager.stop();
 
-    expect(manager.getConnectionString()).toBeNull();
+    expect(manager.getConnectionString()).toThrowError();
     expect(await findAllKyrageManagedContainerIDs()).toEqual([]);
   });
 });

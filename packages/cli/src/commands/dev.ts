@@ -29,13 +29,7 @@ export async function executeDevGetUrl(dependencies: DevDependencies) {
 
   // TestContainersのreuseによって既存コンテナに自動接続
   await manager.start();
-  const connectionString = manager.getConnectionString();
-
-  if (connectionString) {
-    console.log(connectionString);
-  } else {
-    throw new Error("Failed to get connection string");
-  }
+  console.log(manager.getConnectionString());
 }
 
 export async function executeDevClean(dependencies: DevDependencies) {
@@ -57,12 +51,13 @@ export async function executeDevStart(
   const { config, logger } = dependencies;
   const { reporter } = logger;
 
-  const result = await startDevDatabase({
+  const manager = await startDevDatabase({
     config,
     logger,
     applyMigrations: !options.noApply,
     forceReuse: true, // dev start では常にreuseモードでコンテナを維持
   });
+  const connectionString = manager.getConnectionString();
 
   const isReuse = "container" in config.dev! && config.dev!.container.reuse;
   if (!isReuse) {
@@ -71,11 +66,11 @@ export async function executeDevStart(
       try {
         reporter.info("🧹 Cleaning up temporary dev database...");
 
-        const exists = await result.manager.exists();
+        const exists = await manager.exists();
         if (!exists) {
           reporter.info("Dev database already stopped by some reason");
         } else {
-          await result.manager.stop();
+          await manager.stop();
           reporter.success("Dev database stopped");
         }
       } catch (error) {
@@ -90,7 +85,7 @@ export async function executeDevStart(
     process.on("SIGTERM", cleanup);
 
     reporter.success(
-      `✨ ${options.noApply ? "Empty " : ""}dev database ready: ${result.connectionString}`
+      `✨ ${options.noApply ? "Empty " : ""}dev database ready: ${connectionString}`
     );
     reporter.info("Press Ctrl+C to stop the database");
 
@@ -99,7 +94,7 @@ export async function executeDevStart(
   } else {
     // Background mode: command exits immediately
     reporter.success(
-      `✨ ${options.noApply ? "Empty " : ""}dev database ready: ${result.connectionString}`
+      `✨ ${options.noApply ? "Empty " : ""}dev database ready: ${connectionString}`
     );
   }
 }
