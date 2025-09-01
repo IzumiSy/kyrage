@@ -260,7 +260,7 @@ export async function startDevDatabase(
   }
 
   await devManager.start();
-  reporter.success(`✔ Dev database started: ${dialect}`);
+  reporter.success(`Dev database started: ${dialect}`);
 
   const connectionString = devManager.getConnectionString();
   if (!connectionString) {

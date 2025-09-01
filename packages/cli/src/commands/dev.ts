@@ -65,7 +65,7 @@ export async function executeDevStart(
     });
 
     if (!options.noApply && result.appliedMigrations > 0) {
-      reporter.success(`✔ ${result.appliedMigrations} migrations applied`);
+      reporter.success(`${result.appliedMigrations} migrations applied`);
     }
 
     // Check if reuse is enabled to determine foreground/background behavior
@@ -76,7 +76,7 @@ export async function executeDevStart(
       const cleanup = async () => {
         reporter.info("🧹 Cleaning up temporary dev database...");
         await result.manager.stop();
-        reporter.success("✔ Dev database stopped");
+        reporter.success("Dev database stopped");
         process.exit(0);
       };
 
