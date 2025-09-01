@@ -28,7 +28,7 @@ export async function executeGenerate(
   dependencies: CommonDependencies,
   options: GenerateOptions
 ) {
-  const { client, logger, config } = dependencies;
+  const { logger, config } = dependencies;
   const { reporter } = logger;
 
   // Handle squash mode - do squash-specific work then continue with normal flow
@@ -44,18 +44,26 @@ export async function executeGenerate(
   );
 
   try {
-    // Always check against production for pending migrations if not in dev mode
-    if (!options.dev && !options.ignorePending) {
-      const pm = await getPendingMigrations(client);
+    // Check for pending migrations against the target database
+    if (!options.ignorePending) {
+      const pm = await getPendingMigrations(targetClient);
       if (pm.length > 0) {
-        reporter.warn(
-          [
-            `There are pending migrations: ${pm.map((m) => m.id).join(", ")}`,
-            "Please apply them first before generating a new migration.",
-            "Otherwise, use --ignore-pending to skip this check.",
-          ].join("\n")
-        );
-        return;
+        if (options.dev) {
+          // In dev mode, show info but continue processing since migrations will be auto-applied
+          reporter.info(
+            `Dev database has ${pm.length} pending migrations. These will be applied automatically as baseline.`
+          );
+        } else {
+          // In production mode, warn and stop processing
+          reporter.warn(
+            [
+              `There are pending migrations: ${pm.map((m) => m.id).join(", ")}`,
+              "Please apply them first before generating a new migration.",
+              "Otherwise, use --ignore-pending to skip this check.",
+            ].join("\n")
+          );
+          return;
+        }
       }
     }
 
