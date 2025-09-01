@@ -307,6 +307,30 @@ $ ls migrations/
 
 This consolidates multiple pending migrations into a single migration representing the final desired state. Applied migrations are never touched.
 
+### Typical Development Workflow
+
+A common pattern is to use dev databases for iterative development, then squash migrations before deploying to staging/production:
+
+```bash
+# Development phase - multiple iterations with dev database
+$ kyrage generate --dev --apply  # 1st iteration - adds users table
+$ kyrage generate --dev --apply  # 2nd iteration - adds posts table
+$ kyrage generate --dev --apply  # 3rd iteration - adds indexes
+
+# Development complete - consolidate pending migrations
+$ kyrage generate --squash  # Squash all pending migrations into one
+
+# Deploy to staging/production
+$ kyrage apply  # Apply the single squashed migration
+```
+
+In this workflow:
+- **Dev database** acts like a feature branch - rapid iteration with immediate application
+- **Squashing** consolidates the development history into a clean, single migration
+- **Production deployment** applies one cohesive migration instead of multiple incremental changes
+
+This approach keeps your production migration history clean while allowing flexible development iterations.
+
 ## 📚 API Reference
 
 ### Commands
