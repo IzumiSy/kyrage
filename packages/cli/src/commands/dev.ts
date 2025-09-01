@@ -57,62 +57,57 @@ export async function executeDevStart(
   const { config, logger } = dependencies;
   const { reporter } = logger;
 
-  try {
-    const result = await startDevDatabase({
-      config,
-      logger,
-      applyMigrations: !options.noApply,
-      forceReuse: true, // dev start では常にreuseモードでコンテナを維持
-    });
+  const result = await startDevDatabase({
+    config,
+    logger,
+    applyMigrations: !options.noApply,
+    forceReuse: true, // dev start では常にreuseモードでコンテナを維持
+  });
 
-    if (!options.noApply && result.appliedMigrations > 0) {
-      reporter.success(`${result.appliedMigrations} migrations applied`);
-    }
+  if (!options.noApply && result.appliedMigrations > 0) {
+    reporter.success(`${result.appliedMigrations} migrations applied`);
+  }
 
-    // 元の設定でのreuse判定（ユーザーの意図を保持）
-    const isReuse = "container" in config.dev! && config.dev!.container.reuse;
+  // 元の設定でのreuse判定（ユーザーの意図を保持）
+  const isReuse = "container" in config.dev! && config.dev!.container.reuse;
 
-    if (!isReuse) {
-      // Foreground mode: set up cleanup handlers and keep process alive
-      const cleanup = async () => {
-        try {
-          reporter.info("🧹 Cleaning up temporary dev database...");
+  if (!isReuse) {
+    // Foreground mode: set up cleanup handlers and keep process alive
+    const cleanup = async () => {
+      try {
+        reporter.info("🧹 Cleaning up temporary dev database...");
 
-          const exists = await result.manager.exists();
-          if (!exists) {
-            reporter.info("Dev database already stopped by some reason");
-          } else {
-            await result.manager.stop();
-            reporter.success("Dev database stopped");
-          }
-        } catch (error) {
-          reporter.error(`Failed to stop database: ${error}`);
-        } finally {
-          process.exit(0);
+        const exists = await result.manager.exists();
+        if (!exists) {
+          reporter.info("Dev database already stopped by some reason");
+        } else {
+          await result.manager.stop();
+          reporter.success("Dev database stopped");
         }
-      };
+      } catch (error) {
+        reporter.error(`Failed to stop database: ${error}`);
+      } finally {
+        process.exit(0);
+      }
+    };
 
-      // シグナルハンドラーを設定
-      process.on("SIGINT", cleanup);
-      process.on("SIGTERM", cleanup);
+    // シグナルハンドラーを設定
+    process.on("SIGINT", cleanup);
+    process.on("SIGTERM", cleanup);
 
-      reporter.success(
-        `✨ ${options.noApply ? "Empty " : ""}dev database ready: ${result.connectionString}`
-      );
-      reporter.info("🔄 Container will auto-cleanup on process exit");
-      reporter.info("Press Ctrl+C to stop the database");
+    reporter.success(
+      `✨ ${options.noApply ? "Empty " : ""}dev database ready: ${result.connectionString}`
+    );
+    reporter.info("🔄 Container will auto-cleanup on process exit");
+    reporter.info("Press Ctrl+C to stop the database");
 
-      // プロセスを維持するためのシンプルな方法
-      setInterval(() => {}, 1 << 30);
-    } else {
-      // Background mode: command exits immediately
-      reporter.success(
-        `✨ ${options.noApply ? "Empty " : ""}dev database ready: ${result.connectionString}`
-      );
-    }
-  } catch (error) {
-    reporter.error("Failed to start dev database");
-    throw error;
+    // プロセスを維持するためのシンプルな方法
+    setInterval(() => {}, 1 << 30);
+  } else {
+    // Background mode: command exits immediately
+    reporter.success(
+      `✨ ${options.noApply ? "Empty " : ""}dev database ready: ${result.connectionString}`
+    );
   }
 }
 
