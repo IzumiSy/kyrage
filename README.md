@@ -209,7 +209,7 @@ This is useful when you want to generate migrations without affecting your produ
 
 #### Container Reuse Feature
 
-You can enable container reuse to maintain persistent development databases across multiple operations:
+kyrage automatically detects and reuses development database containers based on their runtime state, eliminating the need for configuration flags:
 
 ```typescript
 // kyrage.config.ts
@@ -217,30 +217,37 @@ export default defineConfig({
   dev: {
     container: {
       image: "postgres:17",
-      reuse: true,           // Enable container reuse
-      name: "kyrage-dev-db"  // Container name (optional)
+      name: "kyrage-dev-db"  // Optional custom container name
     }
   },
   // ... other config
 });
 ```
 
-With container reuse enabled:
+**Smart Container Detection:**
 
 ```bash
-# First run - starts new container
+# Without dev start container running
 $ kyrage generate --dev
-🚀 Starting dev database for migration generation...
-✔ Dev database started: postgres
+🚀 Starting temporary dev database...
+🔄 Applying 2 pending migrations...
+✔ Applied 2 migrations
 ✔ Migration file generated: migrations/1755525514175.json
-✨ Persistent dev database ready: postgres
+✔ Temporary dev database stopped
 
-# Subsequent runs - reuses existing container
+# After starting dev database
+$ kyrage dev start
+🚀 Starting dev database...
+✔ Applied 2 migrations  
+✨ Dev database ready: postgresql://postgres:password@localhost:32768/test
+
+# Subsequent generate --dev automatically reuses dev start container
 $ kyrage generate --dev  
-🔄 Reusing existing dev database...
-✔ Dev database started: postgres
+🔄 Reusing existing dev start container...
+🔄 Applying 1 pending migration to dev start container...
+✔ Applied 1 migration
 ✔ Migration file generated: migrations/1755525514176.json
-✨ Persistent dev database ready: postgres
+✨ Dev start container remains running
 ```
 
 This feature is expected to be used in steamlined development cycle to make multiple schema changes with the populated data on your database kept, which will help debug or test your latest schema with the developing app that uses the database.
@@ -250,6 +257,12 @@ This feature is expected to be used in steamlined development cycle to make mult
 kyrage also provides handy commands to manage your development database containers without Docker CLI:
 
 ```bash
+# Start persistent dev database with migrations applied
+$ kyrage dev start
+🚀 Starting dev database...
+✔ Applied 2 migrations
+✨ Dev database ready: postgresql://postgres:password@localhost:32768/test
+
 # Check status of dev containers
 $ kyrage dev status
 Running: abc123def456 (postgres:17)
@@ -340,8 +353,9 @@ This approach keeps your production migration history clean while allowing flexi
 |---------|-------------|
 | `kyrage generate` | Compare schema with database and generate migration file |
 | `kyrage generate --squash` | Consolidate pending migrations into a single migration file |
-| `kyrage generate --dev` | Generate migration using ephemeral dev database |
+| `kyrage generate --dev` | Generate migration using development database (auto-detects container reuse) |
 | `kyrage apply` | Apply all pending migrations to the database |
+| `kyrage dev start` | Start persistent development database with migrations applied |
 | `kyrage dev status` | Show status of running development database containers |
 | `kyrage dev get-url` | Print connection URL for running development database (use with `psql $(kyrage dev get-url)`) |
 | `kyrage dev clean` | Remove all kyrage-managed development database containers |
@@ -365,7 +379,6 @@ export default defineConfig({
     // Option 1: Use Docker container (requires Docker)
     container: {
       image: "postgres:17",
-      reuse: true,           // Enable container reuse for persistent dev databases
       name: "kyrage-dev-db"  // Optional custom container name
     },
     // Option 2: Use existing database connection
