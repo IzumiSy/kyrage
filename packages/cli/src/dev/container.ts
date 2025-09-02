@@ -229,7 +229,7 @@ export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
 export const createContainerManager = (
   devConfig: NonNullable<DevDatabaseValue>,
   dialect: DialectEnum,
-  manageType: "dev-start" | "one-off" = "dev-start"
+  manageType: "dev-start" | "one-off"
 ) => {
   if ("connectionString" in devConfig) {
     return new ConnectionStringDevDatabaseManager(devConfig.connectionString);

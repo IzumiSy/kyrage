@@ -27,7 +27,7 @@ export type StartDevDatabaseOptions = {
 );
 
 /**
- * モードに応じて適切なコンテナマネージャーを作成し、初期化メッセージを表示
+ * Prepare development database manager
  */
 async function prepareDevManager(
   dependencies: CommonDependencies,
@@ -37,6 +37,7 @@ async function prepareDevManager(
   const dialect = config.database.dialect;
 
   switch (options.mode) {
+    // Always reuse existing dev database container
     case "dev-start": {
       const containerType = "dev-start" as const;
       const manager = createContainerManager(
@@ -52,18 +53,18 @@ async function prepareDevManager(
       };
     }
 
+    // Generate a new dev database container if needed, but reuse existing one if available
     case "generate-dev": {
       const hasDevStart = await hasRunningDevStartContainer(dialect);
       const containerType = hasDevStart
         ? ("dev-start" as const)
         : ("one-off" as const);
-      const manager = createContainerManager(
-        config.dev!,
-        dialect,
-        containerType
-      );
 
-      return { manager, containerType, result: { reused: hasDevStart } };
+      return {
+        manager: createContainerManager(config.dev!, dialect, containerType),
+        containerType,
+        result: { reused: hasDevStart },
+      };
     }
   }
 }
@@ -125,7 +126,7 @@ export async function startDevDatabase(
       }
     );
 
-    reporter.success(`✔ Applied ${pendingMigrations.length} migrations`);
+    reporter.success(`Applied ${pendingMigrations.length} migrations`);
   } else {
     reporter.info("No pending migrations found");
   }
@@ -135,15 +136,15 @@ export async function startDevDatabase(
     switch (options.mode) {
       case "dev-start":
         reporter.success(
-          "✨ Persistent dev database ready: " + config.database.dialect
+          "Persistent dev database ready: " + config.database.dialect
         );
         break;
       case "generate-dev":
         if (containerType === "dev-start") {
-          reporter.info("✨ Dev start container remains running");
+          reporter.info("Dev start container remains running");
         } else {
           await devManager.stop();
-          reporter.success("✔ Temporary dev database stopped");
+          reporter.success("Temporary dev database stopped");
         }
         break;
     }
