@@ -29,13 +29,7 @@ export async function executeDevGetUrl(dependencies: DevDependencies) {
 
   // TestContainersのreuseによって既存コンテナに自動接続
   await manager.start();
-  const connectionString = manager.getConnectionString();
-
-  if (connectionString) {
-    console.log(connectionString);
-  } else {
-    throw new Error("Failed to get connection string");
-  }
+  console.log(manager.getConnectionString());
 }
 
 export async function executeDevClean(dependencies: DevDependencies) {

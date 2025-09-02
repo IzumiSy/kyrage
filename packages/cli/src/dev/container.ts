@@ -22,7 +22,7 @@ export type DevDatabaseManager = {
   stop: () => Promise<void>;
   remove: () => Promise<void>;
   exists: () => Promise<boolean>;
-  getConnectionString: () => string | null;
+  getConnectionString: () => string;
   getStatus: () => Promise<DevStatus | null>;
 };
 
@@ -63,6 +63,10 @@ export const removeContainersByIDs = async (ids: ReadonlyArray<string>) => {
     ids.map(async (id) => runtime.container.getById(id).remove({ force: true }))
   );
 };
+
+export const CannotGetConnectionStringError = new Error(
+  "Dev database is not started or unavailable"
+);
 
 export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   implements DevDatabaseManager
@@ -109,10 +113,10 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   }
 
   getConnectionString() {
-    if (this.startedContainer) {
-      return this.startedContainer.getConnectionUri();
+    if (!this.startedContainer) {
+      throw CannotGetConnectionStringError;
     }
-    return null;
+    return this.startedContainer.getConnectionUri();
   }
 
   async stop() {
