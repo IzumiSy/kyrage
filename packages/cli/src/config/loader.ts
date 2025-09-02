@@ -42,7 +42,7 @@ const devDatabaseSchema = z
     z.object({
       container: z.object({
         image: z.string(),
-        reuse: z.boolean().optional(),
+        keepAlive: z.boolean().optional(),
         name: z.string().optional(),
       }),
     }),

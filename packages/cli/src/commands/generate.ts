@@ -165,8 +165,9 @@ const setupDatabaseClient = async (
   const devManager = createDevDatabaseManager(config.dev, dialect);
 
   // Check if reuse is enabled and container is already running
-  const isReuse = "container" in config.dev && config.dev.container.reuse;
-  if (isReuse && (await devManager.exists())) {
+  const isKeepAlive =
+    "container" in config.dev && config.dev.container.keepAlive;
+  if (isKeepAlive && (await devManager.exists())) {
     reporter.info("🔄 Reusing existing dev database...");
   } else {
     reporter.info("🚀 Starting dev database for migration generation...");
@@ -204,7 +205,7 @@ const setupDatabaseClient = async (
   return {
     client: devClient,
     cleanup: async () => {
-      if (!isReuse) {
+      if (!isKeepAlive) {
         await devManager.stop();
         reporter.success("Dev database stopped");
       } else {

@@ -85,7 +85,7 @@ describe("generate with dev database", () => {
       dev: {
         container: {
           image: "postgres:16",
-          reuse: true,
+          keepAlive: true,
         },
       },
     };
