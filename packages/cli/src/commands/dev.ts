@@ -1,6 +1,10 @@
 import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
 import { createDevDatabaseManager } from "../dev/container";
+import {
+  startDevDatabase,
+  validateDevStartRequirements,
+} from "../dev/database";
 import type { DevDatabaseManager } from "../dev/container";
 
 export interface DevDependencies extends CommonDependencies {
@@ -44,6 +48,27 @@ export async function executeDevClean(dependencies: DevDependencies) {
   logger.reporter.success("Cleaned up dev containers");
 }
 
+/**
+ * Execute dev start command
+ */
+export async function executeDevStart(dependencies: CommonDependencies) {
+  const { config, logger } = dependencies;
+  const { reporter } = logger;
+
+  // バリデーション
+  validateDevStartRequirements(config);
+
+  // データベース起動とマイグレーション適用
+  const { manager, cleanup } = await startDevDatabase(dependencies, {
+    logger,
+  });
+
+  // 接続情報表示
+  reporter.success(`✨ Dev database ready: ${manager.getConnectionString()}`);
+
+  return { manager, cleanup };
+}
+
 // dev専用の依存関係作成関数
 async function createDevDependencies() {
   const commonDeps = await createCommonDependencies();
@@ -62,6 +87,23 @@ async function createDevDependencies() {
     manager,
   };
 }
+
+const devStartCmd = defineCommand({
+  meta: {
+    name: "start",
+    description: "Start development database with migrations applied",
+  },
+  run: async () => {
+    try {
+      const dependencies = await createCommonDependencies();
+      await executeDevStart(dependencies);
+    } catch (error) {
+      const { defaultConsolaLogger } = await import("../logger");
+      defaultConsolaLogger.reporter.error(error as Error);
+      process.exit(1);
+    }
+  },
+});
 
 const devStatusCmd = defineCommand({
   meta: {
@@ -120,6 +162,7 @@ export const devCmd = defineCommand({
     description: "Manage development database containers",
   },
   subCommands: {
+    start: devStartCmd,
     status: devStatusCmd,
     "get-url": devGetUrlCmd,
     clean: devCleanCmd,

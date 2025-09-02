@@ -2,18 +2,17 @@ import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
 import { mkdir, writeFile, unlink } from "fs/promises";
 import { join } from "path";
-import { nullLogger, type Logger } from "../logger";
+import { type Logger } from "../logger";
 import {
   migrationDirName,
   getPendingMigrations,
   SchemaDiff,
 } from "../migration";
-import { executeApply } from "./apply";
 import { diffSchema } from "../diff";
 import { Tables, Operation } from "../operation";
 import { getIntrospector } from "../introspection/introspector";
-import { getClient, type DBClient } from "../client";
-import { createDevDatabaseManager } from "../dev/container";
+import { type DBClient } from "../client";
+import { startDevDatabase } from "../dev/database";
 import { type ConfigValue } from "../config/loader";
 
 export interface GenerateOptions {
@@ -129,8 +128,7 @@ const setupDatabaseClient = async (
   dependencies: CommonDependencies,
   options: GenerateOptions
 ) => {
-  const { client, logger, config } = dependencies;
-  const { reporter } = logger;
+  const { client } = dependencies;
 
   if (!options.dev) {
     return {
@@ -139,60 +137,12 @@ const setupDatabaseClient = async (
     };
   }
 
-  if (!config.dev) {
-    throw new Error(
-      "Dev database configuration is required when using --dev flag"
-    );
-  }
-
-  // Create dev database manager
-  const dialect = config.database.dialect;
-  const devManager = createDevDatabaseManager(config.dev, dialect);
-
-  // Check if reuse is enabled and container is already running
-  const isKeepAlive =
-    "container" in config.dev && config.dev.container.keepAlive;
-  if (isKeepAlive && (await devManager.exists())) {
-    reporter.info("🔄 Reusing existing dev database...");
-  } else {
-    reporter.info("🚀 Starting dev database for migration generation...");
-  }
-
-  await devManager.start();
-  reporter.success(`Dev database started: ${dialect}`);
-
-  // Create client for dev database
-  const devClient = getClient({
-    database: {
-      dialect,
-      connectionString: devManager.getConnectionString(),
-    },
+  // 新しい共通関数を使用
+  const { client: devClient, cleanup } = await startDevDatabase(dependencies, {
+    logger: dependencies.logger,
   });
 
-  // Apply baseline migrations to dev database
-  await executeApply(
-    {
-      client: devClient,
-      logger: nullLogger,
-      config,
-    },
-    {
-      plan: false,
-      pretty: false,
-    }
-  );
-
-  return {
-    client: devClient,
-    cleanup: async () => {
-      if (!isKeepAlive) {
-        await devManager.stop();
-        reporter.success("Dev database stopped");
-      } else {
-        reporter.success("✨ Persistent dev database ready: " + dialect);
-      }
-    },
-  };
+  return { client: devClient, cleanup };
 };
 
 const generateMigrationFromIntrospection = async (props: {
