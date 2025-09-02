@@ -60,8 +60,6 @@ export async function executeDevStart(dependencies: CommonDependencies) {
 
   // 接続情報表示
   reporter.success(`✨ Dev database ready: ${manager.getConnectionString()}`);
-
-  return { manager };
 }
 
 // dev専用の依存関係作成関数
