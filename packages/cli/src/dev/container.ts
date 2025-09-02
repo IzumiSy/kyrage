@@ -41,9 +41,9 @@ export type StartableContainer = Omit<GenericContainer, "start"> & {
   start: () => Promise<ConnectableStartedContainer>;
 };
 
-const DialectKey = "kyrage.dialect";
-const ManagedKey = "kyrage.managed";
-const DevStartKey = "kyrage.managed-by";
+export const DialectKey = "kyrage.dialect";
+export const ManagedKey = "kyrage.managed";
+export const DevStartKey = "kyrage.managed-by";
 
 /**
  * dev start コンテナが実行中かどうかを確認する
@@ -79,18 +79,6 @@ export const removeAllKyrageManagedContainers = async () => {
       runtime.container.getById(id).remove({ force: true })
     )
   );
-};
-
-/**
- * 全てのkyrage管理コンテナのIDを取得する（テスト用）
- */
-export const findAllKyrageManagedContainerIDs = async () => {
-  const runtime = await getContainerRuntimeClient();
-  const allContainers = await runtime.container.list();
-
-  return allContainers
-    .filter((container) => container.Labels[ManagedKey] === "true")
-    .map((container) => container.Id);
 };
 
 export const CannotGetConnectionStringError = new Error(

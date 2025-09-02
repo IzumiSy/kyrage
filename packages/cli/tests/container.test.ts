@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   CannotGetConnectionStringError,
-  findAllKyrageManagedContainerIDs,
   PostgreSqlDevDatabaseManager,
 } from "../src/dev/container";
+import { findAllKyrageManagedContainerIDs } from "./helper";
 
 describe("DevDatabaseManager", () => {
   const expected = {

@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { defineConfigForTest, setupTestDB } from "./helper";
+import {
+  defineConfigForTest,
+  findAllKyrageManagedContainerIDs,
+  setupTestDB,
+} from "./helper";
 import { defineTable, column } from "../src/config/builder";
 import { executeGenerate } from "../src/commands/generate";
 import { executeDevStart } from "../src/commands/dev";
 import { defaultConsolaLogger } from "../src/logger";
 import { readdir } from "fs/promises";
-import {
-  findAllKyrageManagedContainerIDs,
-  removeAllKyrageManagedContainers,
-} from "../src/dev/container";
+import { removeAllKyrageManagedContainers } from "../src/dev/container";
 import { vol } from "memfs";
 
 vi.mock("fs/promises", async () => {
