@@ -29,7 +29,7 @@ export type DevDatabaseManager = {
 export interface ContainerOptions {
   image: string;
   dialect: DialectEnum;
-  reuse?: boolean;
+  keepAlive?: boolean;
   containerName?: string;
 }
 
@@ -80,7 +80,7 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
       [ManagedKey]: "true",
     });
 
-    if (this.options.reuse) {
+    if (this.options.keepAlive) {
       container.withReuse();
     }
     if (this.options.containerName) {
@@ -198,7 +198,7 @@ export const createDevDatabaseManager = (
     const containerOptions = {
       dialect,
       image: devConfig.container.image,
-      reuse: devConfig.container.reuse || false,
+      keepAlive: devConfig.container.keepAlive || false,
       containerName: devConfig.container.name,
     };
 
