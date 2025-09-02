@@ -1,5 +1,36 @@
 # @izumisy/kyrage
 
+## 1.2.0
+
+### Minor Changes
+
+- [#62](https://github.com/IzumiSy/kyrage/pull/62) [`ce5a307`](https://github.com/IzumiSy/kyrage/commit/ce5a3075633f9e1709bffa86e43d55e28efda8fe) Thanks [@copilot-swe-agent](https://github.com/apps/copilot-swe-agent)! - Add migration squashing feature #49
+
+- [#76](https://github.com/IzumiSy/kyrage/pull/76) [`c125b88`](https://github.com/IzumiSy/kyrage/commit/c125b8809fc433cc27f64db7d2e447c4d3ac241c) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Drop `--apply` option from generate command
+
+- [#77](https://github.com/IzumiSy/kyrage/pull/77) [`ecb519a`](https://github.com/IzumiSy/kyrage/commit/ecb519ae1eed5449ff0f69ebca65477b4d646ced) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Replace configuration-based container reuse with smart runtime detection. The `generate --dev` command now automatically detects and reuses containers started by `dev start`, falling back to one-off containers when none are running.
+
+  **New behavior:**
+
+  - Removed `reuse: true` configuration option from dev container config
+  - Added `kyrage dev start` command to start persistent containers with migration baseline
+  - `kyrage generate --dev` automatically detects running dev-start containers
+  - Smart fallback to temporary one-off containers when dev-start not available
+
+  **Example workflow:**
+
+  ```bash
+  # Start persistent dev container
+  kyrage dev start
+
+  # Generate migrations - automatically reuses dev container. Without dev start, creates temporary container
+  kyrage generate --dev
+  ```
+
+### Patch Changes
+
+- [#69](https://github.com/IzumiSy/kyrage/pull/69) [`465d7c2`](https://github.com/IzumiSy/kyrage/commit/465d7c2a7b8802ac22035aaf63bd167259c9778a) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Allow pending migrations in dev mode for consistent migration generation. When using `--dev` flag, pending migrations are now ignored and automatically applied as baseline, ensuring dev database consistency with production behavior.
+
 ## 1.1.0
 
 ### Minor Changes
