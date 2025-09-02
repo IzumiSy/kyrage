@@ -202,6 +202,7 @@ $ kyrage generate --dev
    -> column: id ({"type":"uuid","primaryKey":true,"notNull":true})
    -> column: email ({"type":"text","notNull":true,"unique":true})
 ✔ Migration file generated: migrations/1755525514175.json
+✔ Migration applied: 1755525514175
 ✔ Dev database stopped
 ```
 
@@ -231,6 +232,7 @@ $ kyrage generate --dev
 🔄 Applying 2 pending migrations...
 ✔ Applied 2 migrations
 ✔ Migration file generated: migrations/1755525514175.json
+✔ Migration applied: 1755525514175
 ✔ Temporary dev database stopped
 
 # After starting dev database
@@ -245,6 +247,7 @@ $ kyrage generate --dev
 🔄 Applying 1 pending migration to dev start container...
 ✔ Applied 1 migration
 ✔ Migration file generated: migrations/1755525514176.json
+✔ Migration applied: 1755525514176
 ✨ Dev start container remains running
 ```
 
