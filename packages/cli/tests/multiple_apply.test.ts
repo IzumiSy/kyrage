@@ -3,6 +3,7 @@ import { defineTable, column } from "../src";
 import { setupTestDB, defineConfigForTest } from "./helper";
 import { executeGenerate } from "../src/commands/generate";
 import { defaultConsolaLogger } from "../src/logger";
+import { executeApply } from "../src/commands/apply";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");
@@ -23,20 +24,20 @@ const config = defineConfigForTest({
 describe("apply migrations in multiple times", () => {
   it("should update DB in multiple times by the schema in config", async () => {
     await using db = client.getDB();
+    const deps = {
+      client,
+      logger: defaultConsolaLogger,
+      config,
+    };
 
-    await executeGenerate(
-      {
-        client,
-        logger: defaultConsolaLogger,
-        config,
-      },
-      {
-        ignorePending: false,
-        apply: true,
-        plan: false,
-        dev: false,
-      }
-    );
+    await executeGenerate(deps, {
+      ignorePending: false,
+      dev: false,
+    });
+    await executeApply(deps, {
+      plan: false,
+      pretty: false,
+    });
 
     const tables = await db.introspection.getTables();
     expect(tables).toHaveLength(1);
@@ -52,20 +53,19 @@ describe("apply migrations in multiple times", () => {
         }),
       ],
     });
+    const updatedDeps = {
+      ...deps,
+      config: updateConfig,
+    };
 
-    await executeGenerate(
-      {
-        client,
-        logger: defaultConsolaLogger,
-        config: updateConfig,
-      },
-      {
-        ignorePending: false,
-        apply: true,
-        plan: false,
-        dev: false,
-      }
-    );
+    await executeGenerate(updatedDeps, {
+      ignorePending: false,
+      dev: false,
+    });
+    await executeApply(updatedDeps, {
+      plan: false,
+      pretty: false,
+    });
 
     const updatedTables = await db.introspection.getTables();
     expect(updatedTables[0].name).toBe("posts");

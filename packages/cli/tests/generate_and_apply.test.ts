@@ -31,8 +31,6 @@ describe("generate and apply", () => {
       },
       {
         ignorePending: false,
-        apply: false,
-        plan: false,
         dev: false,
       }
     );
