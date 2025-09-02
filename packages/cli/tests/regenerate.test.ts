@@ -74,20 +74,16 @@ beforeAll(async () => {
 describe("generate", () => {
   it("should not generate a new migration", async () => {
     const beforeVol = vol.toJSON();
+    const deps = {
+      client,
+      logger: defaultConsolaLogger,
+      config,
+    };
 
-    await executeGenerate(
-      {
-        client,
-        logger: defaultConsolaLogger,
-        config,
-      },
-      {
-        ignorePending: false,
-        apply: false,
-        plan: false,
-        dev: false,
-      }
-    );
+    await executeGenerate(deps, {
+      ignorePending: false,
+      dev: false,
+    });
 
     expect(vol.toJSON()).toEqual(beforeVol);
   });

@@ -22,8 +22,6 @@ const { database, client } = await setupTestDB();
 describe("generate with dev database", () => {
   const defaultOptions = {
     ignorePending: false,
-    apply: false,
-    plan: false,
     dev: true,
   };
 

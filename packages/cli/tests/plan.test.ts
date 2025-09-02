@@ -28,55 +28,48 @@ it("generate with planned apply", async () => {
       },
       (t) => [t.index(["name", "email"]), t.unique(["name", "email"])]
     );
+    const deps = {
+      client,
+      logger: defaultConsolaLogger,
+      config: defineConfigForTest({
+        database,
+        tables: [
+          membersTable,
+          defineTable(
+            "category",
+            {
+              id: column("uuid"),
+              member_id: column("uuid"),
+              name: column("text", { unique: true }),
+            },
+            (t) => [
+              t.primaryKey(["id", "member_id"]),
+              t.reference("member_id", membersTable, "id", {
+                onDelete: "cascade",
+                name: "category_member_fk",
+              }),
+            ]
+          ),
+        ],
+      }),
+    };
 
-    await executeGenerate(
-      {
-        client,
-        logger: defaultConsolaLogger,
-        config: defineConfigForTest({
-          database,
-          tables: [
-            membersTable,
-            defineTable(
-              "category",
-              {
-                id: column("uuid"),
-                member_id: column("uuid"),
-                name: column("text", { unique: true }),
-              },
-              (t) => [
-                t.primaryKey(["id", "member_id"]),
-                t.reference("member_id", membersTable, "id", {
-                  onDelete: "cascade",
-                  name: "category_member_fk",
-                }),
-              ]
-            ),
-          ],
-        }),
-      },
-      {
-        ignorePending: false,
-        apply: true,
-        plan: true,
-        dev: false,
-      }
-    );
+    await executeGenerate(deps, {
+      ignorePending: false,
+      dev: false,
+    });
 
-    await executeApply(
-      {
-        client,
-        logger: defaultConsolaLogger,
-        config: defineConfigForTest({
-          database,
-          tables: [],
-        }),
-      },
-      {
-        plan: false,
-        pretty: false,
-      }
-    );
+    // Plan changes
+    await executeApply(deps, {
+      plan: true,
+      pretty: false,
+    });
+
+    // Apply changes to the DB
+    await executeApply(deps, {
+      plan: false,
+      pretty: false,
+    });
   }
 
   // 2nd phase
@@ -90,40 +83,42 @@ it("generate with planned apply", async () => {
       },
       (t) => [t.index(["id", "email"], { unique: true })]
     );
+    const deps = {
+      client,
+      logger: defaultConsolaLogger,
+      config: defineConfigForTest({
+        database,
+        tables: [
+          membersTable,
+          defineTable(
+            "posts",
+            {
+              id: column("uuid", { primaryKey: true }),
+              content: column("text"),
+              author_id: column("uuid", { notNull: true }),
+            },
+            (t) => [
+              t.reference("author_id", membersTable, "id", {
+                onDelete: "set null",
+                onUpdate: "cascade",
+                name: "posts_author_fk",
+              }),
+            ]
+          ),
+        ],
+      }),
+    };
 
-    await executeGenerate(
-      {
-        client,
-        logger: defaultConsolaLogger,
-        config: defineConfigForTest({
-          database,
-          tables: [
-            membersTable,
-            defineTable(
-              "posts",
-              {
-                id: column("uuid", { primaryKey: true }),
-                content: column("text"),
-                author_id: column("uuid", { notNull: true }),
-              },
-              (t) => [
-                t.reference("author_id", membersTable, "id", {
-                  onDelete: "set null",
-                  onUpdate: "cascade",
-                  name: "posts_author_fk",
-                }),
-              ]
-            ),
-          ],
-        }),
-      },
-      {
-        ignorePending: false,
-        apply: true,
-        plan: true,
-        dev: false,
-      }
-    );
+    await executeGenerate(deps, {
+      ignorePending: false,
+      dev: false,
+    });
+
+    // Plan changes
+    await executeApply(deps, {
+      plan: true,
+      pretty: false,
+    });
   }
 
   [

@@ -48,8 +48,6 @@ describe("generate --squash", () => {
       { client, logger: defaultConsolaLogger, config: configStep1 },
       {
         ignorePending: false,
-        apply: false,
-        plan: false,
         dev: false,
         squash: false,
       }
@@ -70,8 +68,6 @@ describe("generate --squash", () => {
       { client, logger: defaultConsolaLogger, config: configStep2 },
       {
         ignorePending: true,
-        apply: false,
-        plan: false,
         dev: false,
         squash: false,
       }
@@ -82,8 +78,6 @@ describe("generate --squash", () => {
       { client, logger: defaultConsolaLogger, config },
       {
         ignorePending: true,
-        apply: false,
-        plan: false,
         dev: false,
         squash: false,
       }
@@ -98,8 +92,6 @@ describe("generate --squash", () => {
       { client, logger: defaultConsolaLogger, config },
       {
         ignorePending: false,
-        apply: false,
-        plan: false,
         dev: false,
         squash: true,
       }
@@ -140,8 +132,6 @@ describe("generate --squash", () => {
       { client, logger: defaultConsolaLogger, config },
       {
         ignorePending: false,
-        apply: false,
-        plan: false,
         dev: false,
         squash: true,
       }
