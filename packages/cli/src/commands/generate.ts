@@ -14,6 +14,7 @@ import { getIntrospector } from "../introspection/introspector";
 import { type DBClient } from "../client";
 import { type ConfigValue } from "../config/loader";
 import { startDevDatabase } from "../dev/database";
+import { executeApply } from "./apply";
 
 export interface GenerateOptions {
   ignorePending: boolean;
@@ -88,6 +89,20 @@ export async function executeGenerate(
       ? `Generated squashed migration: ${migrationFilePath}`
       : `Migration file generated: ${migrationFilePath}`;
     reporter.success(successMessage);
+
+    // Apply the migration immediately if in dev mode
+    if (options.dev) {
+      await executeApply(
+        {
+          ...dependencies,
+          client: targetClient,
+        },
+        {
+          plan: false,
+          pretty: false,
+        }
+      );
+    }
   } finally {
     await cleanup();
   }
