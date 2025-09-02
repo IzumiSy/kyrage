@@ -143,7 +143,7 @@ export type DevDatabaseManager = {
   stop: () => Promise<void>;
   remove: () => Promise<void>;
   exists: () => Promise<boolean>;
-  getConnectionString: () => string | null;
+  getConnectionString: () => string;
   getStatus: () => Promise<DevStatus | null>;
 };
 

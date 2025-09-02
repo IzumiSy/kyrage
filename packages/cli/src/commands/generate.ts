@@ -176,16 +176,11 @@ const setupDatabaseClient = async (
   await devManager.start();
   reporter.success(`Dev database started: ${dialect}`);
 
-  const connectionString = devManager.getConnectionString();
-  if (!connectionString) {
-    throw new Error("Failed to get connection string for dev database");
-  }
-
   // Create client for dev database
   const devClient = getClient({
     database: {
       dialect,
-      connectionString,
+      connectionString: devManager.getConnectionString(),
     },
   });
 
