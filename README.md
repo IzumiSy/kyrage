@@ -190,8 +190,8 @@ The dev database will:
 1. Start a fresh container with your specified database image (or reuse existing one)
 2. Apply all existing migrations to establish the current baseline
 3. Compare your schema against this clean state
-4. Generate the migration file
-5. Optionally maintain the container for subsequent operations (with `reuse: true`)
+4. Generate the migration file and apply it immediately (no need to run `kyrage apply` manually in in dev mode)
+5. Optionally maintain the container for subsequent operations (if the container is booted with `kyrage dev start`)
 
 ```bash
 # Generate migration against a clean dev database
@@ -209,7 +209,7 @@ This is useful when you want to generate migrations without affecting your produ
 
 #### Container Reuse Feature
 
-kyrage automatically detects and reuses development database containers based on their runtime state, eliminating the need for configuration flags:
+kyrage automatically detects and reuses development database containers based on the Dev Database container state:
 
 ```typescript
 // kyrage.config.ts
@@ -223,8 +223,6 @@ export default defineConfig({
   // ... other config
 });
 ```
-
-**Smart Container Detection:**
 
 ```bash
 # Without dev start container running
@@ -406,7 +404,6 @@ export default defineConfig({
     dev: {
       container: {
         image: "postgres:17",
-        reuse: true  // Keep container running between operations
       }
     }
   },
