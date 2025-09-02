@@ -9,7 +9,6 @@ export default defineConfig({
   dev: {
     container: {
       image: "postgres:16",
-      keepAlive: true,
     },
   },
   tables: [members, posts],
