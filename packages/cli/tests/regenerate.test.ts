@@ -5,6 +5,7 @@ import { sql } from "kysely";
 import { executeGenerate } from "../src/commands/generate";
 import { vol } from "memfs";
 import { defaultConsolaLogger } from "../src/logger";
+import { executeApply } from "../src/commands/apply";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");
@@ -74,20 +75,16 @@ beforeAll(async () => {
 describe("generate", () => {
   it("should not generate a new migration", async () => {
     const beforeVol = vol.toJSON();
+    const deps = {
+      client,
+      logger: defaultConsolaLogger,
+      config,
+    };
 
-    await executeGenerate(
-      {
-        client,
-        logger: defaultConsolaLogger,
-        config,
-      },
-      {
-        ignorePending: false,
-        apply: false,
-        plan: false,
-        dev: false,
-      }
-    );
+    await executeGenerate(deps, {
+      ignorePending: false,
+      dev: false,
+    });
 
     expect(vol.toJSON()).toEqual(beforeVol);
   });
