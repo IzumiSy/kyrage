@@ -5,7 +5,6 @@ import { sql } from "kysely";
 import { executeGenerate } from "../src/commands/generate";
 import { vol } from "memfs";
 import { defaultConsolaLogger } from "../src/logger";
-import { executeApply } from "../src/commands/apply";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");
