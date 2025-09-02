@@ -1,10 +1,7 @@
 import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
-import { createDevDatabaseManager } from "../dev/container";
-import {
-  startDevDatabase,
-  validateDevStartRequirements,
-} from "../dev/database";
+import { createContainerManager } from "../dev/container";
+import { startDevDatabase } from "../dev/database";
 import type { DevDatabaseManager } from "../dev/container";
 
 export interface DevDependencies extends CommonDependencies {
@@ -52,16 +49,18 @@ export async function executeDevClean(dependencies: DevDependencies) {
  * Execute dev start command
  */
 export async function executeDevStart(dependencies: CommonDependencies) {
-  const { config, logger } = dependencies;
+  const { logger } = dependencies;
   const { reporter } = logger;
 
-  validateDevStartRequirements(config);
-
+  // データベース起動とマイグレーション適用
   const { manager } = await startDevDatabase(dependencies, {
     logger,
   });
 
+  // 接続情報表示
   reporter.success(`✨ Dev database ready: ${manager.getConnectionString()}`);
+
+  return { manager };
 }
 
 // dev専用の依存関係作成関数
@@ -72,9 +71,10 @@ async function createDevDependencies() {
     throw new Error("No dev database container configuration found");
   }
 
-  const manager = createDevDatabaseManager(
+  const manager = createContainerManager(
     commonDeps.config.dev,
-    commonDeps.config.database.dialect
+    commonDeps.config.database.dialect,
+    "dev-start"
   );
 
   return {

@@ -7,7 +7,7 @@ import { defaultConsolaLogger } from "../src/logger";
 import { readdir } from "fs/promises";
 import {
   findAllKyrageManagedContainerIDs,
-  removeContainersByIDs,
+  removeAllKyrageManagedContainers,
 } from "../src/dev/container";
 import { vol } from "memfs";
 
@@ -135,6 +135,6 @@ describe("generate with dev database", () => {
     expect(lastContainerIDs).toHaveLength(1);
 
     // Clean up the dev start container
-    await removeContainersByIDs(lastContainerIDs);
+    await removeAllKyrageManagedContainers();
   });
 });

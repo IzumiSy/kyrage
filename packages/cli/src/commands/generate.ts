@@ -14,9 +14,8 @@ import { getIntrospector } from "../introspection/introspector";
 import { type DBClient, getClient } from "../client";
 import { type ConfigValue } from "../config/loader";
 import {
-  findRunningDevStartContainer,
-  createDevDatabaseManager,
-  createOneOffContainerManager,
+  hasRunningDevStartContainer,
+  createContainerManager,
 } from "../dev/container";
 import { executeApply } from "./apply";
 import { nullLogger } from "../logger";
@@ -151,73 +150,59 @@ const setupDatabaseClient = async (
   const { logger } = dependencies;
   const { reporter } = logger;
 
-  // dev start コンテナを探す
-  const existingContainer = await findRunningDevStartContainer(dialect);
+  // dev start コンテナが動いているかチェック
+  const hasDevStartContainer = await hasRunningDevStartContainer(dialect);
+  const manageType = hasDevStartContainer ? "dev-start" : "one-off";
 
-  if (existingContainer) {
-    // 既存のdev startコンテナを再利用
+  if (hasDevStartContainer) {
     reporter.info("🔄 Reusing existing dev start container...");
-
-    const manager = createDevDatabaseManager(config.dev, dialect);
-    await manager.start(); // 既存コンテナに接続
-
-    const devClient = getClient({
-      database: {
-        dialect,
-        connectionString: manager.getConnectionString(),
-      },
-    });
-
-    return {
-      client: devClient,
-      cleanup: async () => {
-        reporter.info("✨ Dev start container remains running");
-      },
-    };
   } else {
-    // One-off コンテナを起動
     reporter.info("🚀 Starting temporary dev database...");
+  }
 
-    const manager = createOneOffContainerManager(config.dev, dialect);
-    await manager.start();
+  const manager = createContainerManager(config.dev, dialect, manageType);
+  await manager.start();
 
-    const devClient = getClient({
-      database: {
-        dialect,
-        connectionString: manager.getConnectionString(),
+  const devClient = getClient({
+    database: {
+      dialect,
+      connectionString: manager.getConnectionString(),
+    },
+  });
+
+  // pending migrationsを適用してベースラインを整える
+  const pendingMigrations = await getPendingMigrations(devClient);
+  if (pendingMigrations.length > 0) {
+    reporter.info(
+      `🔄 Applying ${pendingMigrations.length} pending migrations...`
+    );
+
+    await executeApply(
+      {
+        client: devClient,
+        logger: nullLogger,
+        config,
       },
-    });
+      {
+        plan: false,
+        pretty: false,
+      }
+    );
 
-    // マイグレーション適用
-    const pendingMigrations = await getPendingMigrations(devClient);
-    if (pendingMigrations.length > 0) {
-      reporter.info(
-        `🔄 Applying ${pendingMigrations.length} pending migrations...`
-      );
+    reporter.success(`✔ Applied ${pendingMigrations.length} migrations`);
+  }
 
-      await executeApply(
-        {
-          client: devClient,
-          logger: nullLogger,
-          config,
-        },
-        {
-          plan: false,
-          pretty: false,
-        }
-      );
-
-      reporter.success(`✔ Applied ${pendingMigrations.length} migrations`);
-    }
-
-    return {
-      client: devClient,
-      cleanup: async () => {
+  return {
+    client: devClient,
+    cleanup: async () => {
+      if (hasDevStartContainer) {
+        reporter.info("✨ Dev start container remains running");
+      } else {
         await manager.stop();
         reporter.success("✔ Temporary dev database stopped");
-      },
-    };
-  }
+      }
+    },
+  };
 };
 
 const generateMigrationFromIntrospection = async (props: {

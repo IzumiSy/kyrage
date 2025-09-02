@@ -46,7 +46,43 @@ const ManagedKey = "kyrage.managed";
 const DevStartKey = "kyrage.managed-by";
 
 /**
- * kyrage管理の全てのコンテナIDを取得する共通処理
+ * dev start コンテナが実行中かどうかを確認する
+ */
+export const hasRunningDevStartContainer = async (
+  dialect: DialectEnum
+): Promise<boolean> => {
+  const runtime = await getContainerRuntimeClient();
+  const allContainers = await runtime.container.list();
+
+  return allContainers.some(
+    (container) =>
+      container.Labels[ManagedKey] === "true" &&
+      container.Labels[DevStartKey] === "dev-start" &&
+      container.Labels[DialectKey] === dialect &&
+      container.State === "running"
+  );
+};
+
+/**
+ * 全てのkyrage管理コンテナを削除する
+ */
+export const removeAllKyrageManagedContainers = async () => {
+  const runtime = await getContainerRuntimeClient();
+  const allContainers = await runtime.container.list();
+
+  const kyrageManagedContainers = allContainers
+    .filter((container) => container.Labels[ManagedKey] === "true")
+    .map((container) => container.Id);
+
+  await Promise.allSettled(
+    kyrageManagedContainers.map(async (id) =>
+      runtime.container.getById(id).remove({ force: true })
+    )
+  );
+};
+
+/**
+ * 全てのkyrage管理コンテナのIDを取得する（テスト用）
  */
 export const findAllKyrageManagedContainerIDs = async () => {
   const runtime = await getContainerRuntimeClient();
@@ -55,31 +91,6 @@ export const findAllKyrageManagedContainerIDs = async () => {
   return allContainers
     .filter((container) => container.Labels[ManagedKey] === "true")
     .map((container) => container.Id);
-};
-
-/**
- * dev start コマンドで起動されたコンテナを検索する
- */
-export const findRunningDevStartContainer = async (
-  dialect: DialectEnum
-): Promise<any | undefined> => {
-  const runtime = await getContainerRuntimeClient();
-  const allContainers = await runtime.container.list();
-
-  return allContainers.find(
-    (container) =>
-      container.Labels[ManagedKey] === "true" &&
-      container.Labels[DevStartKey] === "dev-start" &&
-      container.Labels[DialectKey] === dialect
-  );
-};
-
-export const removeContainersByIDs = async (ids: ReadonlyArray<string>) => {
-  const runtime = await getContainerRuntimeClient();
-
-  await Promise.allSettled(
-    ids.map(async (id) => runtime.container.getById(id).remove({ force: true }))
-  );
 };
 
 export const CannotGetConnectionStringError = new Error(
@@ -150,10 +161,7 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   }
 
   async remove() {
-    const containerIds = await findAllKyrageManagedContainerIDs();
-
-    await removeContainersByIDs(containerIds);
-
+    await removeAllKyrageManagedContainers();
     this.startedContainer = null;
   }
 
@@ -215,9 +223,13 @@ export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
   }
 }
 
-export const createDevDatabaseManager = (
+/**
+ * コンテナマネージャーを作成する共通関数
+ */
+export const createContainerManager = (
   devConfig: NonNullable<DevDatabaseValue>,
-  dialect: DialectEnum
+  dialect: DialectEnum,
+  manageType: "dev-start" | "one-off" = "dev-start"
 ) => {
   if ("connectionString" in devConfig) {
     return new ConnectionStringDevDatabaseManager(devConfig.connectionString);
@@ -225,8 +237,9 @@ export const createDevDatabaseManager = (
     const containerOptions = {
       dialect,
       image: devConfig.container.image,
-      containerName: devConfig.container.name,
-      manageType: "dev-start" as const, // dev start用は常にdev-start
+      containerName:
+        manageType === "dev-start" ? devConfig.container.name : undefined,
+      manageType,
     };
 
     switch (dialect) {
@@ -239,33 +252,5 @@ export const createDevDatabaseManager = (
     }
   } else {
     throw new Error("Invalid dev database configuration");
-  }
-};
-
-/**
- * One-off generate用のコンテナマネージャーを作成
- */
-export const createOneOffContainerManager = (
-  devConfig: NonNullable<DevDatabaseValue>,
-  dialect: DialectEnum
-) => {
-  if (!("container" in devConfig)) {
-    throw new Error("Container configuration required for one-off manager");
-  }
-
-  const containerOptions = {
-    dialect,
-    image: devConfig.container.image,
-    containerName: undefined, // one-offは名前を指定しない
-    manageType: "one-off" as const,
-  };
-
-  switch (dialect) {
-    case "postgres":
-      return new PostgreSqlDevDatabaseManager(containerOptions);
-    case "cockroachdb":
-      return new CockroachDbDevDatabaseManager(containerOptions);
-    default:
-      throw new Error(`Unsupported dialect for container: ${dialect}`);
   }
 };

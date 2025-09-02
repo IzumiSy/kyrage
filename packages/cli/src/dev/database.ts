@@ -1,10 +1,9 @@
 import { type Logger, nullLogger } from "../logger";
 import { type CommonDependencies } from "../commands/common";
 import { type DBClient, getClient } from "../client";
-import { createDevDatabaseManager, type DevDatabaseManager } from "./container";
+import { createContainerManager, type DevDatabaseManager } from "./container";
 import { executeApply } from "../commands/apply";
 import { getPendingMigrations } from "../migration";
-import { type ConfigValue } from "../config/loader";
 
 export interface DatabaseStartupResult {
   client: DBClient;
@@ -14,23 +13,6 @@ export interface DatabaseStartupResult {
 
 export interface DatabaseStartupOptions {
   logger?: Logger;
-}
-
-/**
- * Dev database configuration validation for dev start command
- */
-export function validateDevStartRequirements(config: ConfigValue) {
-  if (!config.dev) {
-    throw new Error(
-      "Dev database configuration is required for dev start command"
-    );
-  }
-
-  if (!("container" in config.dev)) {
-    throw new Error(
-      "Container-based dev database configuration is required for dev start command"
-    );
-  }
 }
 
 /**
@@ -50,7 +32,7 @@ export async function startDevDatabase(
 
   // Create dev database manager (for dev start, always with reuse)
   const dialect = config.database.dialect;
-  const devManager = createDevDatabaseManager(config.dev, dialect);
+  const devManager = createContainerManager(config.dev, dialect, "dev-start");
 
   // Check if container is already running
   if (await devManager.exists()) {
