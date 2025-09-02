@@ -1,7 +1,11 @@
 import { type Logger, nullLogger } from "../logger";
 import { type CommonDependencies } from "../commands/common";
 import { type DBClient, getClient } from "../client";
-import { createContainerManager, type DevDatabaseManager } from "./container";
+import {
+  createContainerManager,
+  type DevDatabaseManager,
+  hasRunningDevStartContainer,
+} from "./container";
 import { executeApply } from "../commands/apply";
 import { getPendingMigrations } from "../migration";
 
@@ -11,8 +15,57 @@ export interface DatabaseStartupResult {
   cleanup: () => Promise<void>;
 }
 
-export interface DatabaseStartupOptions {
-  logger?: Logger;
+export type StartDevDatabaseOptions = {
+  logger: Logger;
+} & (
+  | {
+      mode: "dev-start";
+    }
+  | {
+      mode: "generate-dev";
+    }
+);
+
+/**
+ * モードに応じて適切なコンテナマネージャーを作成し、初期化メッセージを表示
+ */
+async function prepareDevManager(
+  dependencies: CommonDependencies,
+  options: StartDevDatabaseOptions
+) {
+  const { config } = dependencies;
+  const dialect = config.database.dialect;
+
+  switch (options.mode) {
+    case "dev-start": {
+      const containerType = "dev-start" as const;
+      const manager = createContainerManager(
+        config.dev!,
+        dialect,
+        containerType
+      );
+
+      return {
+        manager,
+        containerType,
+        result: { reused: await manager.exists() },
+      };
+    }
+
+    case "generate-dev": {
+      const hasDevStart = await hasRunningDevStartContainer(dialect);
+      const containerType = hasDevStart
+        ? ("dev-start" as const)
+        : ("one-off" as const);
+      const manager = createContainerManager(
+        config.dev!,
+        dialect,
+        containerType
+      );
+
+      return { manager, containerType, result: { reused: hasDevStart } };
+    }
+  }
 }
 
 /**
@@ -20,7 +73,7 @@ export interface DatabaseStartupOptions {
  */
 export async function startDevDatabase(
   dependencies: CommonDependencies,
-  options: DatabaseStartupOptions = {}
+  options: StartDevDatabaseOptions
 ): Promise<DatabaseStartupResult> {
   const { config } = dependencies;
   const logger = options.logger || nullLogger;
@@ -30,24 +83,25 @@ export async function startDevDatabase(
     throw new Error("Dev database configuration is required");
   }
 
-  // Create dev database manager (for dev start, always with reuse)
-  const dialect = config.database.dialect;
-  const devManager = createContainerManager(config.dev, dialect, "dev-start");
-
-  // Check if container is already running
-  if (await devManager.exists()) {
+  // コンテナマネージャーの作成と準備
+  const {
+    manager: devManager,
+    containerType,
+    result: devManagerResult,
+  } = await prepareDevManager(dependencies, options);
+  if (devManagerResult.reused) {
     reporter.info("🔄 Reusing existing dev database...");
   } else {
     reporter.info("🚀 Starting dev database...");
   }
 
   await devManager.start();
-  reporter.success(`Dev database started: ${dialect}`);
+  reporter.success(`Dev database started: ${config.database.dialect}`);
 
   // Create client for dev database
   const devClient = getClient({
     database: {
-      dialect,
+      dialect: config.database.dialect,
       connectionString: devManager.getConnectionString(),
     },
   });
@@ -76,9 +130,23 @@ export async function startDevDatabase(
     reporter.info("No pending migrations found");
   }
 
-  // Cleanup function - dev start containers are always persistent
+  // Cleanup function
   const cleanup = async () => {
-    reporter.success("✨ Persistent dev database ready: " + dialect);
+    switch (options.mode) {
+      case "dev-start":
+        reporter.success(
+          "✨ Persistent dev database ready: " + config.database.dialect
+        );
+        break;
+      case "generate-dev":
+        if (containerType === "dev-start") {
+          reporter.info("✨ Dev start container remains running");
+        } else {
+          await devManager.stop();
+          reporter.success("✔ Temporary dev database stopped");
+        }
+        break;
+    }
   };
 
   return { client: devClient, manager: devManager, cleanup };

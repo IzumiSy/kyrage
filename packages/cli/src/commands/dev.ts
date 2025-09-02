@@ -54,6 +54,7 @@ export async function executeDevStart(dependencies: CommonDependencies) {
 
   // データベース起動とマイグレーション適用
   const { manager } = await startDevDatabase(dependencies, {
+    mode: "dev-start",
     logger,
   });
 

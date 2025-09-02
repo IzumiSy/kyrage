@@ -11,14 +11,9 @@ import {
 import { diffSchema } from "../diff";
 import { Tables, Operation } from "../operation";
 import { getIntrospector } from "../introspection/introspector";
-import { type DBClient, getClient } from "../client";
+import { type DBClient } from "../client";
 import { type ConfigValue } from "../config/loader";
-import {
-  hasRunningDevStartContainer,
-  createContainerManager,
-} from "../dev/container";
-import { executeApply } from "./apply";
-import { nullLogger } from "../logger";
+import { startDevDatabase } from "../dev/database";
 
 export interface GenerateOptions {
   ignorePending: boolean;
@@ -40,10 +35,15 @@ export async function executeGenerate(
   }
 
   // Create the appropriate client (dev or production)
-  const { client: targetClient, cleanup } = await setupDatabaseClient(
-    dependencies,
-    options
-  );
+  const { client: targetClient, cleanup } = options.dev
+    ? await startDevDatabase(dependencies, {
+        mode: "generate-dev",
+        logger,
+      })
+    : {
+        client: dependencies.client,
+        cleanup: async () => void 0,
+      };
 
   try {
     // Check for pending migrations against the target database
@@ -127,82 +127,6 @@ const removePendingMigrations = async (dependencies: CommonDependencies) => {
   } catch (error) {
     throw new Error(`Failed to remove pending migration files: ${error}`);
   }
-};
-
-const setupDatabaseClient = async (
-  dependencies: CommonDependencies,
-  options: GenerateOptions
-) => {
-  const { client, config } = dependencies;
-
-  if (!options.dev) {
-    return {
-      client,
-      cleanup: async () => void 0,
-    };
-  }
-
-  if (!config.dev || !("container" in config.dev)) {
-    throw new Error("Dev container configuration required for --dev option");
-  }
-
-  const dialect = config.database.dialect;
-  const { logger } = dependencies;
-  const { reporter } = logger;
-
-  // dev start コンテナが動いているかチェック
-  const hasDevStartContainer = await hasRunningDevStartContainer(dialect);
-  const manageType = hasDevStartContainer ? "dev-start" : "one-off";
-
-  if (hasDevStartContainer) {
-    reporter.info("🔄 Reusing existing dev start container...");
-  } else {
-    reporter.info("🚀 Starting temporary dev database...");
-  }
-
-  const manager = createContainerManager(config.dev, dialect, manageType);
-  await manager.start();
-
-  const devClient = getClient({
-    database: {
-      dialect,
-      connectionString: manager.getConnectionString(),
-    },
-  });
-
-  // pending migrationsを適用してベースラインを整える
-  const pendingMigrations = await getPendingMigrations(devClient);
-  if (pendingMigrations.length > 0) {
-    reporter.info(
-      `🔄 Applying ${pendingMigrations.length} pending migrations...`
-    );
-
-    await executeApply(
-      {
-        client: devClient,
-        logger: nullLogger,
-        config,
-      },
-      {
-        plan: false,
-        pretty: false,
-      }
-    );
-
-    reporter.success(`✔ Applied ${pendingMigrations.length} migrations`);
-  }
-
-  return {
-    client: devClient,
-    cleanup: async () => {
-      if (hasDevStartContainer) {
-        reporter.info("✨ Dev start container remains running");
-      } else {
-        await manager.stop();
-        reporter.success("✔ Temporary dev database stopped");
-      }
-    },
-  };
 };
 
 const generateMigrationFromIntrospection = async (props: {
