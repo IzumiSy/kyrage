@@ -134,7 +134,7 @@ async function executeOperation(
 
 ### 5. Development Database Management (`dev/container.ts`)
 
-**Purpose**: Manage ephemeral and persistent development database containers
+**Purpose**: Manage ephemeral and persistent development database containers with smart reuse detection
 
 **Architecture**:
 ```typescript
@@ -147,36 +147,37 @@ export type DevDatabaseManager = {
   getStatus: () => Promise<DevStatus | null>;
 };
 
-export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
-  implements DevDatabaseManager {
-  // Common container lifecycle management
-}
+// Unified container manager factory
+export function createContainerManager(
+  dialect: SupportedDialect,
+  container: DevDatabaseContainerConfig,
+  managedBy: ContainerManagedBy
+): DevDatabaseManager;
 
-export class PostgreSqlDevDatabaseManager extends ContainerDevDatabaseManager<PostgreSqlContainer> {
-  // PostgreSQL-specific implementation
-}
-
-export class CockroachDbDevDatabaseManager extends ContainerDevDatabaseManager<CockroachDbContainer> {
-  // CockroachDB-specific implementation
-}
+// Smart container detection for reuse
+export async function hasRunningDevStartContainer(
+  dialect: SupportedDialect
+): Promise<DevDatabaseManager | null>;
 ```
 
 **Key Features**:
-- **Container Reuse**: Persistent development databases with `reuse: true` configuration
-- **Lifecycle Management**: Start, stop, remove, and status checking of containers
+- **Smart Container Reuse**: Automatically detects and reuses containers started by `dev start` command
+- **Dynamic Detection**: No configuration required - runtime detection based on container labels
+- **Unified Management**: Single `createContainerManager` function handles all container types
 - **Multi-dialect Support**: PostgreSQL and CockroachDB container management
-- **Label-based Discovery**: Uses Docker labels to identify kyrage-managed containers
+- **Label-based Discovery**: Uses Docker labels (`kyrage.managed`, `kyrage.managed-by`, `kyrage.dialect`) for identification
 
-**Container Reuse Benefits**:
-- Faster subsequent migration generation (no container startup overhead)
-- Consistent development environment across operations
-- Optional cleanup with `kyrage dev clean` command
+**Container Reuse Behavior**:
+- `generate --dev` automatically reuses `dev start` containers when available
+- Falls back to one-off containers when no persistent container is running
+- Eliminates configuration complexity while providing optimal performance
 
 ### 6. Development Commands (`commands/dev.ts`)
 
 **Purpose**: Provide CLI interface for development database management
 
 **Commands**:
+- `kyrage dev start`: Start persistent development database container with automatic migration baseline
 - `kyrage dev status`: Show running container information
 - `kyrage dev get-url`: Output connection string for running container
 - `kyrage dev clean`: Remove all kyrage-managed containers
@@ -185,6 +186,7 @@ export class CockroachDbDevDatabaseManager extends ContainerDevDatabaseManager<C
 - Direct container management without external Docker commands
 - Integrated workflow with kyrage configuration
 - Safe cleanup of only kyrage-managed containers
+- Persistent containers enable smart reuse for `generate --dev`
 
 ### 7. Console Output (`generate.ts`)
 
@@ -237,8 +239,8 @@ export function createCommonDependencies(
 
 **Command Implementations**:
 - `commands/apply.ts`: `executeApply(dependencies, options)` - Migration execution
-- `commands/generate.ts`: `executeGenerate(dependencies, options)` - Migration generation with dev database support and migration squashing capability
-- `commands/dev.ts`: `executeDevStatus`, `executeDevGetUrl`, `executeDevClean` - Development database management
+- `commands/generate.ts`: `executeGenerate(dependencies, options)` - Migration generation with smart dev database reuse and migration squashing capability
+- `commands/dev.ts`: `executeDevStart`, `executeDevStatus`, `executeDevGetUrl`, `executeDevClean` - Development database management
 - `commands/common.ts`: Shared dependency injection infrastructure
 
 **Benefits**:
@@ -264,7 +266,7 @@ export function createCommonDependencies(
     - `common.ts`: Shared dependency injection infrastructure (`CommonDependencies`, `createCommonDependencies`).
     - `apply.ts`: Migration application command (`executeApply`).
     - `generate.ts`: Migration generation command with dev database support and migration squashing (`executeGenerate`, `handleSquashMode`, `printPrettyDiff`).
-    - `dev.ts`: Development database container management commands (`executeDevStatus`, `executeDevGetUrl`, `executeDevClean`).
+    - `dev.ts`: Development database container management commands (`executeDevStart`, `executeDevStatus`, `executeDevGetUrl`, `executeDevClean`).
   - `config/`: Configuration loading and validation.
   - `dev/container.ts`: Development database container lifecycle management with reuse capabilities.
   - `tests/`: Unit tests for core logic including comprehensive Operation array validation.
@@ -295,8 +297,9 @@ export function createCommonDependencies(
    - `--dev` option for `generate` uses containerized development databases for clean migration generation.
 
 6. **Development Database Management**
-   - `executeGenerate --dev` automatically manages ephemeral or persistent development database containers.
-   - Container reuse feature (`reuse: true`) maintains persistent development databases across operations.
+   - `executeDevStart` starts persistent development database containers with automatic baseline migration.
+   - `executeGenerate --dev` automatically detects and reuses `dev start` containers, falling back to one-off containers when needed.
+   - Smart container detection eliminates configuration complexity while optimizing performance.
    - `executeDevStatus`, `executeDevGetUrl`, `executeDevClean` provide container lifecycle management.
    - Automatic baseline migration application to development databases ensures accurate diffs.
 
@@ -312,7 +315,7 @@ export function createCommonDependencies(
 - **Diff-based Migration**: Only the necessary changes are applied, minimizing risk and manual intervention.
 - **Dry-run Support**: The `--dry-run` option for `apply` allows users to preview SQL without execution.
 - **Development Database Isolation**: Container-based development databases provide clean environments for migration generation.
-- **Container Reuse Optimization**: Optional persistent containers reduce startup overhead for iterative development workflows.
+- **Smart Container Reuse**: Dynamic detection of running containers eliminates configuration complexity while optimizing performance.
 - **Label-based Container Management**: Docker labels enable safe identification and cleanup of kyrage-managed containers.
 - **Unified Command Architecture**: All commands follow consistent patterns with shared infrastructure for error handling and logging.
 

@@ -29,8 +29,8 @@ export type DevDatabaseManager = {
 export interface ContainerOptions {
   image: string;
   dialect: DialectEnum;
-  keepAlive?: boolean;
   containerName?: string;
+  manageType?: "dev-start" | "one-off"; // コンテナの種類を識別
 }
 
 type ConnectableStartedContainer = StartedTestContainer & {
@@ -41,26 +41,43 @@ export type StartableContainer = Omit<GenericContainer, "start"> & {
   start: () => Promise<ConnectableStartedContainer>;
 };
 
-const DialectKey = "kyrage.dialect";
-const ManagedKey = "kyrage.managed";
+export const DialectKey = "kyrage.dialect";
+export const ManagedKey = "kyrage.managed";
+export const DevStartKey = "kyrage.managed-by";
 
 /**
- * kyrage管理の全てのコンテナIDを取得する共通処理
+ * dev start コンテナが実行中かどうかを確認する
  */
-export const findAllKyrageManagedContainerIDs = async () => {
+export const hasRunningDevStartContainer = async (
+  dialect: DialectEnum
+): Promise<boolean> => {
   const runtime = await getContainerRuntimeClient();
   const allContainers = await runtime.container.list();
 
-  return allContainers
-    .filter((container) => container.Labels[ManagedKey] === "true")
-    .map((container) => container.Id);
+  return allContainers.some(
+    (container) =>
+      container.Labels[ManagedKey] === "true" &&
+      container.Labels[DevStartKey] === "dev-start" &&
+      container.Labels[DialectKey] === dialect &&
+      container.State === "running"
+  );
 };
 
-export const removeContainersByIDs = async (ids: ReadonlyArray<string>) => {
+/**
+ * 全てのkyrage管理コンテナを削除する
+ */
+export const removeAllKyrageManagedContainers = async () => {
   const runtime = await getContainerRuntimeClient();
+  const allContainers = await runtime.container.list();
+
+  const kyrageManagedContainers = allContainers
+    .filter((container) => container.Labels[ManagedKey] === "true")
+    .map((container) => container.Id);
 
   await Promise.allSettled(
-    ids.map(async (id) => runtime.container.getById(id).remove({ force: true }))
+    kyrageManagedContainers.map(async (id) =>
+      runtime.container.getById(id).remove({ force: true })
+    )
   );
 };
 
@@ -79,14 +96,19 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
     createContainer: () => C
   ) {
     const container = createContainer();
+    const manageType = this.options.manageType || "one-off";
+
     container.withLabels({
       [DialectKey]: this.options.dialect,
       [ManagedKey]: "true",
+      [DevStartKey]: manageType,
     });
 
-    if (this.options.keepAlive) {
+    // dev-start コンテナは常にreuse、one-offは再利用しない
+    if (manageType === "dev-start") {
       container.withReuse();
     }
+
     if (this.options.containerName) {
       container.withName(this.options.containerName);
     }
@@ -127,10 +149,7 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   }
 
   async remove() {
-    const containerIds = await findAllKyrageManagedContainerIDs();
-
-    await removeContainersByIDs(containerIds);
-
+    await removeAllKyrageManagedContainers();
     this.startedContainer = null;
   }
 
@@ -192,9 +211,13 @@ export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
   }
 }
 
-export const createDevDatabaseManager = (
+/**
+ * コンテナマネージャーを作成する共通関数
+ */
+export const createContainerManager = (
   devConfig: NonNullable<DevDatabaseValue>,
-  dialect: DialectEnum
+  dialect: DialectEnum,
+  manageType: "dev-start" | "one-off"
 ) => {
   if ("connectionString" in devConfig) {
     return new ConnectionStringDevDatabaseManager(devConfig.connectionString);
@@ -202,8 +225,9 @@ export const createDevDatabaseManager = (
     const containerOptions = {
       dialect,
       image: devConfig.container.image,
-      keepAlive: devConfig.container.keepAlive || false,
-      containerName: devConfig.container.name,
+      containerName:
+        manageType === "dev-start" ? devConfig.container.name : undefined,
+      manageType,
     };
 
     switch (dialect) {

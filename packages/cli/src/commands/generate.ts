@@ -2,19 +2,19 @@ import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
 import { mkdir, writeFile, unlink } from "fs/promises";
 import { join } from "path";
-import { nullLogger, type Logger } from "../logger";
+import { type Logger } from "../logger";
 import {
   migrationDirName,
   getPendingMigrations,
   SchemaDiff,
 } from "../migration";
-import { executeApply } from "./apply";
 import { diffSchema } from "../diff";
 import { Tables, Operation } from "../operation";
 import { getIntrospector } from "../introspection/introspector";
-import { getClient, type DBClient } from "../client";
-import { createDevDatabaseManager } from "../dev/container";
+import { type DBClient } from "../client";
 import { type ConfigValue } from "../config/loader";
+import { startDevDatabase } from "../dev/database";
+import { executeApply } from "./apply";
 
 export interface GenerateOptions {
   ignorePending: boolean;
@@ -36,10 +36,15 @@ export async function executeGenerate(
   }
 
   // Create the appropriate client (dev or production)
-  const { client: targetClient, cleanup } = await setupDatabaseClient(
-    dependencies,
-    options
-  );
+  const { client: targetClient, cleanup } = options.dev
+    ? await startDevDatabase(dependencies, {
+        mode: "generate-dev",
+        logger,
+      })
+    : {
+        client: dependencies.client,
+        cleanup: async () => void 0,
+      };
 
   try {
     // Check for pending migrations against the target database
@@ -84,6 +89,20 @@ export async function executeGenerate(
       ? `Generated squashed migration: ${migrationFilePath}`
       : `Migration file generated: ${migrationFilePath}`;
     reporter.success(successMessage);
+
+    // Apply the migration immediately if in dev mode
+    if (options.dev) {
+      await executeApply(
+        {
+          ...dependencies,
+          client: targetClient,
+        },
+        {
+          plan: false,
+          pretty: false,
+        }
+      );
+    }
   } finally {
     await cleanup();
   }
@@ -123,76 +142,6 @@ const removePendingMigrations = async (dependencies: CommonDependencies) => {
   } catch (error) {
     throw new Error(`Failed to remove pending migration files: ${error}`);
   }
-};
-
-const setupDatabaseClient = async (
-  dependencies: CommonDependencies,
-  options: GenerateOptions
-) => {
-  const { client, logger, config } = dependencies;
-  const { reporter } = logger;
-
-  if (!options.dev) {
-    return {
-      client,
-      cleanup: async () => void 0,
-    };
-  }
-
-  if (!config.dev) {
-    throw new Error(
-      "Dev database configuration is required when using --dev flag"
-    );
-  }
-
-  // Create dev database manager
-  const dialect = config.database.dialect;
-  const devManager = createDevDatabaseManager(config.dev, dialect);
-
-  // Check if reuse is enabled and container is already running
-  const isKeepAlive =
-    "container" in config.dev && config.dev.container.keepAlive;
-  if (isKeepAlive && (await devManager.exists())) {
-    reporter.info("🔄 Reusing existing dev database...");
-  } else {
-    reporter.info("🚀 Starting dev database for migration generation...");
-  }
-
-  await devManager.start();
-  reporter.success(`Dev database started: ${dialect}`);
-
-  // Create client for dev database
-  const devClient = getClient({
-    database: {
-      dialect,
-      connectionString: devManager.getConnectionString(),
-    },
-  });
-
-  // Apply baseline migrations to dev database
-  await executeApply(
-    {
-      client: devClient,
-      logger: nullLogger,
-      config,
-    },
-    {
-      plan: false,
-      pretty: false,
-    }
-  );
-
-  return {
-    client: devClient,
-    cleanup: async () => {
-      if (!isKeepAlive) {
-        await devManager.stop();
-        reporter.success("Dev database stopped");
-      } else {
-        reporter.success("✨ Persistent dev database ready: " + dialect);
-      }
-    },
-  };
 };
 
 const generateMigrationFromIntrospection = async (props: {
