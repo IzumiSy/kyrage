@@ -55,18 +55,13 @@ export async function executeDevStart(dependencies: CommonDependencies) {
   const { config, logger } = dependencies;
   const { reporter } = logger;
 
-  // バリデーション
   validateDevStartRequirements(config);
 
-  // データベース起動とマイグレーション適用
-  const { manager, cleanup } = await startDevDatabase(dependencies, {
+  const { manager } = await startDevDatabase(dependencies, {
     logger,
   });
 
-  // 接続情報表示
   reporter.success(`✨ Dev database ready: ${manager.getConnectionString()}`);
-
-  return { manager, cleanup };
 }
 
 // dev専用の依存関係作成関数

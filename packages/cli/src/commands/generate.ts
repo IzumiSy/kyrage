@@ -11,9 +11,15 @@ import {
 import { diffSchema } from "../diff";
 import { Tables, Operation } from "../operation";
 import { getIntrospector } from "../introspection/introspector";
-import { type DBClient } from "../client";
-import { startDevDatabase } from "../dev/database";
+import { type DBClient, getClient } from "../client";
 import { type ConfigValue } from "../config/loader";
+import {
+  findRunningDevStartContainer,
+  createDevDatabaseManager,
+  createOneOffContainerManager,
+} from "../dev/container";
+import { executeApply } from "./apply";
+import { nullLogger } from "../logger";
 
 export interface GenerateOptions {
   ignorePending: boolean;
@@ -128,7 +134,7 @@ const setupDatabaseClient = async (
   dependencies: CommonDependencies,
   options: GenerateOptions
 ) => {
-  const { client } = dependencies;
+  const { client, config } = dependencies;
 
   if (!options.dev) {
     return {
@@ -137,12 +143,81 @@ const setupDatabaseClient = async (
     };
   }
 
-  // 新しい共通関数を使用
-  const { client: devClient, cleanup } = await startDevDatabase(dependencies, {
-    logger: dependencies.logger,
-  });
+  if (!config.dev || !("container" in config.dev)) {
+    throw new Error("Dev container configuration required for --dev option");
+  }
 
-  return { client: devClient, cleanup };
+  const dialect = config.database.dialect;
+  const { logger } = dependencies;
+  const { reporter } = logger;
+
+  // dev start コンテナを探す
+  const existingContainer = await findRunningDevStartContainer(dialect);
+
+  if (existingContainer) {
+    // 既存のdev startコンテナを再利用
+    reporter.info("🔄 Reusing existing dev start container...");
+
+    const manager = createDevDatabaseManager(config.dev, dialect);
+    await manager.start(); // 既存コンテナに接続
+
+    const devClient = getClient({
+      database: {
+        dialect,
+        connectionString: manager.getConnectionString(),
+      },
+    });
+
+    return {
+      client: devClient,
+      cleanup: async () => {
+        reporter.info("✨ Dev start container remains running");
+      },
+    };
+  } else {
+    // One-off コンテナを起動
+    reporter.info("🚀 Starting temporary dev database...");
+
+    const manager = createOneOffContainerManager(config.dev, dialect);
+    await manager.start();
+
+    const devClient = getClient({
+      database: {
+        dialect,
+        connectionString: manager.getConnectionString(),
+      },
+    });
+
+    // マイグレーション適用
+    const pendingMigrations = await getPendingMigrations(devClient);
+    if (pendingMigrations.length > 0) {
+      reporter.info(
+        `🔄 Applying ${pendingMigrations.length} pending migrations...`
+      );
+
+      await executeApply(
+        {
+          client: devClient,
+          logger: nullLogger,
+          config,
+        },
+        {
+          plan: false,
+          pretty: false,
+        }
+      );
+
+      reporter.success(`✔ Applied ${pendingMigrations.length} migrations`);
+    }
+
+    return {
+      client: devClient,
+      cleanup: async () => {
+        await manager.stop();
+        reporter.success("✔ Temporary dev database stopped");
+      },
+    };
+  }
 };
 
 const generateMigrationFromIntrospection = async (props: {

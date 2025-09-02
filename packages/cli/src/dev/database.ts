@@ -31,12 +31,6 @@ export function validateDevStartRequirements(config: ConfigValue) {
       "Container-based dev database configuration is required for dev start command"
     );
   }
-
-  if (!config.dev.container.keepAlive) {
-    throw new Error(
-      "keepAlive: true is required in dev.container configuration for dev start command"
-    );
-  }
 }
 
 /**
@@ -54,14 +48,12 @@ export async function startDevDatabase(
     throw new Error("Dev database configuration is required");
   }
 
-  // Create dev database manager
+  // Create dev database manager (for dev start, always with reuse)
   const dialect = config.database.dialect;
   const devManager = createDevDatabaseManager(config.dev, dialect);
 
-  // Check if reuse is enabled and container is already running
-  const isKeepAlive =
-    "container" in config.dev && config.dev.container.keepAlive;
-  if (isKeepAlive && (await devManager.exists())) {
+  // Check if container is already running
+  if (await devManager.exists()) {
     reporter.info("🔄 Reusing existing dev database...");
   } else {
     reporter.info("🚀 Starting dev database...");
@@ -102,14 +94,9 @@ export async function startDevDatabase(
     reporter.info("No pending migrations found");
   }
 
-  // Cleanup function
+  // Cleanup function - dev start containers are always persistent
   const cleanup = async () => {
-    if (!isKeepAlive) {
-      await devManager.stop();
-      reporter.success("Dev database stopped");
-    } else {
-      reporter.success("✨ Persistent dev database ready: " + dialect);
-    }
+    reporter.success("✨ Persistent dev database ready: " + dialect);
   };
 
   return { client: devClient, manager: devManager, cleanup };
