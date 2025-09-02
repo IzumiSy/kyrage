@@ -316,9 +316,9 @@ A common pattern is to use dev databases for iterative development, then squash 
 
 ```bash
 # Development phase - multiple iterations with dev database
-$ kyrage generate --dev --apply  # 1st iteration - adds users table
-$ kyrage generate --dev --apply  # 2nd iteration - adds posts table
-$ kyrage generate --dev --apply  # 3rd iteration - adds indexes
+$ kyrage generate --dev  # 1st iteration - adds users table
+$ kyrage generate --dev  # 2nd iteration - adds posts table
+$ kyrage generate --dev  # 3rd iteration - adds indexes
 
 # Development complete - consolidate pending migrations
 $ kyrage generate --squash  # Squash all pending migrations into one
