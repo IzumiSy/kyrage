@@ -70,7 +70,7 @@ export async function executeDevStart(
         if (!exists) {
           reporter.info("Dev database already stopped by some reason");
         } else {
-          await manager.stop();
+          await manager.stop({ includeForceReused: true });
           reporter.success("Dev database stopped");
         }
       } catch (error) {

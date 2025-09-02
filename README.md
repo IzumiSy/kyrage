@@ -252,6 +252,16 @@ This feature is expected to be used in steamlined development cycle to make mult
 kyrage also provides handy commands to manage your development database containers without Docker CLI:
 
 ```bash
+# Start persistent development database
+$ kyrage dev start
+🚀 Starting dev database...
+✔ Dev database started: postgres
+🔄 Applying 3 pending migrations...
+✔ Migration applied: 1755525514175
+✔ Migration applied: 1755525514176  
+✔ Migration applied: 1755525514177
+✨ Dev database ready: postgresql://postgres:password@localhost:32768/test
+
 # Check status of dev containers
 $ kyrage dev status
 Running: abc123def456 (postgres:17)
@@ -345,6 +355,7 @@ This approach keeps your production migration history clean while allowing flexi
 | `kyrage generate --dev` | Generate migration using ephemeral dev database |
 | `kyrage generate --apply` | Generate and immediately apply migration |
 | `kyrage apply` | Apply all pending migrations to the database |
+| `kyrage dev start` | Start development database with migrations applied |
 | `kyrage dev status` | Show status of running development database containers |
 | `kyrage dev get-url` | Print connection URL for running development database (use with `psql $(kyrage dev get-url)`) |
 | `kyrage dev clean` | Remove all kyrage-managed development database containers |

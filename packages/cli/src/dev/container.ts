@@ -27,7 +27,7 @@ type DevStatus =
 
 export type DevDatabaseManager = {
   start: () => Promise<void>;
-  stop: () => Promise<void>;
+  stop: (options?: { includeForceReused?: boolean }) => Promise<void>;
   remove: () => Promise<void>;
   exists: () => Promise<boolean>;
   getConnectionString: () => string;
@@ -51,6 +51,7 @@ export type StartableContainer = Omit<GenericContainer, "start"> & {
 
 const DialectKey = "kyrage.dialect";
 const ManagedKey = "kyrage.managed";
+const ForceReuseKey = "kyrage.forceReuse";
 
 /**
  * kyrage管理の全てのコンテナIDを取得する共通処理
@@ -84,10 +85,18 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   ) {
     const container = this.createContainer();
 
-    container.withLabels({
+    // 基本ラベル
+    const labels: Record<string, string> = {
       [DialectKey]: this.options.dialect,
       [ManagedKey]: "true",
-    });
+    };
+
+    // forceReuse=trueの場合のみForceReuseKeyラベルを追加
+    if (forceReuse) {
+      labels[ForceReuseKey] = "true";
+    }
+
+    container.withLabels(labels);
 
     // 元の設定またはforceReuseが有効な場合にreuseを適用
     if (this.options.reuse || forceReuse) {
@@ -129,8 +138,17 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
     return this.startedContainer.getConnectionUri();
   }
 
-  async stop() {
+  async stop(options?: { includeForceReused?: boolean }) {
     if (this.startedContainer) {
+      // includeForceReused=trueの場合は強制停止、そうでなければforceReuseチェック
+      if (!options?.includeForceReused) {
+        const shouldSkipStop = await this.isForceReuse();
+        if (shouldSkipStop) {
+          // forceReuseコンテナは停止をスキップ（generate --devでの保護）
+          return;
+        }
+      }
+
       await this.startedContainer.stop();
       this.startedContainer = null;
     }
@@ -157,6 +175,21 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
       containerID: r.Id,
     };
   }
+
+  private async isForceReuse(): Promise<boolean> {
+    if (!this.startedContainer) return false;
+
+    try {
+      const runtime = await getContainerRuntimeClient();
+      const containerInfo = await runtime.container
+        .getById(this.startedContainer.getId())
+        .inspect();
+      // ForceReuseKeyラベルが存在し、かつ"true"の場合のみtrue
+      return containerInfo.Config.Labels[ForceReuseKey] === "true";
+    } catch {
+      return false;
+    }
+  }
 }
 
 export class PostgreSqlDevDatabaseManager extends ContainerDevDatabaseManager<PostgreSqlContainer> {
@@ -178,7 +211,7 @@ export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
     // No-op for connection string
   }
 
-  async stop() {
+  async stop(_options?: { includeForceReused?: boolean }) {
     // No-op for connection string
   }
 
