@@ -9,22 +9,22 @@ export interface DevDependencies extends CommonDependencies {
 }
 
 export async function executeDevStatus(dependencies: DevDependencies) {
-  const { manager } = dependencies;
+  const { manager, logger } = dependencies;
 
   const status = await manager.getStatus();
   if (!status || status.type !== "container") {
-    console.log("No running dev containers found");
+    logger.reporter.info("No running dev containers found");
     return;
   }
 
-  console.log(`Running: ${status.containerID} (${status.imageName})`);
+  logger.reporter.info(`Running: ${status.containerID} (${status.imageName})`);
 }
 
 export async function executeDevGetUrl(dependencies: DevDependencies) {
-  const { manager } = dependencies;
+  const { manager, logger } = dependencies;
 
   if (!(await manager.exists())) {
-    console.log("No running dev containers found");
+    logger.reporter.info("No running dev containers found");
     return;
   }
 
@@ -37,7 +37,7 @@ export async function executeDevClean(dependencies: DevDependencies) {
   const { manager, logger } = dependencies;
 
   if (!(await manager.exists())) {
-    console.log("No dev containers found");
+    logger.reporter.info("No dev containers found");
     return;
   }
 
