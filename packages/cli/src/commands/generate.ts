@@ -18,8 +18,6 @@ import { type ConfigValue } from "../config/loader";
 
 export interface GenerateOptions {
   ignorePending: boolean;
-  apply: boolean;
-  plan: boolean;
   dev: boolean;
   squash?: boolean;
 }
@@ -86,19 +84,6 @@ export async function executeGenerate(
       ? `Generated squashed migration: ${migrationFilePath}`
       : `Migration file generated: ${migrationFilePath}`;
     reporter.success(successMessage);
-
-    if (options.apply) {
-      if (options.dev) {
-        reporter.warn(
-          "--apply flag is ignored when using --dev. Use 'kyrage apply' to apply to production database."
-        );
-      } else {
-        await executeApply(dependencies, {
-          plan: options.plan,
-          pretty: false,
-        });
-      }
-    }
   } finally {
     await cleanup();
   }
@@ -442,16 +427,6 @@ export const generateCmd = defineCommand({
     description: "Generate migration files based on the current schema",
   },
   args: {
-    apply: {
-      type: "boolean",
-      description: "Apply the migration after generating it",
-      default: false,
-    },
-    plan: {
-      type: "boolean",
-      description: "Plan the migration without applying it (only for --apply)",
-      default: false,
-    },
     "ignore-pending": {
       type: "boolean",
       description: "Ignore pending migrations and generate a new one",
@@ -474,8 +449,6 @@ export const generateCmd = defineCommand({
       const dependencies = await createCommonDependencies();
       await executeGenerate(dependencies, {
         ignorePending: ctx.args["ignore-pending"],
-        apply: ctx.args.apply,
-        plan: ctx.args.plan,
         dev: ctx.args.dev,
         squash: ctx.args.squash,
       });

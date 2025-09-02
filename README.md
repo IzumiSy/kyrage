@@ -181,8 +181,6 @@ $ kyrage apply
 ✔ Migration applied: 1755525514175
 ```
 
-**PROTIP**: You can also apply the changes immediately on generating migration: `kyrage generate --apply`
-
 ## Dev Database
 
 kyrage supports generating migrations against ephemeral development databases using Docker containers that is pretty much similar to the concept of [Atlas's Dev Database](https://atlasgo.io/concepts/dev-database).
@@ -343,7 +341,6 @@ This approach keeps your production migration history clean while allowing flexi
 | `kyrage generate` | Compare schema with database and generate migration file |
 | `kyrage generate --squash` | Consolidate pending migrations into a single migration file |
 | `kyrage generate --dev` | Generate migration using ephemeral dev database |
-| `kyrage generate --apply` | Generate and immediately apply migration |
 | `kyrage apply` | Apply all pending migrations to the database |
 | `kyrage dev status` | Show status of running development database containers |
 | `kyrage dev get-url` | Print connection URL for running development database (use with `psql $(kyrage dev get-url)`) |
