@@ -1,5 +1,11 @@
 # @izumisy/kyrage
 
+## 1.2.1
+
+### Patch Changes
+
+- [#84](https://github.com/IzumiSy/kyrage/pull/84) [`60062ea`](https://github.com/IzumiSy/kyrage/commit/60062ea8e30264202eb2b8f735e9b7e6c322d176) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Update dependencies
+
 ## 1.2.0
 
 ### Minor Changes
