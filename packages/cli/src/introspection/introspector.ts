@@ -1,5 +1,6 @@
 import { DBClient } from "../client";
 import { postgresExtraIntrospectorDriver } from "./postgres";
+import { duckdbExtraIntrospectorDriver } from "./duckdb";
 import { ColumnExtraAttribute } from "./type";
 
 const getExtraIntrospectorDriver = (client: DBClient) => {
@@ -9,6 +10,8 @@ const getExtraIntrospectorDriver = (client: DBClient) => {
     case "postgres":
     case "cockroachdb":
       return postgresExtraIntrospectorDriver({ client });
+    case "duckdb":
+      return duckdbExtraIntrospectorDriver({ client });
     default:
       throw new Error(`Unsupported dialect: ${dialect}`);
   }
@@ -18,7 +21,7 @@ export const getIntrospector = (client: DBClient) => {
   const extIntrospectorDriver = getExtraIntrospectorDriver(client);
   return {
     getTables: async () => {
-      await using db = client.getDB();
+      const db = await client.getDB();
       const kyselyIntrospection = await db.introspection.getTables();
       const columnExtra = await extIntrospectorDriver.introspectTables();
 

@@ -7,6 +7,8 @@ import {
   PostgresDialect,
   SqliteDialect,
 } from "kysely";
+import { DuckDbDialect } from "@oorabona/kysely-duckdb";
+import { DuckDBInstance } from "@duckdb/node-api";
 import { Pool } from "pg";
 import { createPool } from "mysql2";
 import Database from "better-sqlite3";
@@ -14,7 +16,7 @@ import { CockroachDBDialect } from "./dialects/cockroachdb";
 import { SQLCollectingDriver } from "./collector";
 import { DatabaseValue } from "./config/loader";
 
-const getDialect = (props: DatabaseValue) => {
+const getDialect = async (props: DatabaseValue) => {
   switch (props.dialect) {
     case "cockroachdb": {
       return new CockroachDBDialect({
@@ -38,6 +40,12 @@ const getDialect = (props: DatabaseValue) => {
     case "sqlite": {
       return new SqliteDialect({
         database: new Database(props.connectionString),
+      });
+    }
+    case "duckdb": {
+      const database = await DuckDBInstance.create(props.connectionString);
+      return new DuckDbDialect({
+        database,
       });
     }
     default:
@@ -65,8 +73,8 @@ type DBClientConstructorProps = {
 export class DBClient {
   constructor(private constructorProps: DBClientConstructorProps) {}
 
-  getDB(options?: DBClientConstructorProps["options"]) {
-    const dialect = getDialect(this.constructorProps.databaseProps);
+  async getDB(options?: DBClientConstructorProps["options"]) {
+    const dialect = await getDialect(this.constructorProps.databaseProps);
 
     return new PlannableKysely(
       {

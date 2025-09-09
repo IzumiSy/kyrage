@@ -1,6 +1,10 @@
 import { sql } from "kysely";
 import { DBClient } from "../client";
-import { ReferentialActions } from "../operation";
+import {
+  DatabaseColumnInfo,
+  DatabaseIndexInfo,
+  DatabaseConstraint,
+} from "./type";
 
 const nameDict = {
   bool: "boolean",
@@ -17,7 +21,7 @@ export const postgresExtraIntrospectorDriver = (props: {
 }) => {
   const introspectTables = async () => {
     const client = props.client;
-    await using db = client.getDB();
+    const db = await client.getDB();
     const { rows } = await sql`
       SELECT
         n.nspname AS table_schema,
@@ -39,7 +43,7 @@ export const postgresExtraIntrospectorDriver = (props: {
         AND NOT a.attisdropped
       ORDER BY c.relname, a.attnum;
     `
-      .$castTo<PostgresColumnInfo>()
+      .$castTo<DatabaseColumnInfo>()
       .execute(db);
 
     return rows.map((row) => ({
@@ -53,7 +57,7 @@ export const postgresExtraIntrospectorDriver = (props: {
 
   const introspectIndexes = async () => {
     const client = props.client;
-    await using db = client.getDB();
+    const db = await client.getDB();
 
     const { rows } = await sql`
       SELECT
@@ -76,7 +80,7 @@ export const postgresExtraIntrospectorDriver = (props: {
         )
       GROUP BY t.relname, i.relname, pg_index.indisunique, pg_index.indisprimary, i.oid;
     `
-      .$castTo<PostgresIndexInfo>()
+      .$castTo<DatabaseIndexInfo>()
       .execute(db);
     return rows.map((r) => ({
       table: r.table_name,
@@ -88,7 +92,7 @@ export const postgresExtraIntrospectorDriver = (props: {
 
   const introspectConstraints = async () => {
     const client = props.client;
-    await using db = client.getDB();
+    const db = await client.getDB();
     const { rows } = await sql`
       SELECT
           n.nspname AS schema,
@@ -146,7 +150,7 @@ export const postgresExtraIntrospectorDriver = (props: {
                rt.relname, c.confkey, c.confdeltype, c.confupdtype
       ORDER BY t.relname, c.conname;
     `
-      .$castTo<PostgresConstraint>()
+      .$castTo<DatabaseConstraint>()
       .execute(db);
 
     return {
@@ -181,44 +185,3 @@ export const postgresExtraIntrospectorDriver = (props: {
     convertTypeName,
   };
 };
-
-type PostgresColumnInfo = {
-  table_schema: string;
-  table_name: string;
-  column_name: string;
-  column_default: string | null;
-  character_maximum_length: number | null;
-};
-
-type PostgresIndexInfo = {
-  table_name: string;
-  index_name: string;
-  is_unique: boolean;
-  column_names: ReadonlyArray<string>;
-};
-
-type PostgresConstraintBase = {
-  schema: string;
-  table: string;
-  name: string;
-  columns: ReadonlyArray<string>;
-};
-
-type PostgresForeignKeyConstraint = {
-  referenced_table: string;
-  referenced_columns: ReadonlyArray<string>;
-  on_delete?: ReferentialActions;
-  on_update?: ReferentialActions;
-};
-
-type PostgresConstraint =
-  | (PostgresConstraintBase & {
-      type: "PRIMARY KEY";
-    })
-  | (PostgresConstraintBase & {
-      type: "UNIQUE";
-    })
-  | (PostgresConstraintBase &
-      PostgresForeignKeyConstraint & {
-        type: "FOREIGN KEY";
-      });
