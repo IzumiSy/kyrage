@@ -21,7 +21,7 @@ export const postgresExtraIntrospectorDriver = (props: {
 }) => {
   const introspectTables = async () => {
     const client = props.client;
-    const db = await client.getDB();
+    await using db = await client.getDB();
     const { rows } = await sql`
       SELECT
         n.nspname AS table_schema,
@@ -57,7 +57,7 @@ export const postgresExtraIntrospectorDriver = (props: {
 
   const introspectIndexes = async () => {
     const client = props.client;
-    const db = await client.getDB();
+    await using db = await client.getDB();
 
     const { rows } = await sql`
       SELECT
@@ -92,7 +92,7 @@ export const postgresExtraIntrospectorDriver = (props: {
 
   const introspectConstraints = async () => {
     const client = props.client;
-    const db = await client.getDB();
+    await using db = await client.getDB();
     const { rows } = await sql`
       SELECT
           n.nspname AS schema,

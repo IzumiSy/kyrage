@@ -21,7 +21,7 @@ export const getIntrospector = (client: DBClient) => {
   const extIntrospectorDriver = getExtraIntrospectorDriver(client);
   return {
     getTables: async () => {
-      const db = await client.getDB();
+      await using db = await client.getDB();
       const kyselyIntrospection = await db.introspection.getTables();
       const columnExtra = await extIntrospectorDriver.introspectTables();
 
