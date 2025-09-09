@@ -23,7 +23,7 @@ const config = defineConfigForTest({
 
 describe("apply migrations in multiple times", () => {
   it("should update DB in multiple times by the schema in config", async () => {
-    await using db = client.getDB();
+    await using db = await client.getDB();
     const deps = {
       client,
       logger: defaultConsolaLogger,

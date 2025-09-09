@@ -45,7 +45,7 @@ export const getAllMigrations = async () => {
 };
 
 export const getPendingMigrations = async (client: DBClient) => {
-  await using db = client.getDB();
+  await using db = await client.getDB();
   const migrationFiles = await getAllMigrations();
 
   // If no migration table exists, it should be the initial time to apply migrations

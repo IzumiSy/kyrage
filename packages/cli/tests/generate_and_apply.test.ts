@@ -53,7 +53,7 @@ describe("generate and apply", () => {
       }
     );
 
-    await using db = client.getDB();
+    await using db = await client.getDB();
     const tables = await db.introspection.getTables();
 
     expect(tables).toHaveLength(1);

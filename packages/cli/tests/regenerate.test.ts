@@ -50,7 +50,7 @@ const config = defineConfigForTest({
 });
 
 beforeAll(async () => {
-  await using db = client.getDB();
+  await using db = await client.getDB();
 
   await sql`
     CREATE TABLE members (

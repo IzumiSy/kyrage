@@ -6,7 +6,7 @@ const { client } = await setupTestDB();
 describe("DBClient", () => {
   describe("should be switchable to plan mode and able to be back", async () => {
     it("should create a test table in non-plan mode", async () => {
-      await using actualDB = client.getDB();
+      await using actualDB = await client.getDB();
       await actualDB.schema
         .createTable("test_table")
         .addColumn("id", "serial", (col) => col.primaryKey())
@@ -18,8 +18,8 @@ describe("DBClient", () => {
     });
 
     it("should not mutate tables in plan mode", async () => {
-      await using actualDB = client.getDB();
-      await using planDB = client.getDB({
+      await using actualDB = await client.getDB();
+      await using planDB = await client.getDB({
         plan: true,
       });
       await planDB.schema.dropTable("test_table").execute();

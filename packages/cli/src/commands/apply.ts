@@ -20,7 +20,7 @@ export async function executeApply(
   const { client, logger } = dependencies;
   const { reporter } = logger;
 
-  await using db = client.getDB({
+  await using db = await client.getDB({
     plan: options.plan,
   });
 
