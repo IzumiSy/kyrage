@@ -13,7 +13,6 @@ export const runIntrospectorTests = (config: DialectTestConfig) => {
   describe(`${config.dialectName} introspector driver`, async () => {
     const { client } = await setupTestDB({
       dialect: config.dialectName,
-      enableEachCleanup: true,
     });
     const introspector = config.dialect.createIntrospectionDriver(client);
 
@@ -61,6 +60,8 @@ export const runIntrospectorTests = (config: DialectTestConfig) => {
           characterMaximumLength: null,
         },
       ]);
+
+      await sql`DROP TABLE public.test_table`.execute(db);
     });
 
     it("should introspect indexes correctly", async () => {
@@ -99,6 +100,8 @@ export const runIntrospectorTests = (config: DialectTestConfig) => {
           unique: true,
         },
       ]);
+
+      await sql`DROP TABLE public.test_table_with_indexes`.execute(db);
     });
 
     it("should introspect constraints correctly", async () => {
@@ -125,67 +128,71 @@ export const runIntrospectorTests = (config: DialectTestConfig) => {
 
       const constraints = await introspector.introspectConstraints();
 
-      expect(constraints.primaryKey).toEqual([
-        {
-          name: "posts_pkey",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: "public",
-          table: "posts",
-          type: "PRIMARY KEY",
-          columns: ["id"],
-        },
-        {
-          name: "users_pkey",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: "public",
-          table: "users",
-          type: "PRIMARY KEY",
-          columns: ["id"],
-        },
-      ]);
-
-      expect(constraints.unique).toEqual([
-        {
-          name: "unique_title_per_user",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: "public",
-          table: "posts",
-          type: "UNIQUE",
-          columns: ["user_id", "title"],
-        },
-        {
-          name: "users_email_key",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: "public",
-          table: "users",
-          type: "UNIQUE",
-          columns: ["email"],
-        },
-      ]);
-
-      expect(constraints.foreignKey[0]).toEqual({
-        schema: "public",
-        table: "posts",
-        name: "fk_user",
-        type: "FOREIGN KEY",
-        columns: ["user_id"],
-        referencedTable: "users",
-        referencedColumns: ["id"],
-        onDelete: "cascade",
-        onUpdate: "cascade",
+      expect(constraints).toEqual({
+        primaryKey: [
+          {
+            name: "posts_pkey",
+            on_delete: null,
+            on_update: null,
+            referenced_columns: null,
+            referenced_table: null,
+            schema: "public",
+            table: "posts",
+            type: "PRIMARY KEY",
+            columns: ["id"],
+          },
+          {
+            name: "users_pkey",
+            on_delete: null,
+            on_update: null,
+            referenced_columns: null,
+            referenced_table: null,
+            schema: "public",
+            table: "users",
+            type: "PRIMARY KEY",
+            columns: ["id"],
+          },
+        ],
+        unique: [
+          {
+            name: "unique_title_per_user",
+            on_delete: null,
+            on_update: null,
+            referenced_columns: null,
+            referenced_table: null,
+            schema: "public",
+            table: "posts",
+            type: "UNIQUE",
+            columns: ["user_id", "title"],
+          },
+          {
+            name: "users_email_key",
+            on_delete: null,
+            on_update: null,
+            referenced_columns: null,
+            referenced_table: null,
+            schema: "public",
+            table: "users",
+            type: "UNIQUE",
+            columns: ["email"],
+          },
+        ],
+        foreignKey: [
+          {
+            schema: "public",
+            table: "posts",
+            name: "fk_user",
+            type: "FOREIGN KEY",
+            columns: ["user_id"],
+            referencedTable: "users",
+            referencedColumns: ["id"],
+            onDelete: "cascade",
+            onUpdate: "cascade",
+          },
+        ],
       });
+
+      await sql`DROP TABLE public.posts, public.users`.execute(db);
     });
   });
 };

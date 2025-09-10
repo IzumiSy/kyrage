@@ -1,11 +1,10 @@
-import { afterAll, afterEach } from "vitest";
+import { afterAll } from "vitest";
 import { getClient } from "../src/client";
 import { defineConfig, DefineConfigProp } from "../src/config/builder";
 import { DialectEnum, configSchema } from "../src/config/loader";
 import { getContainerRuntimeClient } from "testcontainers";
 import { ManagedKey } from "../src/dev/container";
 import { getDialect } from "../src/dialect/factory";
-import { sql } from "kysely";
 
 const getContainer = (dialect?: DialectEnum) => {
   const targetDialect =
@@ -19,10 +18,7 @@ const getContainer = (dialect?: DialectEnum) => {
   };
 };
 
-export const setupTestDB = async (options?: {
-  dialect?: DialectEnum;
-  enableEachCleanup?: boolean;
-}) => {
+export const setupTestDB = async (options?: { dialect?: DialectEnum }) => {
   const { container, dialect } = getContainer(options?.dialect);
   const startedContainer = await container.start();
   const database = {
@@ -36,13 +32,6 @@ export const setupTestDB = async (options?: {
   afterAll(async () => {
     await startedContainer.stop();
   });
-
-  if (options?.enableEachCleanup) {
-    afterEach(async () => {
-      await using db = client.getDB();
-      await sql`DROP SCHEMA public CASCADE; CREATE SCHEMA public;`.execute(db);
-    });
-  }
 
   return {
     database,
