@@ -6,8 +6,9 @@ import { getContainerRuntimeClient } from "testcontainers";
 import { ManagedKey } from "../src/dev/container";
 import { getDialect } from "../src/dialect/factory";
 
-const getContainer = () => {
-  const targetDialect = (process.env.TEST_DIALECT as DialectEnum) || "postgres";
+const getContainer = (dialect?: DialectEnum) => {
+  const targetDialect =
+    dialect || (process.env.TEST_DIALECT as DialectEnum) || "postgres";
   const kyrageDialect = getDialect(targetDialect);
   return {
     dialect: targetDialect,
@@ -17,8 +18,8 @@ const getContainer = () => {
   };
 };
 
-export const setupTestDB = async () => {
-  const { container, dialect } = getContainer();
+export const setupTestDB = async (targetDialect?: DialectEnum) => {
+  const { container, dialect } = getContainer(targetDialect);
   const startedContainer = await container.start();
   const database = {
     dialect,
