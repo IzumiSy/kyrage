@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll } from "vitest";
+import { afterAll, afterEach } from "vitest";
 import { getClient } from "../src/client";
 import { defineConfig, DefineConfigProp } from "../src/config/builder";
 import { DialectEnum, configSchema } from "../src/config/loader";
