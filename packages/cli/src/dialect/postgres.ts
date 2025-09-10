@@ -70,7 +70,10 @@ export const postgresExtraIntrospectorDriver = (props: {
       table: row.table_name,
       name: row.column_name,
       default: row.column_default,
-      characterMaximumLength: row.character_maximum_length,
+      characterMaximumLength: row.character_maximum_length
+        ? // NOTE: PostgreSQL returns character_maximum_length as a number, but CockroachDB does not.
+          Number(row.character_maximum_length)
+        : null,
     }));
   };
 

@@ -47,7 +47,7 @@ export type ConstraintAttributes = {
   foreignKey: ReadonlyArray<ForeignKeyConstraintAttribute>;
 };
 
-type IntrospectorDriver = {
+export type IntrospectorDriver = {
   introspectTables: () => Promise<ColumnExtraAttributes>;
   introspectIndexes: () => Promise<IndexAttributes>;
   introspectConstraints: () => Promise<ConstraintAttributes>;
