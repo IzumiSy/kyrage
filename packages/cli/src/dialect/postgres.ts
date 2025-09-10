@@ -88,23 +88,23 @@ export const postgresExtraIntrospectorDriver = (props: {
     const { rows } = await sql`
       SELECT
         t.relname AS table_name,
-        i.relname AS index_name,
-        pg_index.indisunique AS is_unique,
-        jsonb_agg(a.attname ORDER BY array_position(pg_index.indkey, a.attnum)) AS column_names
+        c.relname AS index_name,
+        i.indisunique AS is_unique,
+        jsonb_agg(a.attname ORDER BY array_position(i.indkey, a.attnum)) AS column_names
       FROM pg_class t
       JOIN pg_namespace n ON n.oid = t.relnamespace
-      JOIN pg_index ON pg_index.indrelid = t.oid
-      JOIN pg_class i ON i.oid = pg_index.indexrelid
-      JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY (pg_index.indkey)
+      JOIN pg_index i ON i.indrelid = t.oid
+      JOIN pg_class c ON c.oid = i.indexrelid
+      JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY (i.indkey)
       WHERE t.relkind = 'r'
         AND n.nspname = 'public'
-        AND NOT pg_index.indisprimary
+        AND NOT i.indisprimary
         AND NOT EXISTS (
           SELECT 1 FROM pg_constraint con
-          WHERE con.conindid = i.oid
+          WHERE con.conindid = c.oid
           AND con.contype IN ('p', 'u')
         )
-      GROUP BY t.relname, i.relname, pg_index.indisunique, pg_index.indisprimary, i.oid;
+      GROUP BY t.relname, c.relname, pg_index.indisunique, pg_index.indisprimary, c.oid;
     `
       .$castTo<PostgresIndexInfo>()
       .execute(db);
