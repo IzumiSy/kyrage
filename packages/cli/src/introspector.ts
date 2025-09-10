@@ -1,7 +1,14 @@
-import { DBClient } from "../client";
-import { getDialect } from "../dialect/factory";
-import { ColumnExtraAttribute } from "../dialect/types";
+import { DBClient } from "./client";
+import { getDialect } from "./dialect/factory";
+import { ColumnExtraAttribute } from "./dialect/types";
 
+/**
+ * Get an introspector for the given database client.
+ *
+ * The builtin introspector of Kysely is used to get basic information,
+ * and extended introspection is performed using the dialect-specific driver
+ * to get additional information such as indexes, constraints, and column details.
+ */
 export const getIntrospector = (client: DBClient) => {
   const kyrageDialect = getDialect(client.getDialect());
   const extIntrospectorDriver = kyrageDialect.createIntrospectionDriver(client);
