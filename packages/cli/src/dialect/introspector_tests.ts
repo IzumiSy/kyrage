@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { sql } from "kysely";
-import { getClient, DBClient } from "../client";
-import { KyrageDialect, IntrospectorDriver } from "./types";
+import { KyrageDialect } from "./types";
 import { DialectEnum } from "../config/loader";
+import { setupTestDB } from "../../tests/helper";
 
 export interface DialectTestConfig {
   dialectName: DialectEnum;
@@ -10,33 +10,9 @@ export interface DialectTestConfig {
 }
 
 export const runIntrospectorTests = (config: DialectTestConfig) => {
-  describe(`${config.dialectName} introspector driver`, () => {
-    let startedContainer: any;
-    let connectionString: string;
-    let client: DBClient;
-    let introspector: IntrospectorDriver;
-
-    beforeAll(async () => {
-      const container = config.dialect.createDevDatabaseContainer(
-        config.dialect.getDevDatabaseImageName()
-      );
-
-      startedContainer = await container.start();
-      connectionString = startedContainer.getConnectionUri();
-      client = getClient({
-        database: {
-          dialect: config.dialectName,
-          connectionString,
-        },
-      });
-      introspector = config.dialect.createIntrospectionDriver(client);
-    }, 60000);
-
-    afterAll(async () => {
-      if (startedContainer) {
-        await startedContainer.stop();
-      }
-    });
+  describe(`${config.dialectName} introspector driver`, async () => {
+    const { client } = await setupTestDB(config.dialectName);
+    const introspector = config.dialect.createIntrospectionDriver(client);
 
     describe("introspectTables", () => {
       it("should return empty array for no tables", async () => {
