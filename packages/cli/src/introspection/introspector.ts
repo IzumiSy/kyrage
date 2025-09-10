@@ -47,19 +47,19 @@ export const getIntrospector = (client: DBClient) => {
     },
     getIndexes: async () =>
       (await extIntrospectorDriver.introspectIndexes()).filter(
-        (v: any) => !v.table.startsWith("kysely_")
+        (v) => !v.table.startsWith("kysely_")
       ),
     getConstraints: async () => {
       const constraintResult =
         await extIntrospectorDriver.introspectConstraints();
       const primaryKey = constraintResult.primaryKey.filter(
-        (v: any) => !v.table.startsWith("kysely_")
+        (v) => !v.table.startsWith("kysely_")
       );
       const unique = constraintResult.unique.filter(
-        (v: any) => !v.table.startsWith("kysely_")
+        (v) => !v.table.startsWith("kysely_")
       );
       const foreignKey = constraintResult.foreignKey.filter(
-        (v: any) => !v.table.startsWith("kysely_")
+        (v) => !v.table.startsWith("kysely_")
       );
 
       return {
