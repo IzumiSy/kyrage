@@ -3,9 +3,9 @@ import { getDialect } from "../dialect/factory";
 import { ColumnExtraAttribute } from "./type";
 
 export const getIntrospector = (client: DBClient) => {
-  const dialectName = client.getDialect();
-  const kyrageDialect = getDialect(dialectName);
+  const kyrageDialect = getDialect(client.getDialect());
   const extIntrospectorDriver = kyrageDialect.createIntrospectionDriver(client);
+
   return {
     getTables: async () => {
       await using db = client.getDB();
