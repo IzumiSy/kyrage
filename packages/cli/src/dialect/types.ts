@@ -48,15 +48,18 @@ export type ConstraintAttributes = {
 };
 
 type IntrospectorDriver = {
-  introspectTables(): Promise<ColumnExtraAttributes>;
-  introspectIndexes(): Promise<IndexAttributes>;
-  introspectConstraints(): Promise<ConstraintAttributes>;
-  convertTypeName(typeName: string): string;
+  introspectTables: () => Promise<ColumnExtraAttributes>;
+  introspectIndexes: () => Promise<IndexAttributes>;
+  introspectConstraints: () => Promise<ConstraintAttributes>;
+  convertTypeName: (typeName: string) => string;
 };
 
 export interface KyrageDialect {
-  getDevDatabaseImageName(): string;
-  createKyselyDialect(connectionString: string): Dialect;
-  createIntrospectionDriver(client: DBClient): IntrospectorDriver;
-  createDevDatabaseContainer(image: string, name?: string): StartableContainer;
+  getDevDatabaseImageName: () => string;
+  createKyselyDialect: (connectionString: string) => Dialect;
+  createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;
+  createDevDatabaseContainer: (
+    image: string,
+    name?: string
+  ) => StartableContainer;
 }
