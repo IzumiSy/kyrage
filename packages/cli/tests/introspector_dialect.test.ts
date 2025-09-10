@@ -10,8 +10,9 @@ export interface DialectTestConfig {
 }
 
 const { client, dialect } = await setupTestDB();
+const dialectName = dialect.getName();
 
-describe(`${dialect.getName()} introspector driver`, async () => {
+describe(`${dialectName} introspector driver`, async () => {
   const introspector = dialect.createIntrospectionDriver(client);
 
   it("should introspect table columns correctly", async () => {
