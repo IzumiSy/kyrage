@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { sql } from "kysely";
-import { KyrageDialect } from "./types";
-import { DialectEnum } from "../config/loader";
-import { setupTestDB } from "../../tests/helper";
+import { KyrageDialect } from "../src/dialect/types";
+import { DialectEnum } from "../src/config/loader";
+import { setupTestDB } from "./helper";
 
 export interface DialectTestConfig {
   dialectName: DialectEnum;
@@ -11,9 +11,7 @@ export interface DialectTestConfig {
 
 export const runIntrospectorTests = (config: DialectTestConfig) => {
   describe(`${config.dialectName} introspector driver`, async () => {
-    const { client } = await setupTestDB({
-      dialect: config.dialectName,
-    });
+    const { client } = await setupTestDB();
     const introspector = config.dialect.createIntrospectionDriver(client);
 
     it("should introspect table columns correctly", async () => {
