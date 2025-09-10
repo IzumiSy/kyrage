@@ -1,49 +1,10 @@
-import {
-  CompiledQuery,
-  Kysely,
-  KyselyConfig,
-  KyselyProps,
-  MysqlDialect,
-  PostgresDialect,
-  SqliteDialect,
-} from "kysely";
-import { Pool } from "pg";
-import { createPool } from "mysql2";
-import Database from "better-sqlite3";
-import { CockroachDBDialect } from "./dialects/cockroachdb";
+import { CompiledQuery, Kysely, KyselyConfig, KyselyProps } from "kysely";
+import { getDialect as getKyrageDialect } from "./dialect/factory";
 import { SQLCollectingDriver } from "./collector";
 import { DatabaseValue } from "./config/loader";
 
-const getDialect = (props: DatabaseValue) => {
-  switch (props.dialect) {
-    case "cockroachdb": {
-      return new CockroachDBDialect({
-        pool: new Pool({
-          connectionString: props.connectionString,
-        }),
-      });
-    }
-    case "postgres": {
-      return new PostgresDialect({
-        pool: new Pool({
-          connectionString: props.connectionString,
-        }),
-      });
-    }
-    case "mysql": {
-      return new MysqlDialect({
-        pool: createPool(props.connectionString),
-      });
-    }
-    case "sqlite": {
-      return new SqliteDialect({
-        database: new Database(props.connectionString),
-      });
-    }
-    default:
-      throw new Error(`Unsupported dialect: ${props.dialect}`);
-  }
-};
+const createKyselyDialect = (props: DatabaseValue) =>
+  getKyrageDialect(props.dialect).createKyselyDialect(props.connectionString);
 
 export type GetClientProps = {
   database: DatabaseValue;
@@ -66,7 +27,7 @@ export class DBClient {
   constructor(private constructorProps: DBClientConstructorProps) {}
 
   getDB(options?: DBClientConstructorProps["options"]) {
-    const dialect = getDialect(this.constructorProps.databaseProps);
+    const dialect = createKyselyDialect(this.constructorProps.databaseProps);
 
     return new PlannableKysely(
       {

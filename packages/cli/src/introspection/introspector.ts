@@ -1,21 +1,11 @@
 import { DBClient } from "../client";
-import { postgresExtraIntrospectorDriver } from "./postgres";
+import { getDialect } from "../dialect/factory";
 import { ColumnExtraAttribute } from "./type";
 
-const getExtraIntrospectorDriver = (client: DBClient) => {
-  const dialect = client.getDialect();
-
-  switch (dialect) {
-    case "postgres":
-    case "cockroachdb":
-      return postgresExtraIntrospectorDriver({ client });
-    default:
-      throw new Error(`Unsupported dialect: ${dialect}`);
-  }
-};
-
 export const getIntrospector = (client: DBClient) => {
-  const extIntrospectorDriver = getExtraIntrospectorDriver(client);
+  const dialectName = client.getDialect();
+  const kyrageDialect = getDialect(dialectName);
+  const extIntrospectorDriver = kyrageDialect.createIntrospectionDriver(client);
   return {
     getTables: async () => {
       await using db = client.getDB();
@@ -57,19 +47,19 @@ export const getIntrospector = (client: DBClient) => {
     },
     getIndexes: async () =>
       (await extIntrospectorDriver.introspectIndexes()).filter(
-        (v) => !v.table.startsWith("kysely_")
+        (v: any) => !v.table.startsWith("kysely_")
       ),
     getConstraints: async () => {
       const constraintResult =
         await extIntrospectorDriver.introspectConstraints();
       const primaryKey = constraintResult.primaryKey.filter(
-        (v) => !v.table.startsWith("kysely_")
+        (v: any) => !v.table.startsWith("kysely_")
       );
       const unique = constraintResult.unique.filter(
-        (v) => !v.table.startsWith("kysely_")
+        (v: any) => !v.table.startsWith("kysely_")
       );
       const foreignKey = constraintResult.foreignKey.filter(
-        (v) => !v.table.startsWith("kysely_")
+        (v: any) => !v.table.startsWith("kysely_")
       );
 
       return {
