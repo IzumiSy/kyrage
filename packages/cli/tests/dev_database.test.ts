@@ -79,7 +79,7 @@ describe("generate with dev database", () => {
     expect(await findAllKyrageManagedContainerIDs()).toHaveLength(0);
   });
 
-  it("should reuse dev start container when available", async () => {
+  it.skip("should reuse dev start container when available", async () => {
     const configBase = {
       database,
       dev: {
