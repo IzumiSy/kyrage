@@ -1,10 +1,7 @@
 import { CompiledQuery, Kysely, KyselyConfig, KyselyProps } from "kysely";
-import { getDialect as getKyrageDialect } from "./dialect/factory";
+import { getDialect } from "./dialect/factory";
 import { SQLCollectingDriver } from "./collector";
 import { DatabaseValue } from "./config/loader";
-
-const createKyselyDialect = (props: DatabaseValue) =>
-  getKyrageDialect(props.dialect).createKyselyDialect(props.connectionString);
 
 export type GetClientProps = {
   database: DatabaseValue;
@@ -27,15 +24,17 @@ export class DBClient {
   constructor(private constructorProps: DBClientConstructorProps) {}
 
   getDB(options?: DBClientConstructorProps["options"]) {
-    const dialect = createKyselyDialect(this.constructorProps.databaseProps);
+    const kyselyDialect = getDialect(
+      this.constructorProps.databaseProps.dialect
+    ).createKyselyDialect(this.constructorProps.databaseProps.connectionString);
 
     return new PlannableKysely(
       {
         dialect: {
-          createAdapter: () => dialect.createAdapter(),
-          createDriver: () => dialect.createDriver(),
-          createIntrospector: (db) => dialect.createIntrospector(db),
-          createQueryCompiler: () => dialect.createQueryCompiler(),
+          createAdapter: () => kyselyDialect.createAdapter(),
+          createDriver: () => kyselyDialect.createDriver(),
+          createIntrospector: (db) => kyselyDialect.createIntrospector(db),
+          createQueryCompiler: () => kyselyDialect.createQueryCompiler(),
         },
       },
       {
