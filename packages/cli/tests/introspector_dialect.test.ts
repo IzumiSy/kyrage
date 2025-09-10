@@ -20,13 +20,13 @@ describe(`${dialectName} introspector driver`, async () => {
 
     // テストテーブルを作成
     await sql`
-          CREATE TABLE public.test_table (
-            id uuid PRIMARY KEY,
-            name varchar(255) NOT NULL,
-            age integer DEFAULT 0,
-            is_active boolean DEFAULT true
-          )
-        `.execute(db);
+      CREATE TABLE public.test_table (
+        id uuid PRIMARY KEY,
+        name varchar(255) NOT NULL,
+        age integer DEFAULT 0,
+        is_active boolean DEFAULT true
+      )
+    `.execute(db);
 
     const tables = await introspector.introspectTables();
     expect(tables).toEqual([
@@ -66,15 +66,14 @@ describe(`${dialectName} introspector driver`, async () => {
   it("should introspect indexes correctly", async () => {
     await using db = client.getDB();
 
-    // テストテーブルとインデックスを作成
     await sql`
-          CREATE TABLE public.test_table_with_indexes (
-            id uuid PRIMARY KEY,
-            email text,
-            name text,
-            age integer
-          )
-        `.execute(db);
+      CREATE TABLE public.test_table_with_indexes (
+        id uuid PRIMARY KEY,
+        email text,
+        name text,
+        age integer
+      )
+    `.execute(db);
 
     await sql`CREATE INDEX idx_email ON test_table_with_indexes (email)`.execute(
       db
@@ -106,24 +105,23 @@ describe(`${dialectName} introspector driver`, async () => {
   it("should introspect constraints correctly", async () => {
     await using db = client.getDB();
 
-    // テストテーブルを作成
     await sql`
-          CREATE TABLE public.users (
-            id uuid PRIMARY KEY,
-            email text UNIQUE,
-            username text
-          )
-        `.execute(db);
+      CREATE TABLE public.users (
+        id uuid PRIMARY KEY,
+        email text UNIQUE,
+        username text
+      )
+    `.execute(db);
 
     await sql`
-          CREATE TABLE public.posts (
-            id uuid PRIMARY KEY,
-            user_id uuid,
-            title text,
-            CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-            CONSTRAINT unique_title_per_user UNIQUE (user_id, title)
-          )
-        `.execute(db);
+      CREATE TABLE public.posts (
+        id uuid PRIMARY KEY,
+        user_id uuid,
+        title text,
+        CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        CONSTRAINT unique_title_per_user UNIQUE (user_id, title)
+      )
+    `.execute(db);
 
     const constraints = await introspector.introspectConstraints();
 
