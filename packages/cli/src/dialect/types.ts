@@ -47,14 +47,15 @@ export type ConstraintAttributes = {
   foreignKey: ReadonlyArray<ForeignKeyConstraintAttribute>;
 };
 
-type IntrospectorDriver = {
+export type IntrospectorDriver = {
   introspectTables: () => Promise<ColumnExtraAttributes>;
   introspectIndexes: () => Promise<IndexAttributes>;
   introspectConstraints: () => Promise<ConstraintAttributes>;
   convertTypeName: (typeName: string) => string;
 };
 
-export interface KyrageDialect {
+export interface KyrageDialect<T extends string = string> {
+  getName: () => T;
   getDevDatabaseImageName: () => string;
   createKyselyDialect: (connectionString: string) => Dialect;
   createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;

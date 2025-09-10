@@ -9,7 +9,8 @@
       "dependsOn": ["^build"]
     },
     "test": {
-      "cache": false
+      "cache": false,
+      "env": ["TEST_DIALECT"]
     },
     "dev": {
       "persistent": true,
