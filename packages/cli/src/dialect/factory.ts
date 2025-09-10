@@ -3,12 +3,14 @@ import { PostgresKyrageDialect } from "./postgres";
 import { CockroachDBKyrageDialect } from "./cockroachdb";
 import { DialectEnum } from "../config/loader";
 
-const dialects: Record<DialectEnum, KyrageDialectInterface> = {
+const dialects = {
   postgres: new PostgresKyrageDialect(),
   cockroachdb: new CockroachDBKyrageDialect(),
-};
+} as const;
 
-export const getDialect = (dialectName: DialectEnum) => {
+export const getDialect = (
+  dialectName: DialectEnum
+): KyrageDialectInterface => {
   const dialect = dialects[dialectName];
   if (!dialect) {
     throw new Error(`Unsupported dialect: ${dialectName}`);
