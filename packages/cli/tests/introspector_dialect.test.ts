@@ -102,7 +102,7 @@ describe(`${dialectName} introspector driver`, async () => {
     await sql`DROP TABLE public.test_table_with_indexes`.execute(db);
   });
 
-  it.skip("should introspect constraints correctly", async () => {
+  it("should introspect constraints correctly", async () => {
     await using db = client.getDB();
 
     await sql`
