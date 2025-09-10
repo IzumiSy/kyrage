@@ -1,6 +1,6 @@
 import { DBClient } from "../client";
 import { getDialect } from "../dialect/factory";
-import { ColumnExtraAttribute } from "./type";
+import { ColumnExtraAttribute } from "../dialect/types";
 
 export const getIntrospector = (client: DBClient) => {
   const kyrageDialect = getDialect(client.getDialect());
