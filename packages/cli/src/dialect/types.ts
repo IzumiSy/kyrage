@@ -54,7 +54,8 @@ export type IntrospectorDriver = {
   convertTypeName: (typeName: string) => string;
 };
 
-export interface KyrageDialect {
+export interface KyrageDialect<T extends string = string> {
+  getName: () => T;
   getDevDatabaseImageName: () => string;
   createKyselyDialect: (connectionString: string) => Dialect;
   createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;

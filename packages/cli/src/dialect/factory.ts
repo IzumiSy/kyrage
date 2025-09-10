@@ -8,14 +8,10 @@ const dialects = {
   cockroachdb: new CockroachDBKyrageDialect(),
 } as const;
 
-export const getDialect = (dialectName: DialectEnum): KyrageDialect => {
+export const getDialect = (dialectName: DialectEnum) => {
   const dialect = dialects[dialectName];
   if (!dialect) {
     throw new Error(`Unsupported dialect: ${dialectName}`);
   }
-  return dialect;
-};
-
-export const getSupportedDialects = (): DialectEnum[] => {
-  return Object.keys(dialects) as DialectEnum[];
+  return dialect as KyrageDialect<DialectEnum>;
 };

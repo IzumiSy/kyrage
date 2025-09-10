@@ -6,6 +6,10 @@ import { DBClient } from "../client";
 import { ReferentialActions } from "../operation";
 
 export class PostgresKyrageDialect implements KyrageDialect {
+  getName() {
+    return "postgres" as const;
+  }
+
   getDevDatabaseImageName() {
     return "postgres:16";
   }

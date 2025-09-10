@@ -11,6 +11,10 @@ import {
 import { postgresExtraIntrospectorDriver } from "./postgres";
 
 export class CockroachDBKyrageDialect implements KyrageDialect {
+  getName() {
+    return "cockroachdb" as const;
+  }
+
   getDevDatabaseImageName() {
     return "cockroachdb/cockroach:latest-v24.3";
   }

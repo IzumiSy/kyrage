@@ -10,7 +10,7 @@ const getContainer = () => {
   const targetDialect = (process.env.TEST_DIALECT as DialectEnum) || "postgres";
   const kyrageDialect = getDialect(targetDialect);
   return {
-    dialect: targetDialect,
+    dialect: kyrageDialect,
     container: kyrageDialect.createDevDatabaseContainer(
       kyrageDialect.getDevDatabaseImageName()
     ),
@@ -21,7 +21,7 @@ export const setupTestDB = async () => {
   const { container, dialect } = getContainer();
   const startedContainer = await container.start();
   const database = {
-    dialect,
+    dialect: dialect.getName(),
     connectionString: startedContainer.getConnectionUri(),
   };
   const client = getClient({
@@ -35,6 +35,7 @@ export const setupTestDB = async () => {
   return {
     database,
     client,
+    dialect,
   };
 };
 
