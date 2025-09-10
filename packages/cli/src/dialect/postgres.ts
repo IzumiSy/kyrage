@@ -1,11 +1,11 @@
 import { PostgresDialect, sql } from "kysely";
 import { Pool } from "pg";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { KyrageDialectInterface } from "./types";
+import { KyrageDialect } from "./types";
 import { DBClient } from "../client";
 import { ReferentialActions } from "../operation";
 
-export class PostgresKyrageDialect implements KyrageDialectInterface {
+export class PostgresKyrageDialect implements KyrageDialect {
   getDevDatabaseImageName() {
     return "postgres:16";
   }

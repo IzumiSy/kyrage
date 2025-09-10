@@ -1,5 +1,5 @@
 import { CockroachDbContainer } from "@testcontainers/cockroachdb";
-import { KyrageDialectInterface } from "./types";
+import { KyrageDialect } from "./types";
 import { Pool } from "pg";
 import { DBClient } from "../client";
 import {
@@ -10,7 +10,7 @@ import {
 } from "kysely";
 import { postgresExtraIntrospectorDriver } from "./postgres";
 
-export class CockroachDBKyrageDialect implements KyrageDialectInterface {
+export class CockroachDBKyrageDialect implements KyrageDialect {
   getDevDatabaseImageName() {
     return "cockroachdb/cockroach:latest-v24.3";
   }
