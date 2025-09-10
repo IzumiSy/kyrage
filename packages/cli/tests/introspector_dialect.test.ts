@@ -1,13 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sql } from "kysely";
-import { KyrageDialect } from "../src/dialect/types";
-import { DialectEnum } from "../src/config/loader";
 import { setupTestDB } from "./helper";
-
-export interface DialectTestConfig {
-  dialectName: DialectEnum;
-  dialect: KyrageDialect<DialectEnum>;
-}
 
 const { client, dialect } = await setupTestDB();
 const dialectName = dialect.getName();
