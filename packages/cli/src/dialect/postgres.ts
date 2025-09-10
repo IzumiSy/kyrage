@@ -20,12 +20,8 @@ export class PostgresKyrageDialect implements KyrageDialect {
     return postgresExtraIntrospectorDriver({ client });
   }
 
-  createDevDatabaseContainer(image: string, name?: string) {
-    const container = new PostgreSqlContainer(image);
-    if (name) {
-      container.withName(name);
-    }
-    return container;
+  createDevDatabaseContainer(image: string) {
+    return new PostgreSqlContainer(image);
   }
 }
 

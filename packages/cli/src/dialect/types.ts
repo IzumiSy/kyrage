@@ -58,8 +58,5 @@ export interface KyrageDialect {
   getDevDatabaseImageName: () => string;
   createKyselyDialect: (connectionString: string) => Dialect;
   createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;
-  createDevDatabaseContainer: (
-    image: string,
-    name?: string
-  ) => StartableContainer;
+  createDevDatabaseContainer: (image: string) => StartableContainer;
 }

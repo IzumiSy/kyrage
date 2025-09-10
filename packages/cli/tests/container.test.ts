@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   CannotGetConnectionStringError,
-  PostgreSqlDevDatabaseManager,
+  createContainerManager,
 } from "../src/dev/container";
 import { findAllKyrageManagedContainerIDs } from "./helper";
 
@@ -11,18 +11,20 @@ describe("DevDatabaseManager", () => {
   };
   const options = {
     dialect: "postgres" as const,
-    image: "postgres:16",
+    container: {
+      image: "postgres:16",
+    },
   };
 
   it("should start and stop container successfully", async () => {
-    const manager = new PostgreSqlDevDatabaseManager(options);
+    const manager = createContainerManager(options, "postgres", "dev-start");
 
     await manager.start();
     expect(manager.getConnectionString()).toMatch(expected.connectionPattern);
 
     expect(await manager.getStatus()).toEqual({
       type: "container",
-      imageName: options.image,
+      imageName: options.container.image,
       containerID: expect.any(String),
     });
 

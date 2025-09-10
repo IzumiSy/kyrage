@@ -25,12 +25,8 @@ export class CockroachDBKyrageDialect implements KyrageDialect {
     return postgresExtraIntrospectorDriver({ client });
   }
 
-  createDevDatabaseContainer(image: string, name?: string) {
-    const container = new CockroachDbContainer(image);
-    if (name) {
-      container.withName(name);
-    }
-    return container;
+  createDevDatabaseContainer(image: string) {
+    return new CockroachDbContainer(image);
   }
 }
 

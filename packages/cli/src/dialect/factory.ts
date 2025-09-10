@@ -15,3 +15,7 @@ export const getDialect = (dialectName: DialectEnum): KyrageDialect => {
   }
   return dialect;
 };
+
+export const getSupportedDialects = (): DialectEnum[] => {
+  return Object.keys(dialects) as DialectEnum[];
+};
