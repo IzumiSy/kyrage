@@ -1,9 +1,14 @@
 import { CockroachDbContainer } from "@testcontainers/cockroachdb";
 import { KyrageDialectInterface } from "./types";
-import { CockroachDBDialect } from "../dialects/cockroachdb";
 import { Pool } from "pg";
-import { postgresExtraIntrospectorDriver } from "../introspection/postgres";
 import { DBClient } from "../client";
+import {
+  Kysely,
+  MigrationLockOptions,
+  PostgresAdapter,
+  PostgresDialect,
+} from "kysely";
+import { postgresExtraIntrospectorDriver } from "./postgres";
 
 export class CockroachDBKyrageDialect implements KyrageDialectInterface {
   getName() {
@@ -30,5 +35,21 @@ export class CockroachDBKyrageDialect implements KyrageDialectInterface {
 
   getDefaultImage() {
     return "cockroachdb/cockroach:latest-v24.3";
+  }
+}
+
+// Ref: https://github.com/kysely-org/kysely/issues/325#issuecomment-1426878934
+class CockroachDBAdapter extends PostgresAdapter {
+  override async acquireMigrationLock(
+    db: Kysely<any>,
+    options: MigrationLockOptions
+  ) {
+    await db.selectFrom(options.lockTable).selectAll().forUpdate().execute();
+  }
+}
+
+export class CockroachDBDialect extends PostgresDialect {
+  override createAdapter() {
+    return new CockroachDBAdapter();
   }
 }

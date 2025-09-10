@@ -1,18 +1,19 @@
 import { Dialect } from "kysely";
 import { DBClient } from "../client";
 import { StartableContainer } from "../dev/container";
+import { DialectEnum } from "../config/loader";
 
-export type SupportedDialect = "postgres" | "cockroachdb";
+type IntrospectorDriver = {
+  introspectTables(): Promise<any[]>;
+  introspectIndexes(): Promise<any[]>;
+  introspectConstraints(): Promise<any>;
+  convertTypeName(typeName: string): string;
+};
 
 export interface KyrageDialectInterface {
-  getName(): SupportedDialect;
+  getName(): DialectEnum;
   getDefaultImage(): string;
   createKyselyDialect(connectionString: string): Dialect;
-  createIntrospectionDriver(client: DBClient): {
-    introspectTables(): Promise<any[]>;
-    introspectIndexes(): Promise<any[]>;
-    introspectConstraints(): Promise<any>;
-    convertTypeName(typeName: string): string;
-  };
+  createIntrospectionDriver(client: DBClient): IntrospectorDriver;
   createDevContainer(image: string, name?: string): StartableContainer;
 }

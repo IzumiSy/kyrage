@@ -180,7 +180,7 @@ const generateMigrationFromIntrospection = async (props: {
 
         // このカラムが複合主キーに含まれているかチェック
         const isInCompositePrimaryKey = constraintAttributes.primaryKey.some(
-          (pk) =>
+          (pk: any) =>
             pk.table === table.name &&
             pk.columns.length > 1 &&
             pk.columns.includes(colName)
