@@ -32,6 +32,38 @@ type SchemaDiff = {
 };
 ```
 
+### Dialect Architecture
+
+**kyrage** uses a **Dialect-based Architecture** to provide unified database support through a clean abstraction layer:
+
+```typescript
+export interface KyrageDialect {
+  getDevDatabaseImageName: () => string;
+  createKyselyDialect: (connectionString: string) => Dialect;
+  createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;
+  createDevDatabaseContainer: (image: string) => StartableContainer;
+}
+
+// Factory pattern for dialect management
+export const getDialect = (dialectName: DialectEnum): KyrageDialect => {
+  const dialect = dialects[dialectName];
+  if (!dialect) {
+    throw new Error(`Unsupported dialect: ${dialectName}`);
+  }
+  return dialect;
+};
+```
+
+**Supported Dialects**:
+- **PostgreSQL**: Full support with native introspection
+- **CockroachDB**: Built on PostgreSQL compatibility with custom adapter
+
+**Dialect Benefits**:
+1. **Unified Interface**: All database-specific logic encapsulated in dialect implementations
+2. **Extensibility**: New databases can be added by implementing the `KyrageDialect` interface
+3. **Maintainability**: Database-specific code is isolated and centralized
+4. **Type Safety**: Factory pattern ensures only supported dialects are used
+
 ### Benefits
 
 1. **Unified Processing**: Single `for...of` loop handles all operations consistently
@@ -39,6 +71,7 @@ type SchemaDiff = {
 3. **Testability**: Complete diff can be asserted as a single data structure using `toEqual()`
 4. **Extensibility**: New operation types integrate seamlessly, making it easy to add support for new databases and features
 5. **Maintainability**: No code duplication between console output, SQL generation, and testing
+6. **Database Abstraction**: Dialect architecture provides clean separation between core logic and database-specific implementations
 
 ## Key Modules
 
@@ -58,20 +91,32 @@ export const members = t("members", {
 });
 ```
 
-### 2. Schema Introspection (`introspection/`)
+### 2. Schema Introspection (`introspection/` → `dialect/`)
 
 **Purpose**: Extract current database schema for comparison
 
 **Architecture**:
-- `introspector.ts`: Core interface and coordination
-- `postgres.ts`: PostgreSQL-specific implementation  
-- `type.ts`: Schema representation types
+- `introspector.ts`: Core interface and coordination using dialect factory
+- `dialect/postgres.ts`: PostgreSQL-specific implementation with introspection driver
+- `dialect/cockroachdb.ts`: CockroachDB implementation reusing PostgreSQL introspection
+- `dialect/types.ts`: Dialect interface and schema representation types
+- `dialect/factory.ts`: Centralized dialect management and instantiation
 
 **Key Function**: `getIntrospector(client)` returns an introspector object with methods to extract database schema:
 - `getTables()`: Returns table and column information
 - `getIndexes()`: Returns index information
 
-The introspector provides a standardized interface regardless of database dialect.
+**Dialect Integration**:
+```typescript
+export const getIntrospector = (client: DBClient) => {
+  const dialectName = client.getDialect();
+  const kyrageDialect = getDialect(dialectName);
+  const extIntrospectorDriver = kyrageDialect.createIntrospectionDriver(client);
+  // ... unified processing
+};
+```
+
+The introspector provides a standardized interface regardless of database dialect, with all database-specific logic encapsulated in dialect implementations.
 
 ### 3. Diff Calculation (`diff.ts`)
 
@@ -147,24 +192,42 @@ export type DevDatabaseManager = {
   getStatus: () => Promise<DevStatus | null>;
 };
 
-// Unified container manager factory
+// Unified container manager using dialect factory
 export function createContainerManager(
-  dialect: SupportedDialect,
-  container: DevDatabaseContainerConfig,
-  managedBy: ContainerManagedBy
+  devConfig: NonNullable<DevDatabaseValue>,
+  dialect: DialectEnum,
+  manageType: "dev-start" | "one-off"
 ): DevDatabaseManager;
 
 // Smart container detection for reuse
 export async function hasRunningDevStartContainer(
-  dialect: SupportedDialect
-): Promise<DevDatabaseManager | null>;
+  dialect: DialectEnum
+): Promise<boolean>;
+```
+
+**Dialect Integration**:
+```typescript
+// Unified container creation using dialect factory
+export const createContainerManager = (
+  devConfig: NonNullable<DevDatabaseValue>,
+  dialect: DialectEnum,
+  manageType: "dev-start" | "one-off"
+) => {
+  if ("container" in devConfig) {
+    return new ContainerDevDatabaseManager(
+      { dialect, containerName, manageType },
+      () => getDialect(dialect).createDevDatabaseContainer(devConfig.container.image)
+    );
+  }
+  // ... handle connection string case
+};
 ```
 
 **Key Features**:
 - **Smart Container Reuse**: Automatically detects and reuses containers started by `dev start` command
 - **Dynamic Detection**: No configuration required - runtime detection based on container labels
-- **Unified Management**: Single `createContainerManager` function handles all container types
-- **Multi-dialect Support**: PostgreSQL and CockroachDB container management
+- **Unified Management**: Single `createContainerManager` function handles all container types via dialect factory
+- **Multi-dialect Support**: PostgreSQL and CockroachDB container management through dialect abstraction
 - **Label-based Discovery**: Uses Docker labels (`kyrage.managed`, `kyrage.managed-by`, `kyrage.dialect`) for identification
 
 **Container Reuse Behavior**:
@@ -258,17 +321,22 @@ export function createCommonDependencies(
   - `main.ts`: CLI entry point and command registration. Uses dependency injection to coordinate commands.
   - `operation.ts`: Operation type definitions and schema validation for array-based architecture.
   - `diff.ts`: Calculates Operation arrays representing schema differences.
-  - `introspection/`: Database schema introspection modules.
+  - `dialect/`: Centralized database dialect management and abstractions.
+    - `types.ts`: Dialect interface definitions and schema representation types (`KyrageDialect`, `ColumnExtraAttribute`, `ConstraintAttributes`).
+    - `factory.ts`: Centralized dialect instantiation and management (`getDialect`, `getSupportedDialects`).
+    - `postgres.ts`: PostgreSQL dialect implementation with introspection driver (`PostgresKyrageDialect`, `postgresExtraIntrospectorDriver`).
+    - `cockroachdb.ts`: CockroachDB dialect implementation extending PostgreSQL compatibility (`CockroachDBKyrageDialect`).
+  - `introspector.ts`: Database schema introspection coordination using dialect factory (moved from `introspection/`).
   - `migration.ts`: Executes Operation arrays against the database.
-  - `client.ts`: Database connection and client management.
+  - `client.ts`: Database connection and client management using dialect factory.
   - `logger.ts`: Logging utilities and console output formatting.
   - `commands/`: Unified command implementations with dependency injection.
     - `common.ts`: Shared dependency injection infrastructure (`CommonDependencies`, `createCommonDependencies`).
     - `apply.ts`: Migration application command (`executeApply`).
     - `generate.ts`: Migration generation command with dev database support and migration squashing (`executeGenerate`, `handleSquashMode`, `printPrettyDiff`).
     - `dev.ts`: Development database container management commands (`executeDevStart`, `executeDevStatus`, `executeDevGetUrl`, `executeDevClean`).
-  - `config/`: Configuration loading and validation.
-  - `dev/container.ts`: Development database container lifecycle management with reuse capabilities.
+  - `config/`: Configuration loading and validation with dialect enum restriction.
+  - `dev/container.ts`: Development database container lifecycle management with dialect factory integration.
   - `tests/`: Unit tests for core logic including comprehensive Operation array validation.
 
 - `examples/basic/`  
@@ -310,6 +378,7 @@ export function createCommonDependencies(
 
 - **Declarative Schema**: Users define the desired schema in TypeScript, enabling type safety and flexibility.
 - **Operation-based Architecture**: Unified Operation arrays enable consistent processing across all modules (console output, SQL generation, testing).
+- **Dialect-based Architecture**: Clean abstraction layer for database-specific functionality with centralized management through factory pattern.
 - **Dependency Injection**: Commands use dependency injection pattern for better testability and maintainability.
 - **Functional Programming**: Uses Ramda utilities like `eqBy` for immutable schema comparison.
 - **Diff-based Migration**: Only the necessary changes are applied, minimizing risk and manual intervention.
@@ -318,13 +387,15 @@ export function createCommonDependencies(
 - **Smart Container Reuse**: Dynamic detection of running containers eliminates configuration complexity while optimizing performance.
 - **Label-based Container Management**: Docker labels enable safe identification and cleanup of kyrage-managed containers.
 - **Unified Command Architecture**: All commands follow consistent patterns with shared infrastructure for error handling and logging.
+- **Type Safety**: Dialect factory ensures compile-time validation of supported database types.
 
 ## Future Work
 
-- Support for MySQL, SQLite, MSSQL.
+- Support for MySQL, SQLite, MSSQL through dialect interface implementation.
 - More advanced diffing (constraints, triggers, etc.).
 - Enhanced Operation types for complex schema changes.
 - Improved error handling and reporting.
 - Richer config validation and editor integration.
 - Advanced container orchestration features (health checks, resource limits).
 - Integration with CI/CD pipelines for automated migration testing.
+- Dialect plugin system for third-party database support.

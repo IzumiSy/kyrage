@@ -1,20 +1,43 @@
-import { sql } from "kysely";
+import { PostgresDialect, sql } from "kysely";
+import { Pool } from "pg";
+import { PostgreSqlContainer } from "@testcontainers/postgresql";
+import { KyrageDialect } from "./types";
 import { DBClient } from "../client";
 import { ReferentialActions } from "../operation";
 
-const nameDict = {
-  bool: "boolean",
-  int2: "smallint",
-  int4: "integer",
-  int8: "bigint",
-};
+export class PostgresKyrageDialect implements KyrageDialect {
+  getDevDatabaseImageName() {
+    return "postgres:16";
+  }
 
-const convertTypeName = (typeName: string) =>
-  nameDict[typeName as keyof typeof nameDict] ?? typeName;
+  createKyselyDialect(connectionString: string) {
+    return new PostgresDialect({
+      pool: new Pool({ connectionString }),
+    });
+  }
+
+  createIntrospectionDriver(client: DBClient) {
+    return postgresExtraIntrospectorDriver({ client });
+  }
+
+  createDevDatabaseContainer(image: string) {
+    return new PostgreSqlContainer(image);
+  }
+}
 
 export const postgresExtraIntrospectorDriver = (props: {
   client: DBClient;
 }) => {
+  const nameDict = {
+    bool: "boolean",
+    int2: "smallint",
+    int4: "integer",
+    int8: "bigint",
+  };
+
+  const convertTypeName = (typeName: string) =>
+    nameDict[typeName as keyof typeof nameDict] ?? typeName;
+
   const introspectTables = async () => {
     const client = props.client;
     await using db = client.getDB();

@@ -1,21 +1,18 @@
-import { DBClient } from "../client";
-import { postgresExtraIntrospectorDriver } from "./postgres";
-import { ColumnExtraAttribute } from "./type";
+import { DBClient } from "./client";
+import { getDialect } from "./dialect/factory";
+import { ColumnExtraAttribute } from "./dialect/types";
 
-const getExtraIntrospectorDriver = (client: DBClient) => {
-  const dialect = client.getDialect();
-
-  switch (dialect) {
-    case "postgres":
-    case "cockroachdb":
-      return postgresExtraIntrospectorDriver({ client });
-    default:
-      throw new Error(`Unsupported dialect: ${dialect}`);
-  }
-};
-
+/**
+ * Get an introspector for the given database client.
+ *
+ * The builtin introspector of Kysely is used to get basic information,
+ * and extended introspection is performed using the dialect-specific driver
+ * to get additional information such as indexes, constraints, and column details.
+ */
 export const getIntrospector = (client: DBClient) => {
-  const extIntrospectorDriver = getExtraIntrospectorDriver(client);
+  const kyrageDialect = getDialect(client.getDialect());
+  const extIntrospectorDriver = kyrageDialect.createIntrospectionDriver(client);
+
   return {
     getTables: async () => {
       await using db = client.getDB();

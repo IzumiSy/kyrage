@@ -10,7 +10,7 @@ import {
 } from "../migration";
 import { diffSchema } from "../diff";
 import { Tables, Operation } from "../operation";
-import { getIntrospector } from "../introspection/introspector";
+import { getIntrospector } from "../introspector";
 import { type DBClient } from "../client";
 import { type ConfigValue } from "../config/loader";
 import { startDevDatabase } from "../dev/database";

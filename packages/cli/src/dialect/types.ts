@@ -1,3 +1,6 @@
+import { Dialect } from "kysely";
+import { DBClient } from "../client";
+import { StartableContainer } from "../dev/container";
 import { ReferentialActions } from "../operation";
 
 export type ColumnExtraAttribute = {
@@ -7,6 +10,7 @@ export type ColumnExtraAttribute = {
   default: string | null;
   characterMaximumLength: number | null;
 };
+
 type ColumnExtraAttributes = ReadonlyArray<ColumnExtraAttribute>;
 
 type IndexAttributes = ReadonlyArray<{
@@ -43,20 +47,16 @@ export type ConstraintAttributes = {
   foreignKey: ReadonlyArray<ForeignKeyConstraintAttribute>;
 };
 
-export type ExtraIntrospectorDriver = {
+type IntrospectorDriver = {
   introspectTables: () => Promise<ColumnExtraAttributes>;
   introspectIndexes: () => Promise<IndexAttributes>;
   introspectConstraints: () => Promise<ConstraintAttributes>;
-  convertTypeName: (type: string) => string;
+  convertTypeName: (typeName: string) => string;
 };
 
-export type IndexIntrospector = {
-  introspectIndexes: () => Promise<
-    ReadonlyArray<{
-      table: string;
-      name: string;
-      columns: ReadonlyArray<string>;
-      unique: boolean;
-    }>
-  >;
-};
+export interface KyrageDialect {
+  getDevDatabaseImageName: () => string;
+  createKyselyDialect: (connectionString: string) => Dialect;
+  createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;
+  createDevDatabaseContainer: (image: string) => StartableContainer;
+}

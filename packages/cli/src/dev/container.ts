@@ -1,11 +1,10 @@
-import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { CockroachDbContainer } from "@testcontainers/cockroachdb";
 import {
   GenericContainer,
   getContainerRuntimeClient,
   StartedTestContainer,
 } from "testcontainers";
 import { DevDatabaseValue, DialectEnum } from "../config/loader";
+import { getDialect } from "../dialect/factory";
 
 type DevStatus =
   | {
@@ -25,13 +24,6 @@ export type DevDatabaseManager = {
   getConnectionString: () => string;
   getStatus: () => Promise<DevStatus | null>;
 };
-
-export interface ContainerOptions {
-  image: string;
-  dialect: DialectEnum;
-  containerName?: string;
-  manageType?: "dev-start" | "one-off"; // コンテナの種類を識別
-}
 
 type ConnectableStartedContainer = StartedTestContainer & {
   getConnectionUri: () => string;
@@ -85,14 +77,18 @@ export const CannotGetConnectionStringError = new Error(
   "Dev database is not started or unavailable"
 );
 
-export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
+export class ContainerDevDatabaseManager<C extends StartableContainer>
   implements DevDatabaseManager
 {
   protected startedContainer: ConnectableStartedContainer | null = null;
   protected container: C;
 
   constructor(
-    private options: ContainerOptions,
+    private options: {
+      dialect: DialectEnum;
+      containerName?: string;
+      manageType?: "dev-start" | "one-off"; // コンテナの種類を識別
+    },
     createContainer: () => C
   ) {
     const container = createContainer();
@@ -168,18 +164,6 @@ export abstract class ContainerDevDatabaseManager<C extends StartableContainer>
   }
 }
 
-export class PostgreSqlDevDatabaseManager extends ContainerDevDatabaseManager<PostgreSqlContainer> {
-  constructor(props: ContainerOptions) {
-    super(props, () => new PostgreSqlContainer(props.image));
-  }
-}
-
-export class CockroachDbDevDatabaseManager extends ContainerDevDatabaseManager<CockroachDbContainer> {
-  constructor(props: ContainerOptions) {
-    super(props, () => new CockroachDbContainer(props.image));
-  }
-}
-
 export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
   constructor(private connectionString: string) {}
 
@@ -222,22 +206,18 @@ export const createContainerManager = (
   if ("connectionString" in devConfig) {
     return new ConnectionStringDevDatabaseManager(devConfig.connectionString);
   } else if ("container" in devConfig) {
-    const containerOptions = {
-      dialect,
-      image: devConfig.container.image,
-      containerName:
-        manageType === "dev-start" ? devConfig.container.name : undefined,
-      manageType,
-    };
-
-    switch (dialect) {
-      case "postgres":
-        return new PostgreSqlDevDatabaseManager(containerOptions);
-      case "cockroachdb":
-        return new CockroachDbDevDatabaseManager(containerOptions);
-      default:
-        throw new Error(`Unsupported dialect for container: ${dialect}`);
-    }
+    return new ContainerDevDatabaseManager(
+      {
+        dialect,
+        containerName:
+          manageType === "dev-start" ? devConfig.container.name : undefined,
+        manageType,
+      },
+      () =>
+        getDialect(dialect).createDevDatabaseContainer(
+          devConfig.container.image
+        )
+    );
   } else {
     throw new Error("Invalid dev database configuration");
   }
