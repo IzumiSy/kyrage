@@ -31,7 +31,7 @@ jobs:
       matrix:
         dialect:
           - postgres
-          # - cockroachdb
+          - cockroachdb
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
