@@ -70,6 +70,7 @@ describe(`${dialectName} introspector driver`, async () => {
       CREATE TABLE public.test_table_with_indexes (
         id uuid PRIMARY KEY,
         email text,
+        alias text UNIQUE,
         name text,
         age integer
       )

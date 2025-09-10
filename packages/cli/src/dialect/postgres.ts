@@ -104,7 +104,7 @@ export const postgresExtraIntrospectorDriver = (props: {
           WHERE con.conindid = c.oid
           AND con.contype IN ('p', 'u')
         )
-      GROUP BY t.relname, c.relname, pg_index.indisunique, pg_index.indisprimary, c.oid;
+      GROUP BY t.relname, c.relname, i.indisunique, i.indisprimary, c.oid;
     `
       .$castTo<PostgresIndexInfo>()
       .execute(db);
