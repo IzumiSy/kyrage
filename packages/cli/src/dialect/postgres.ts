@@ -6,8 +6,8 @@ import { DBClient } from "../client";
 import { ReferentialActions } from "../operation";
 
 export class PostgresKyrageDialect implements KyrageDialectInterface {
-  getName() {
-    return "postgres" as const;
+  getDevDatabaseImageName() {
+    return "postgres:16";
   }
 
   createKyselyDialect(connectionString: string) {
@@ -20,16 +20,12 @@ export class PostgresKyrageDialect implements KyrageDialectInterface {
     return postgresExtraIntrospectorDriver({ client });
   }
 
-  createDevContainer(image: string, name?: string) {
+  createDevDatabaseContainer(image: string, name?: string) {
     const container = new PostgreSqlContainer(image);
     if (name) {
       container.withName(name);
     }
     return container;
-  }
-
-  getDefaultImage() {
-    return "postgres:16";
   }
 }
 

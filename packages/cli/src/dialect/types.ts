@@ -1,7 +1,6 @@
 import { Dialect } from "kysely";
 import { DBClient } from "../client";
 import { StartableContainer } from "../dev/container";
-import { DialectEnum } from "../config/loader";
 import { ReferentialActions } from "../operation";
 
 export type ColumnExtraAttribute = {
@@ -56,9 +55,8 @@ type IntrospectorDriver = {
 };
 
 export interface KyrageDialectInterface {
-  getName(): DialectEnum;
-  getDefaultImage(): string;
+  getDevDatabaseImageName(): string;
   createKyselyDialect(connectionString: string): Dialect;
   createIntrospectionDriver(client: DBClient): IntrospectorDriver;
-  createDevContainer(image: string, name?: string): StartableContainer;
+  createDevDatabaseContainer(image: string, name?: string): StartableContainer;
 }

@@ -11,8 +11,8 @@ import {
 import { postgresExtraIntrospectorDriver } from "./postgres";
 
 export class CockroachDBKyrageDialect implements KyrageDialectInterface {
-  getName() {
-    return "cockroachdb" as const;
+  getDevDatabaseImageName() {
+    return "cockroachdb/cockroach:latest-v24.3";
   }
 
   createKyselyDialect(connectionString: string) {
@@ -25,16 +25,12 @@ export class CockroachDBKyrageDialect implements KyrageDialectInterface {
     return postgresExtraIntrospectorDriver({ client });
   }
 
-  createDevContainer(image: string, name?: string) {
+  createDevDatabaseContainer(image: string, name?: string) {
     const container = new CockroachDbContainer(image);
     if (name) {
       container.withName(name);
     }
     return container;
-  }
-
-  getDefaultImage() {
-    return "cockroachdb/cockroach:latest-v24.3";
   }
 }
 

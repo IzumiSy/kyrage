@@ -6,26 +6,27 @@ import { getContainerRuntimeClient } from "testcontainers";
 import { ManagedKey } from "../src/dev/container";
 import { getDialect } from "../src/dialect/factory";
 
-const getContainer = (dialect: string) => {
-  if (dialect !== "postgres" && dialect !== "cockroachdb") {
-    throw new Error(`Unsupported dialect: ${dialect}`);
-  }
-
-  const kyrageDialect = getDialect(dialect);
-  return kyrageDialect.createDevContainer(kyrageDialect.getDefaultImage());
+const getContainer = () => {
+  const targetDialect = (process.env.TEST_DIALECT as DialectEnum) || "postgres";
+  const kyrageDialect = getDialect(targetDialect);
+  return {
+    dialect: targetDialect,
+    container: kyrageDialect.createDevDatabaseContainer(
+      kyrageDialect.getDevDatabaseImageName()
+    ),
+  };
 };
 
-const targetDialect = (process.env.TEST_DIALECT as DialectEnum) || "postgres";
-
 export const setupTestDB = async () => {
-  const container = await getContainer(targetDialect).start();
+  const { container, dialect } = getContainer();
+  const startedContainer = await container.start();
   const database = {
-    dialect: targetDialect as DialectEnum,
-    connectionString: container.getConnectionUri(),
-  } as const;
+    dialect,
+    connectionString: startedContainer.getConnectionUri(),
+  };
 
   afterAll(async () => {
-    await container.stop();
+    await startedContainer.stop();
   });
 
   return {
