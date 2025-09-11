@@ -99,11 +99,6 @@ export const postgresExtraIntrospectorDriver = (props: {
       WHERE t.relkind = 'r'
         AND n.nspname = 'public'
         AND NOT i.indisprimary
-        AND NOT EXISTS (
-          SELECT 1 FROM pg_constraint con
-          WHERE con.conindid = c.oid
-          AND con.contype IN ('p', 'u')
-        )
       GROUP BY t.relname, c.relname, i.indisunique, i.indisprimary, c.oid;
     `
       .$castTo<PostgresIndexInfo>()

@@ -287,6 +287,7 @@ export const defineConfig = (config: DefineConfigProp) => {
         }
       }
 
+      /*
       // unique: true の場合、unique constraintを自動生成
       if (columnDef.unique) {
         const constraintName = constraintNaming.unique(tableName, [columnName]);
@@ -301,6 +302,7 @@ export const defineConfig = (config: DefineConfigProp) => {
           });
         }
       }
+      */
     }
   }
 
