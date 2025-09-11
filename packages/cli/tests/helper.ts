@@ -73,6 +73,8 @@ export const setupTable = async (
     plan: false,
     pretty: false,
   });
+
+  return deps;
 };
 
 /**
