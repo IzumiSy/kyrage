@@ -15,6 +15,8 @@ import { type DBClient } from "../client";
 import { type ConfigValue } from "../config/loader";
 import { startDevDatabase } from "../dev/database";
 import { executeApply } from "./apply";
+import { is } from "ramda";
+import { constraintNaming } from "../naming";
 
 export interface GenerateOptions {
   ignorePending: boolean;
@@ -169,6 +171,8 @@ const generateMigrationFromIntrospection = async (props: {
           constraint.columns[0] === colName
       );
 
+  let modifiedRemoteUnique = constraintAttributes.unique;
+
   const dbTables: Tables = tables.map((table) => ({
     name: table.name,
     columns: Object.fromEntries(
@@ -177,6 +181,21 @@ const generateMigrationFromIntrospection = async (props: {
           table.name,
           colName
         );
+        const primaryKey = hasColumnConstraint(constraintAttributes.primaryKey);
+        const unique = hasColumnConstraint(constraintAttributes.unique);
+
+        // console.log(`column (${table.name}.${colName}) unique: ${unique}`);
+        if (unique) {
+          // Filter out the unique constraint that is automatically created from remote uniques
+          modifiedRemoteUnique = modifiedRemoteUnique.filter(
+            (uq) =>
+              !(
+                uq.table === table.name &&
+                uq.columns.length === 1 &&
+                uq.columns[0] === colName
+              )
+          );
+        }
 
         // このカラムが複合主キーに含まれているかチェック
         const isInCompositePrimaryKey = constraintAttributes.primaryKey.some(
@@ -197,9 +216,9 @@ const generateMigrationFromIntrospection = async (props: {
           {
             type: colDef.dataType,
             notNull: effectiveNotNull,
-            primaryKey: hasColumnConstraint(constraintAttributes.primaryKey),
-            unique: hasColumnConstraint(constraintAttributes.unique),
             defaultSql: colDef.default ?? undefined,
+            primaryKey,
+            unique,
           },
         ];
       })
@@ -234,25 +253,40 @@ const generateMigrationFromIntrospection = async (props: {
 
   const indexes = await introspector.getIndexes();
 
+  // Remove an implicit index that is automatically created for unique constraints from `constraintAttributes.unique`
+  // The index is the same name as the unique constraint, so we can filter it out.
+  const modifiedRemoteIndexes = indexes.filter(
+    (idx) =>
+      !constraintAttributes.unique.some(
+        (uq) => uq.table === idx.table && uq.name === idx.name
+      )
+  );
+
+  /*
+  // DEBUGGING -- START
+  console.log("config", {
+    unique: config.uniqueConstraints,
+    indexes: config.indexes,
+  });
+  console.log("-----");
+  console.log("remote", {
+    unique: modifiedRemoteUnique,
+    indexes: modifiedRemoteIndexes,
+  });
+  // DEBUGGING -- END
+  */
+
   const diff = diffSchema({
     current: {
       tables: dbTables,
-      indexes,
+      indexes: modifiedRemoteIndexes,
+      uniqueConstraints: modifiedRemoteUnique,
       primaryKeyConstraints: constraintAttributes.primaryKey,
-      uniqueConstraints: constraintAttributes.unique,
       foreignKeyConstraints: constraintAttributes.foreignKey,
     },
     ideal: {
+      ...config,
       tables: configTables,
-      indexes: config.indexes.map((i) => ({
-        table: i.table,
-        name: i.name,
-        columns: i.columns,
-        unique: i.unique,
-      })),
-      primaryKeyConstraints: config.primaryKeyConstraints || [],
-      uniqueConstraints: config.uniqueConstraints || [],
-      foreignKeyConstraints: config.foreignKeyConstraints || [],
     },
   });
 

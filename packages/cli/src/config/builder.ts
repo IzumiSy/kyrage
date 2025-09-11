@@ -302,7 +302,7 @@ export const defineConfig = (config: DefineConfigProp) => {
           });
         }
       }
-      */
+        */
     }
   }
 
