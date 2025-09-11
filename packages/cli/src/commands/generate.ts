@@ -169,8 +169,6 @@ const generateMigrationFromIntrospection = async (props: {
           constraint.columns[0] === colName
       );
 
-  let modifiedRemoteUnique = constraintAttributes.unique;
-
   const dbTables: Tables = tables.map((table) => ({
     name: table.name,
     columns: Object.fromEntries(
@@ -181,19 +179,6 @@ const generateMigrationFromIntrospection = async (props: {
         );
         const primaryKey = hasColumnConstraint(constraintAttributes.primaryKey);
         const unique = hasColumnConstraint(constraintAttributes.unique);
-
-        // console.log(`column (${table.name}.${colName}) unique: ${unique}`);
-        if (unique) {
-          // Filter out the unique constraint that is automatically created from remote uniques
-          modifiedRemoteUnique = modifiedRemoteUnique.filter(
-            (uq) =>
-              !(
-                uq.table === table.name &&
-                uq.columns.length === 1 &&
-                uq.columns[0] === colName
-              )
-          );
-        }
 
         // このカラムが複合主キーに含まれているかチェック
         const isInCompositePrimaryKey = constraintAttributes.primaryKey.some(
@@ -251,16 +236,6 @@ const generateMigrationFromIntrospection = async (props: {
 
   const indexes = await introspector.getIndexes();
 
-  // Remove an implicit index that is automatically created for unique constraints from `constraintAttributes.unique`
-  // The index is the same name as the unique constraint, so we can filter it out.
-  const modifiedRemoteIndexes = indexes.filter(
-    (idx) =>
-      !constraintAttributes.unique.some(
-        (uq) => uq.table === idx.table && uq.name === idx.name
-      )
-  );
-
-  /*
   // DEBUGGING -- START
   console.log("config", {
     unique: config.uniqueConstraints,
@@ -268,17 +243,16 @@ const generateMigrationFromIntrospection = async (props: {
   });
   console.log("-----");
   console.log("remote", {
-    unique: modifiedRemoteUnique,
-    indexes: modifiedRemoteIndexes,
+    unique: constraintAttributes.unique,
+    indexes: indexes,
   });
   // DEBUGGING -- END
-  */
 
   const diff = diffSchema({
     current: {
       tables: dbTables,
-      indexes: modifiedRemoteIndexes,
-      uniqueConstraints: modifiedRemoteUnique,
+      indexes,
+      uniqueConstraints: constraintAttributes.unique,
       primaryKeyConstraints: constraintAttributes.primaryKey,
       foreignKeyConstraints: constraintAttributes.foreignKey,
     },
