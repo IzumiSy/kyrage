@@ -13,7 +13,7 @@ export type ColumnExtraAttribute = {
 
 type ColumnExtraAttributes = ReadonlyArray<ColumnExtraAttribute>;
 
-type IndexAttributes = ReadonlyArray<{
+export type IndexAttributes = ReadonlyArray<{
   schema?: string;
   table: string;
   name: string;
@@ -21,7 +21,7 @@ type IndexAttributes = ReadonlyArray<{
   unique: boolean;
 }>;
 
-type ConstraintAttribute = {
+export type ConstraintAttribute = {
   schema?: string;
   table: string;
   name: string;
