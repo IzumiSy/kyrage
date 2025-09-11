@@ -27,7 +27,7 @@ describe(`${dialectName} introspector driver`, async () => {
       )
     `.execute(db);
 
-    const tables = await introspector.introspectTables();
+    const { tables } = await introspector.introspect();
     expect(tables).toEqual([
       {
         schema: "public",
@@ -77,8 +77,7 @@ describe(`${dialectName} introspector driver`, async () => {
       ),
     ]);
 
-    const indexes = await introspector.introspectIndexes();
-
+    const { indexes } = await introspector.introspect();
     expect(indexes).toEqual([
       {
         table: "test_table_with_indexes",
@@ -119,8 +118,7 @@ describe(`${dialectName} introspector driver`, async () => {
       )
     `.execute(db);
 
-    const constraints = await introspector.introspectConstraints();
-
+    const { constraints } = await introspector.introspect();
     expect(constraints).toEqual({
       primaryKey: [
         {
