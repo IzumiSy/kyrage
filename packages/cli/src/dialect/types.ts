@@ -48,9 +48,11 @@ export type ConstraintAttributes = {
 };
 
 export type IntrospectorDriver = {
-  introspectTables: () => Promise<ColumnExtraAttributes>;
-  introspectIndexes: () => Promise<IndexAttributes>;
-  introspectConstraints: () => Promise<ConstraintAttributes>;
+  introspect: () => Promise<{
+    tables: ColumnExtraAttributes;
+    indexes: IndexAttributes;
+    constraints: ConstraintAttributes;
+  }>;
   convertTypeName: (typeName: string) => string;
 };
 

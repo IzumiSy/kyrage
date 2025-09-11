@@ -150,8 +150,7 @@ const generateMigrationFromIntrospection = async (props: {
 }) => {
   const { client, config } = props;
   const introspector = getIntrospector(client);
-  const tables = await introspector.getTables();
-  const constraintAttributes = await introspector.getConstraints();
+  const { tables, indexes, constraints } = await introspector.introspect();
 
   // カラム制約の判定
   const columnConstraintPredicate =
@@ -177,11 +176,11 @@ const generateMigrationFromIntrospection = async (props: {
           table.name,
           colName
         );
-        const primaryKey = hasColumnConstraint(constraintAttributes.primaryKey);
-        const unique = hasColumnConstraint(constraintAttributes.unique);
+        const primaryKey = hasColumnConstraint(constraints.primaryKey);
+        const unique = hasColumnConstraint(constraints.unique);
 
         // このカラムが複合主キーに含まれているかチェック
-        const isInCompositePrimaryKey = constraintAttributes.primaryKey.some(
+        const isInCompositePrimaryKey = constraints.primaryKey.some(
           (pk) =>
             pk.table === table.name &&
             pk.columns.length > 1 &&
@@ -234,8 +233,6 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const indexes = await introspector.getIndexes();
-
   // DEBUGGING -- START
   console.log("config", {
     unique: config.uniqueConstraints,
@@ -243,7 +240,7 @@ const generateMigrationFromIntrospection = async (props: {
   });
   console.log("-----");
   console.log("remote", {
-    unique: constraintAttributes.unique,
+    unique: constraints.unique,
     indexes: indexes,
   });
   // DEBUGGING -- END
@@ -252,9 +249,9 @@ const generateMigrationFromIntrospection = async (props: {
     current: {
       tables: dbTables,
       indexes,
-      uniqueConstraints: constraintAttributes.unique,
-      primaryKeyConstraints: constraintAttributes.primaryKey,
-      foreignKeyConstraints: constraintAttributes.foreignKey,
+      uniqueConstraints: constraints.unique,
+      primaryKeyConstraints: constraints.primaryKey,
+      foreignKeyConstraints: constraints.foreignKey,
     },
     ideal: {
       ...config,

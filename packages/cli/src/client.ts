@@ -51,7 +51,7 @@ export class DBClient {
 /**
  * A Kysely instance that can be used to capture queries without executing them.
  */
-class PlannableKysely extends Kysely<any> {
+export class PlannableKysely extends Kysely<any> {
   private plannedQueries: Array<CompiledQuery> = [];
 
   constructor(
