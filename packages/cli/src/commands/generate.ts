@@ -15,8 +15,6 @@ import { type DBClient } from "../client";
 import { type ConfigValue } from "../config/loader";
 import { startDevDatabase } from "../dev/database";
 import { executeApply } from "./apply";
-import { is } from "ramda";
-import { constraintNaming } from "../naming";
 
 export interface GenerateOptions {
   ignorePending: boolean;
