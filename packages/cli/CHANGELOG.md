@@ -1,5 +1,41 @@
 # @izumisy/kyrage
 
+## 1.2.3
+
+### Patch Changes
+
+- [#98](https://github.com/IzumiSy/kyrage/pull/98) [`2880b70`](https://github.com/IzumiSy/kyrage/commit/2880b709fce022ea16337b8484f545873ad3cd87) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Fix redundant DROP INDEX operations when dropping constraints
+
+  Prevents "index does not exist" errors by filtering out redundant DROP INDEX operations that would fail due to automatic index deletion when dropping unique or primary key constraints. This commonly occurs in PostgreSQL and MySQL where dropping a constraint automatically drops its backing index.
+
+  **Example:**
+
+  ```sql
+  -- Before: This would fail with "index does not exist"
+  DROP CONSTRAINT uk_users_email;  -- Automatically drops the index
+  DROP INDEX uk_users_email;       -- ERROR: index no longer exists
+
+  -- After: Redundant DROP INDEX is automatically filtered out
+  DROP CONSTRAINT uk_users_email;  -- Index automatically deleted
+  -- DROP INDEX uk_users_email;    -- Filtered out, no error
+  ```
+
+- [#100](https://github.com/IzumiSy/kyrage/pull/100) [`825f90e`](https://github.com/IzumiSy/kyrage/commit/825f90e0cece66ddbe763cbe2543057192fb208c) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Fix redundant operations for tables being dropped
+
+  Prevents unnecessary operations and potential errors when tables are dropped by filtering out all operations that affect tables marked for deletion. When a table is dropped, all related operations (ALTER TABLE, DROP INDEX, constraint modifications) become redundant since the table deletion automatically removes all associated objects.
+
+  **Example:**
+
+  ```sql
+  -- Before: These operations would be unnecessary or cause errors
+  ALTER TABLE users ADD COLUMN email VARCHAR(255);  -- Unnecessary
+  DROP INDEX idx_users_name;                        -- Unnecessary
+  DROP TABLE users;                                 -- The actual operation needed
+
+  -- After: Only the essential operation is performed
+  DROP TABLE users;
+  ```
+
 ## 1.2.2
 
 ### Patch Changes
