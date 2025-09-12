@@ -15,19 +15,16 @@ describe(`${dialectName} introspector driver`, async () => {
   const introspector = dialect.createIntrospectionDriver(client);
 
   it.skip("should introspect table columns correctly", async () => {
-    await using db = client.getDB();
+    const deps = await setupTable({ client, database }, [
+      defineTable("test_table", {
+        id: column("uuid", { primaryKey: true }),
+        name: column("varchar(255)", { notNull: true }),
+        age: column("integer", { defaultSql: "0" }),
+        is_active: column("boolean", { defaultSql: "true" }),
+      }),
+    ]);
 
-    // テストテーブルを作成
-    await sql`
-      CREATE TABLE public.test_table (
-        id uuid PRIMARY KEY,
-        name varchar(255) NOT NULL,
-        age integer DEFAULT 0,
-        is_active boolean DEFAULT true
-      )
-    `.execute(db);
-
-    const { tables } = await introspector.introspect();
+    const { tables } = await introspector.introspect({ config: deps.config });
     expect(tables).toEqual([
       {
         schema: "public",
@@ -59,11 +56,12 @@ describe(`${dialectName} introspector driver`, async () => {
       },
     ]);
 
+    await using db = client.getDB();
     await sql`DROP TABLE public.test_table`.execute(db);
   });
 
   it("should introspect indexes correctly", async () => {
-    await setupTable({ client, database }, [
+    const deps = await setupTable({ client, database }, [
       defineTable(
         "test_table_with_indexes",
         {
@@ -77,7 +75,7 @@ describe(`${dialectName} introspector driver`, async () => {
       ),
     ]);
 
-    const { indexes } = await introspector.introspect();
+    const { indexes } = await introspector.introspect({ config: deps.config });
     expect(indexes).toEqual([
       {
         table: "test_table_with_indexes",
@@ -98,8 +96,7 @@ describe(`${dialectName} introspector driver`, async () => {
   });
 
   it.skip("should introspect constraints correctly", async () => {
-    await using db = client.getDB();
-
+    /*
     await sql`
       CREATE TABLE public.users (
         id uuid PRIMARY KEY,
@@ -117,8 +114,35 @@ describe(`${dialectName} introspector driver`, async () => {
         CONSTRAINT unique_title_per_user UNIQUE (user_id, title)
       )
     `.execute(db);
+    */
 
-    const { constraints } = await introspector.introspect();
+    const usersTable = defineTable("users", {
+      id: column("uuid", { primaryKey: true }),
+      email: column("text", { unique: true }),
+      username: column("text"),
+    });
+    const deps = await setupTable({ client, database }, [
+      defineTable(
+        "posts",
+        {
+          id: column("uuid", { primaryKey: true }),
+          user_id: column("uuid"),
+          title: column("text"),
+        },
+        (t) => [
+          t.reference("user_id", usersTable, "id", {
+            onDelete: "cascade",
+            onUpdate: "cascade",
+            name: "fk_user",
+          }),
+          t.unique(["user_id", "title"], { name: "unique_title_per_user" }),
+        ]
+      ),
+    ]);
+
+    const { constraints } = await introspector.introspect({
+      config: deps.config,
+    });
     expect(constraints).toEqual({
       primaryKey: [
         {
@@ -183,6 +207,7 @@ describe(`${dialectName} introspector driver`, async () => {
       ],
     });
 
+    await using db = client.getDB();
     await sql`DROP TABLE public.posts, public.users`.execute(db);
   });
 });

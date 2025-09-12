@@ -13,8 +13,9 @@ vi.mock("fs/promises", async () => {
 const { database, client } = await setupTestDB();
 
 it("generate with planned apply", async () => {
-  const loggerStdout = vi.spyOn(defaultConsolaLogger, "stdout");
-  // .mockImplementation(() => void 0);
+  const loggerStdout = vi
+    .spyOn(defaultConsolaLogger, "stdout")
+    .mockImplementation(() => void 0);
 
   // 1st phase
   {
