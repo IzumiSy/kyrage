@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { sql } from "kysely";
 import { applyTable, setupTestDB } from "./helper";
 import { column, defineTable } from "../src";
+import { getIntrospector } from "../src/introspector";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");
@@ -9,50 +10,51 @@ vi.mock("fs/promises", async () => {
 });
 
 const { client, dialect, database } = await setupTestDB();
+const introspector = getIntrospector(client);
 const dialectName = dialect.getName();
 
 describe(`${dialectName} introspector driver`, async () => {
-  const introspector = dialect.createIntrospectionDriver(client);
-
-  it.skip("should introspect table columns correctly", async () => {
+  it("should introspect table columns correctly", async () => {
     const deps = await applyTable({ client, database }, [
       defineTable("test_table", {
         id: column("uuid", { primaryKey: true }),
         name: column("varchar(255)", { notNull: true }),
-        age: column("integer", { defaultSql: "0" }),
+        age: column("int8", { defaultSql: "0" }),
         is_active: column("boolean", { defaultSql: "true" }),
       }),
     ]);
 
-    const { tables } = await introspector.introspect({ config: deps.config });
+    const { tables } = await introspector.introspect(deps.config);
     expect(tables).toEqual([
       {
+        name: "test_table",
         schema: "public",
-        table: "test_table",
-        name: "id",
-        default: null,
-        characterMaximumLength: null,
-      },
-      {
-        schema: "public",
-        table: "test_table",
-        name: "name",
-        default: null,
-        characterMaximumLength: 255,
-      },
-      {
-        schema: "public",
-        table: "test_table",
-        name: "age",
-        default: "0",
-        characterMaximumLength: null,
-      },
-      {
-        schema: "public",
-        table: "test_table",
-        name: "is_active",
-        default: "true",
-        characterMaximumLength: null,
+        columns: {
+          id: expect.objectContaining({
+            dataType: "uuid",
+            notNull: true,
+            default: null,
+            characterMaximumLength: null,
+          }),
+          name: expect.objectContaining({
+            dataType: "varchar",
+            notNull: true,
+            default: null,
+            characterMaximumLength: 255,
+          }),
+          age: expect.objectContaining({
+            dataType: "bigint",
+            notNull: false,
+            default: "0",
+            characterMaximumLength: null,
+          }),
+          is_active: expect.objectContaining({
+            dataType: "boolean",
+            notNull: false,
+            default: "true",
+            characterMaximumLength: null,
+          }),
+        },
       },
     ]);
 
@@ -75,7 +77,7 @@ describe(`${dialectName} introspector driver`, async () => {
       ),
     ]);
 
-    const { indexes } = await introspector.introspect({ config: deps.config });
+    const { indexes } = await introspector.introspect(deps.config);
     expect(indexes).toEqual([
       {
         table: "test_table_with_indexes",
@@ -95,33 +97,14 @@ describe(`${dialectName} introspector driver`, async () => {
     await sql`DROP TABLE public.test_table_with_indexes`.execute(db);
   });
 
-  it.skip("should introspect constraints correctly", async () => {
-    /*
-    await sql`
-      CREATE TABLE public.users (
-        id uuid PRIMARY KEY,
-        email text UNIQUE,
-        username text
-      )
-    `.execute(db);
-
-    await sql`
-      CREATE TABLE public.posts (
-        id uuid PRIMARY KEY,
-        user_id uuid,
-        title text,
-        CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-        CONSTRAINT unique_title_per_user UNIQUE (user_id, title)
-      )
-    `.execute(db);
-    */
-
+  it("should introspect constraints correctly", async () => {
     const usersTable = defineTable("users", {
       id: column("uuid", { primaryKey: true }),
       email: column("text", { unique: true }),
       username: column("text"),
     });
     const deps = await applyTable({ client, database }, [
+      usersTable,
       defineTable(
         "posts",
         {
@@ -140,13 +123,11 @@ describe(`${dialectName} introspector driver`, async () => {
       ),
     ]);
 
-    const { constraints } = await introspector.introspect({
-      config: deps.config,
-    });
+    const { constraints } = await introspector.introspect(deps.config);
     expect(constraints).toEqual({
       primaryKey: [
         {
-          name: "posts_pkey",
+          name: "posts_id_primary_key",
           on_delete: null,
           on_update: null,
           referenced_columns: null,
@@ -157,7 +138,7 @@ describe(`${dialectName} introspector driver`, async () => {
           columns: ["id"],
         },
         {
-          name: "users_pkey",
+          name: "users_id_primary_key",
           on_delete: null,
           on_update: null,
           referenced_columns: null,
@@ -181,7 +162,7 @@ describe(`${dialectName} introspector driver`, async () => {
           columns: ["user_id", "title"],
         },
         {
-          name: "users_email_key",
+          name: "users_email_unique",
           on_delete: null,
           on_update: null,
           referenced_columns: null,

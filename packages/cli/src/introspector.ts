@@ -1,7 +1,6 @@
 import { DBClient } from "./client";
 import { ConfigValue } from "./config/loader";
 import { getDialect } from "./dialect/factory";
-import { ColumnExtraAttribute } from "./dialect/types";
 
 /**
  * Get an introspector for the given database client.
@@ -23,9 +22,11 @@ export const getIntrospector = (client: DBClient) => {
       constraints,
     } = await extIntrospectorDriver.introspect({ config });
 
-    const getTables = () => {
-      return kyselyIntrospection.map((table) => {
-        const columns: Record<string, Column> = Object.fromEntries(
+    const getTables = () =>
+      kyselyIntrospection.map((table) => ({
+        schema: table.schema,
+        name: table.name,
+        columns: Object.fromEntries(
           table.columns.map((column) => {
             const ex = extTables.filter(
               (c) => c.table === table.name && c.name === column.name
@@ -48,15 +49,8 @@ export const getIntrospector = (client: DBClient) => {
               },
             ];
           })
-        );
-
-        return {
-          schema: table.schema,
-          name: table.name,
-          columns,
-        };
-      });
-    };
+        ),
+      }));
 
     const notInternalTable = (p: { table: string }) =>
       !p.table.startsWith("kysely_");
@@ -79,11 +73,4 @@ export const getIntrospector = (client: DBClient) => {
   return {
     introspect,
   };
-};
-
-// A data structure enriched with the data from kysely introspector
-type Column = ColumnExtraAttribute & {
-  dataType: string;
-  characterMaximumLength: number | null;
-  notNull: boolean;
 };
