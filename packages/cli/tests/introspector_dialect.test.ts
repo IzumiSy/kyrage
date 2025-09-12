@@ -128,10 +128,6 @@ describe(`${dialectName} introspector driver`, async () => {
       primaryKey: [
         {
           name: "posts_id_primary_key",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
           schema: "public",
           table: "posts",
           type: "PRIMARY KEY",
@@ -139,10 +135,6 @@ describe(`${dialectName} introspector driver`, async () => {
         },
         {
           name: "users_id_primary_key",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
           schema: "public",
           table: "users",
           type: "PRIMARY KEY",
@@ -152,10 +144,6 @@ describe(`${dialectName} introspector driver`, async () => {
       unique: [
         {
           name: "unique_title_per_user",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
           schema: "public",
           table: "posts",
           type: "UNIQUE",
@@ -163,10 +151,6 @@ describe(`${dialectName} introspector driver`, async () => {
         },
         {
           name: "users_email_unique",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
           schema: "public",
           table: "users",
           type: "UNIQUE",

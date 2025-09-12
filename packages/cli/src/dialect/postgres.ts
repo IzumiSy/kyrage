@@ -198,112 +198,116 @@ type PostgresIndexInfo = {
 
 export const introspectPSQLConstraints = async (db: PlannableKysely) => {
   const { rows } = await sql`
+    -- Primary Key & Unique制約
     SELECT
-      n.nspname AS schema,
-      t.relname AS table,
-      c.conname AS name,
-      CASE c.contype
-          WHEN 'p' THEN 'PRIMARY KEY'
-          WHEN 'u' THEN 'UNIQUE'
-          WHEN 'f' THEN 'FOREIGN KEY'
-      END AS type,
-      jsonb_agg(a.attname ORDER BY array_position(c.conkey, a.attnum)) AS columns,
-      -- Foreign Key専用の情報
-      CASE 
-          WHEN c.contype = 'f' THEN rt.relname 
-          ELSE NULL 
-      END AS referenced_table,
-      CASE 
-          WHEN c.contype = 'f' THEN jsonb_agg(ra.attname ORDER BY array_position(c.confkey, ra.attnum))
-          ELSE NULL 
-      END AS referenced_columns,
-      CASE 
-          WHEN c.contype = 'f' THEN 
-              CASE c.confdeltype
-                  WHEN 'c' THEN 'cascade'
-                  WHEN 'n' THEN 'set null'
-                  WHEN 'd' THEN 'set default'
-                  WHEN 'r' THEN 'restrict'
-                  WHEN 'a' THEN 'no action'
-              END
-          ELSE NULL
+      tc.constraint_schema AS schema,
+      tc.table_name AS "table",
+      tc.constraint_name AS name,
+      tc.constraint_type AS type,
+      jsonb_agg(kcu.column_name ORDER BY kcu.ordinal_position) AS columns,
+      NULL::text AS referenced_table,
+      NULL::jsonb AS referenced_columns,
+      NULL::text AS on_delete,
+      NULL::text AS on_update
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_name = kcu.constraint_name
+      AND tc.table_schema = kcu.table_schema
+      AND tc.table_name = kcu.table_name
+    WHERE tc.table_schema = 'public'
+      AND tc.constraint_type IN ('PRIMARY KEY', 'UNIQUE')
+    GROUP BY tc.constraint_schema, tc.table_name, tc.constraint_name, tc.constraint_type
+
+    UNION ALL
+
+    -- Foreign Key制約
+    SELECT
+      tc.constraint_schema AS schema,
+      tc.table_name AS "table",
+      tc.constraint_name AS name,
+      tc.constraint_type AS type,
+      jsonb_agg(kcu.column_name ORDER BY kcu.ordinal_position) AS columns,
+      kcu_ref.table_name AS referenced_table,
+      jsonb_agg(kcu_ref.column_name ORDER BY kcu_ref.ordinal_position) AS referenced_columns,
+      CASE rc.delete_rule
+        WHEN 'CASCADE' THEN 'cascade'
+        WHEN 'SET NULL' THEN 'set null'
+        WHEN 'SET DEFAULT' THEN 'set default'
+        WHEN 'RESTRICT' THEN 'restrict'
+        WHEN 'NO ACTION' THEN 'no action'
+        ELSE NULL
       END AS on_delete,
-      CASE 
-          WHEN c.contype = 'f' THEN 
-              CASE c.confupdtype
-                  WHEN 'c' THEN 'cascade'
-                  WHEN 'n' THEN 'set null'
-                  WHEN 'd' THEN 'set default'
-                  WHEN 'r' THEN 'restrict'
-                  WHEN 'a' THEN 'no action'
-              END
-          ELSE NULL
+      CASE rc.update_rule
+        WHEN 'CASCADE' THEN 'cascade'
+        WHEN 'SET NULL' THEN 'set null'
+        WHEN 'SET DEFAULT' THEN 'set default'
+        WHEN 'RESTRICT' THEN 'restrict'
+        WHEN 'NO ACTION' THEN 'no action'
+        ELSE NULL
       END AS on_update
-    FROM pg_constraint c
-    JOIN pg_class t ON c.conrelid = t.oid
-    JOIN pg_namespace n ON t.relnamespace = n.oid
-    JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
-    -- Foreign Key用のJOIN
-    LEFT JOIN pg_class rt ON c.confrelid = rt.oid
-    LEFT JOIN pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = ANY(c.confkey)
-    WHERE c.contype IN ('p', 'u', 'f')  -- primary key, unique, foreign key constraints
-        AND n.nspname = 'public'
-        AND NOT a.attisdropped
-        AND (c.contype != 'f' OR NOT ra.attisdropped)  -- Foreign Key用の条件
-    GROUP BY n.nspname, t.relname, c.conname, c.contype, c.oid, c.conkey, t.oid, 
-              rt.relname, c.confkey, c.confdeltype, c.confupdtype
-    ORDER BY t.relname, c.conname;
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_name = kcu.constraint_name
+      AND tc.table_schema = kcu.table_schema
+      AND tc.table_name = kcu.table_name
+    JOIN information_schema.referential_constraints rc
+      ON tc.constraint_name = rc.constraint_name
+      AND tc.table_schema = rc.constraint_schema
+    JOIN information_schema.key_column_usage kcu_ref
+      ON rc.unique_constraint_name = kcu_ref.constraint_name
+      AND rc.unique_constraint_schema = kcu_ref.table_schema
+    WHERE tc.table_schema = 'public'
+      AND tc.constraint_type = 'FOREIGN KEY'
+    GROUP BY tc.constraint_schema, tc.table_name, tc.constraint_name, tc.constraint_type,
+             kcu_ref.table_name, rc.delete_rule, rc.update_rule
+    ORDER BY "table", name;
   `
-    .$castTo<PostgresConstraint>()
+    .$castTo<InformationSchemaConstraint>()
     .execute(db);
 
   return {
-    primaryKey: rows.filter((row) => row.type === "PRIMARY KEY"),
-    unique: rows.filter((row) => row.type === "UNIQUE"),
+    primaryKey: rows
+      .filter((row) => row.type === "PRIMARY KEY")
+      .map((row) => ({
+        name: row.name,
+        schema: row.schema,
+        table: row.table,
+        type: row.type as "PRIMARY KEY",
+        columns: row.columns,
+      })),
+    unique: rows
+      .filter((row) => row.type === "UNIQUE")
+      .map((row) => ({
+        name: row.name,
+        schema: row.schema,
+        table: row.table,
+        type: row.type as "UNIQUE",
+        columns: row.columns,
+      })),
     foreignKey: rows
       .filter((row) => row.type === "FOREIGN KEY")
-      .map((row) => {
-        const {
-          referenced_table: referencedTable,
-          referenced_columns: referencedColumns,
-          on_delete: onDelete,
-          on_update: onUpdate,
-          ...columns
-        } = row;
-
-        return {
-          ...columns,
-          referencedTable,
-          referencedColumns,
-          onDelete,
-          onUpdate,
-        };
-      }),
+      .map((row) => ({
+        schema: row.schema,
+        table: row.table,
+        name: row.name,
+        type: row.type as "FOREIGN KEY",
+        columns: row.columns,
+        referencedTable: row.referenced_table!,
+        referencedColumns: row.referenced_columns!,
+        onDelete: row.on_delete || undefined,
+        onUpdate: row.on_update || undefined,
+      })),
   };
 };
 
-type PostgresConstraintBase = {
+type InformationSchemaConstraint = {
   schema: string;
   table: string;
   name: string;
+  type: "PRIMARY KEY" | "UNIQUE" | "FOREIGN KEY";
   columns: ReadonlyArray<string>;
+  referenced_table: string | null;
+  referenced_columns: ReadonlyArray<string> | null;
+  on_delete: ReferentialActions | null;
+  on_update: ReferentialActions | null;
 };
-
-type PostgresForeignKeyConstraint = {
-  referenced_table: string;
-  referenced_columns: ReadonlyArray<string>;
-  on_delete?: ReferentialActions;
-  on_update?: ReferentialActions;
-};
-
-type PostgresConstraint =
-  | (PostgresConstraintBase & {
-      type: "PRIMARY KEY";
-    })
-  | (PostgresConstraintBase & {
-      type: "UNIQUE";
-    })
-  | (PostgresConstraintBase &
-      PostgresForeignKeyConstraint & {
-        type: "FOREIGN KEY";
-      });
