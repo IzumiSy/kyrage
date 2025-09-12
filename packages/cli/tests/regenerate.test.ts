@@ -56,9 +56,8 @@ beforeAll(async () => {
     CREATE TABLE members (
       id UUID CONSTRAINT members_id_primary_key PRIMARY KEY,
       name TEXT NOT NULL,
-      email TEXT NOT NULL
+      email TEXT NOT NULL CONSTRAINT members_email_unique UNIQUE
     );
-    CREATE UNIQUE INDEX members_email_uq_idx ON members (email);
     CREATE UNIQUE INDEX "idx_members_name_email" ON "members" ("name", "email");
 
     CREATE TABLE orders (
