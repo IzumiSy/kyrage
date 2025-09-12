@@ -42,9 +42,11 @@ export class PostgresKyrageDialect implements KyrageDialect {
 export const doPSQLintrospect =
   (client: DBClient) => async (props: IntrospectProps) => {
     await using db = client.getDB();
-    const tables = await introspectPSQLTables(db);
-    const indexes = await introspectPSQLIndexes(db);
-    const constraints = await introspectPSQLConstraints(db);
+    const [tables, indexes, constraints] = await Promise.all([
+      introspectPSQLTables(db),
+      introspectPSQLIndexes(db),
+      introspectPSQLConstraints(db),
+    ]);
     const {
       indexes: normalizedIndexes,
       uniqueConstraints: normalizedUniqueConstraints,
