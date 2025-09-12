@@ -105,15 +105,17 @@ export async function buildMigrationFromDiff(
   db: Kysely<any>,
   diff: SchemaDiff
 ) {
-  const operations = R.pipe(
+  const buildOperations = R.pipe(
+    // Filter out operations for tables that will be dropped
+    filterOperationsForDroppedTables,
     // Filter out redundant DROP INDEX operations that would fail due to
     // automatic index deletion when dropping constraints
     filterRedundantDropIndexOperations,
     // Sort operations by dependency to ensure correct execution order
     sortOperationsByDependency
-  )(diff.operations);
+  );
 
-  for (const operation of operations) {
+  for (const operation of buildOperations(diff.operations)) {
     await executeOperation(db, operation);
   }
 }
@@ -375,6 +377,44 @@ const OPERATION_PRIORITY = {
   create_unique_constraint: 11,
   create_foreign_key_constraint: 12, // Foreign keys must be created last
 } as const;
+
+/**
+ * Filter out redundant operations for tables that are being dropped.
+ * When a table is dropped, all operations affecting that table become redundant.
+ *
+ * This prevents unnecessary operations and potential errors when attempting
+ * to alter or modify tables that will be dropped anyway.
+ */
+export const filterOperationsForDroppedTables = (
+  operations: ReadonlyArray<Operation>
+): ReadonlyArray<Operation> => {
+  // Identify tables that are being dropped
+  const droppedTables = new Set<string>();
+  operations.forEach((operation) => {
+    if (operation.type === "drop_table") {
+      droppedTables.add(operation.table);
+    }
+  });
+
+  // If no tables are being dropped, return all operations unchanged
+  if (droppedTables.size === 0) {
+    return operations;
+  }
+
+  // Filter out operations that affect dropped tables
+  return operations.filter((operation) => {
+    if (operation.type === "drop_table") {
+      return true; // Keep drop_table operations
+    }
+
+    // Skip operations on tables that will be dropped
+    if (droppedTables.has(operation.table)) {
+      return false;
+    }
+
+    return true;
+  });
+};
 
 /**
  * Filter out redundant DROP INDEX operations that would fail due to

@@ -122,11 +122,8 @@ it("generate with planned apply", async () => {
     `alter table "category" add constraint "category_member_fk" foreign key ("member_id") references "members" ("id") on delete cascade`,
 
     // 2nd phase
-    `alter table "category" drop constraint "category_member_fk"`,
-    `alter table "category" drop constraint "category_name_unique"`,
     `alter table "members" drop constraint "members_name_unique"`,
     `alter table "members" drop constraint "uq_members_name_email"`,
-    `alter table "category" drop constraint "pk_category_id_member_id"`,
     `drop index "idx_members_name_email"`,
     `drop table "category"`,
     `create table "posts" ("id" uuid not null, "content" text, "author_id" uuid not null)`,
