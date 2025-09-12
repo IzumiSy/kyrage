@@ -21,7 +21,7 @@ vi.mock("fs/promises", async () => {
 // However, it can be just useful for setting up a test database environment.
 const { database, client } = await setupTestDB();
 
-describe.skipIf(() => process.env.TEST_DIALECT !== "postgres")(
+describe.skipIf(process.env.TEST_DIALECT !== "postgres")(
   "generate with dev database",
   () => {
     const defaultOptions = {
