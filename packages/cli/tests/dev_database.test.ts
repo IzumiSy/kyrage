@@ -21,101 +21,81 @@ vi.mock("fs/promises", async () => {
 // However, it can be just useful for setting up a test database environment.
 const { database, client } = await setupTestDB();
 
-describe("generate with dev database", () => {
-  const defaultOptions = {
-    ignorePending: false,
-    dev: true,
-  };
+describe.skipIf(() => process.env.TEST_DIALECT !== "postgres")(
+  "generate with dev database",
+  () => {
+    const defaultOptions = {
+      ignorePending: false,
+      dev: true,
+    };
 
-  afterEach(() => {
-    vol.reset();
-  });
+    afterEach(() => {
+      vol.reset();
+    });
 
-  it("should create and cleanup one-off container when dev start not running", async () => {
-    const configBase = {
-      database,
-      dev: {
-        container: {
-          image: "postgres:16",
+    it("should create and cleanup one-off container when dev start not running", async () => {
+      const configBase = {
+        database,
+        dev: {
+          container: {
+            image: "postgres:16",
+          },
         },
-      },
-    };
+      };
 
-    await executeGenerate(
-      {
-        client,
-        logger: defaultConsolaLogger,
-        config: defineConfigForTest({
-          ...configBase,
-          tables: [
-            defineTable("members", {
-              id: column("uuid", { primaryKey: true }),
-              name: column("text"),
-            }),
-          ],
-        }),
-      },
-      defaultOptions
-    );
-
-    await executeGenerate(
-      {
-        client,
-        logger: defaultConsolaLogger,
-        config: defineConfigForTest({
-          ...configBase,
-          tables: [
-            defineTable("members", {
-              id: column("uuid", { primaryKey: true }),
-              age: column("integer"),
-            }),
-          ],
-        }),
-      },
-      defaultOptions
-    );
-
-    expect(await readdir("migrations")).toHaveLength(2);
-    expect(await findAllKyrageManagedContainerIDs()).toHaveLength(0);
-  });
-
-  it.skip("should reuse dev start container when available", async () => {
-    const configBase = {
-      database,
-      dev: {
-        container: {
-          image: "postgres:16",
-        },
-      },
-    };
-    const depBase = {
-      client,
-      logger: defaultConsolaLogger,
-    };
-
-    const deps = {
-      ...depBase,
-      config: defineConfigForTest({
-        ...configBase,
-        tables: [
-          defineTable("members", {
-            id: column("uuid", { primaryKey: true }),
-            name: column("text"),
+      await executeGenerate(
+        {
+          client,
+          logger: defaultConsolaLogger,
+          config: defineConfigForTest({
+            ...configBase,
+            tables: [
+              defineTable("members", {
+                id: column("uuid", { primaryKey: true }),
+                name: column("text"),
+              }),
+            ],
           }),
-        ],
-      }),
-    };
+        },
+        defaultOptions
+      );
 
-    // First, generate a migration
-    await executeGenerate(deps, defaultOptions);
+      await executeGenerate(
+        {
+          client,
+          logger: defaultConsolaLogger,
+          config: defineConfigForTest({
+            ...configBase,
+            tables: [
+              defineTable("members", {
+                id: column("uuid", { primaryKey: true }),
+                age: column("integer"),
+              }),
+            ],
+          }),
+        },
+        defaultOptions
+      );
 
-    // Start a dev start container with initial table, and verify dev start container is running
-    await executeDevStart(deps);
-    expect(await findAllKyrageManagedContainerIDs()).toHaveLength(1);
+      expect(await readdir("migrations")).toHaveLength(2);
+      expect(await findAllKyrageManagedContainerIDs()).toHaveLength(0);
+    });
 
-    // Generate another migration, and verify it does not stop the container
-    await executeGenerate(
-      {
+    it("should reuse dev start container when available", async () => {
+      const configBase = {
+        database,
+        dev: {
+          container: {
+            image: "postgres:16",
+          },
+        },
+      };
+      const depBase = {
+        client,
+        logger: defaultConsolaLogger,
+      };
+
+      const deps = {
         ...depBase,
         config: defineConfigForTest({
           ...configBase,
@@ -123,19 +103,42 @@ describe("generate with dev database", () => {
             defineTable("members", {
               id: column("uuid", { primaryKey: true }),
               name: column("text"),
-              age: column("integer"),
-              email: column("text"), // Add email field
             }),
           ],
         }),
-      },
-      defaultOptions
-    );
-    expect(await readdir("migrations")).toHaveLength(2);
-    const lastContainerIDs = await findAllKyrageManagedContainerIDs();
-    expect(lastContainerIDs).toHaveLength(1);
+      };
 
-    // Clean up the dev start container
-    await removeAllKyrageManagedContainers();
-  });
-});
+      // First, generate a migration
+      await executeGenerate(deps, defaultOptions);
+
+      // Start a dev start container with initial table, and verify dev start container is running
+      await executeDevStart(deps);
+      expect(await findAllKyrageManagedContainerIDs()).toHaveLength(1);
+
+      // Generate another migration, and verify it does not stop the container
+      await executeGenerate(
+        {
+          ...depBase,
+          config: defineConfigForTest({
+            ...configBase,
+            tables: [
+              defineTable("members", {
+                id: column("uuid", { primaryKey: true }),
+                name: column("text"),
+                age: column("integer"),
+                email: column("text"), // Add email field
+              }),
+            ],
+          }),
+        },
+        defaultOptions
+      );
+      expect(await readdir("migrations")).toHaveLength(2);
+      const lastContainerIDs = await findAllKyrageManagedContainerIDs();
+      expect(lastContainerIDs).toHaveLength(1);
+
+      // Clean up the dev start container
+      await removeAllKyrageManagedContainers();
+    });
+  }
+);
