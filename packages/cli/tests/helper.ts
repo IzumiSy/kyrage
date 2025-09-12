@@ -1,10 +1,22 @@
 import { afterAll } from "vitest";
-import { getClient } from "../src/client";
-import { defineConfig, DefineConfigProp } from "../src/config/builder";
-import { DialectEnum, configSchema } from "../src/config/loader";
+import { DBClient, getClient } from "../src/client";
+import {
+  defineConfig,
+  DefineConfigProp,
+  DefinedTables,
+} from "../src/config/builder";
+import {
+  ConfigValue,
+  DatabaseValue,
+  DialectEnum,
+  configSchema,
+} from "../src/config/loader";
 import { getContainerRuntimeClient } from "testcontainers";
 import { ManagedKey } from "../src/dev/container";
 import { getDialect } from "../src/dialect/factory";
+import { executeApply } from "../src/commands/apply";
+import { executeGenerate } from "../src/commands/generate";
+import { defaultConsolaLogger, Logger } from "../src/logger";
 
 const getContainer = () => {
   const targetDialect = (process.env.TEST_DIALECT as DialectEnum) || "postgres";
@@ -41,6 +53,45 @@ export const setupTestDB = async () => {
 
 export const defineConfigForTest = (config: DefineConfigProp) =>
   configSchema.parse(defineConfig(config));
+
+type SetupDeps = {
+  client: DBClient;
+  logger: Logger;
+  config: ConfigValue;
+};
+
+/**
+ * テスト用にマイグレーションを生成と適用しテーブルをセットアップする
+ */
+export const applyTable = async (
+  baseDeps: { client: DBClient; database: DatabaseValue },
+  tables: DefinedTables,
+  hooks?: {
+    beforeApply?: (deps: SetupDeps) => Promise<void> | void;
+  }
+) => {
+  const deps = {
+    client: baseDeps.client,
+    logger: defaultConsolaLogger,
+    config: defineConfigForTest({
+      database: baseDeps.database,
+      tables,
+    }),
+  };
+
+  await executeGenerate(deps, {
+    ignorePending: false,
+    dev: false,
+  });
+
+  await hooks?.beforeApply?.(deps);
+  await executeApply(deps, {
+    plan: false,
+    pretty: false,
+  });
+
+  return deps;
+};
 
 /**
  * 全てのkyrage管理コンテナのIDを取得する（テスト用）

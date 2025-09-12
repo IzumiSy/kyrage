@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
 import { defineTable, column } from "../src";
-import { setupTestDB, defineConfigForTest } from "./helper";
+import { setupTestDB, defineConfigForTest, applyTable } from "./helper";
 import { executeGenerate } from "../src/commands/generate";
 import { defaultConsolaLogger } from "../src/logger";
 import { executeApply } from "../src/commands/apply";
@@ -28,48 +28,36 @@ it("generate with planned apply", async () => {
       },
       (t) => [t.index(["name", "email"]), t.unique(["name", "email"])]
     );
-    const deps = {
-      client,
-      logger: defaultConsolaLogger,
-      config: defineConfigForTest({
-        database,
-        tables: [
-          membersTable,
-          defineTable(
-            "category",
-            {
-              id: column("uuid"),
-              member_id: column("uuid"),
-              name: column("text", { unique: true }),
-            },
-            (t) => [
-              t.primaryKey(["id", "member_id"]),
-              t.reference("member_id", membersTable, "id", {
-                onDelete: "cascade",
-                name: "category_member_fk",
-              }),
-            ]
-          ),
-        ],
-      }),
-    };
-
-    await executeGenerate(deps, {
-      ignorePending: false,
-      dev: false,
-    });
-
-    // Plan changes
-    await executeApply(deps, {
-      plan: true,
-      pretty: false,
-    });
-
-    // Apply changes to the DB
-    await executeApply(deps, {
-      plan: false,
-      pretty: false,
-    });
+    await applyTable(
+      { client, database },
+      [
+        membersTable,
+        defineTable(
+          "category",
+          {
+            id: column("uuid"),
+            member_id: column("uuid"),
+            name: column("text", { unique: true }),
+          },
+          (t) => [
+            t.primaryKey(["id", "member_id"]),
+            t.reference("member_id", membersTable, "id", {
+              onDelete: "cascade",
+              name: "category_member_fk",
+            }),
+          ]
+        ),
+      ],
+      {
+        beforeApply: async (deps_) => {
+          // Plan changes
+          await executeApply(deps_, {
+            plan: true,
+            pretty: false,
+          });
+        },
+      }
+    );
   }
 
   // 2nd phase
@@ -139,7 +127,10 @@ it("generate with planned apply", async () => {
     `alter table "members" drop constraint "members_name_unique"`,
     `alter table "members" drop constraint "uq_members_name_email"`,
     `alter table "category" drop constraint "pk_category_id_member_id"`,
+    `drop index "category_name_unique"`,
     `drop index "idx_members_name_email"`,
+    `drop index "uq_members_name_email"`,
+    `drop index "members_name_unique"`,
     `drop table "category"`,
     `create table "posts" ("id" uuid not null, "content" text, "author_id" uuid not null)`,
     `create unique index "idx_members_id_email" on "members" ("id", "email")`,

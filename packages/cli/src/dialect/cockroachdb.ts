@@ -8,7 +8,7 @@ import {
   PostgresAdapter,
   PostgresDialect,
 } from "kysely";
-import { postgresExtraIntrospectorDriver } from "./postgres";
+import { convertPSQLTypeName, doPSQLintrospect } from "./postgres";
 
 export class CockroachDBKyrageDialect implements KyrageDialect {
   getName() {
@@ -26,7 +26,10 @@ export class CockroachDBKyrageDialect implements KyrageDialect {
   }
 
   createIntrospectionDriver(client: DBClient) {
-    return postgresExtraIntrospectorDriver({ client });
+    return {
+      convertTypeName: convertPSQLTypeName,
+      introspect: doPSQLintrospect(client),
+    };
   }
 
   createDevDatabaseContainer(image: string) {

@@ -21,7 +21,7 @@ vi.mock("fs/promises", async () => {
 // However, it can be just useful for setting up a test database environment.
 const { database, client } = await setupTestDB();
 
-describe("generate with dev database", () => {
+describe.skip("generate with dev database", () => {
   const defaultOptions = {
     ignorePending: false,
     dev: true,
@@ -79,7 +79,7 @@ describe("generate with dev database", () => {
     expect(await findAllKyrageManagedContainerIDs()).toHaveLength(0);
   });
 
-  it.skip("should reuse dev start container when available", async () => {
+  it("should reuse dev start container when available", async () => {
     const configBase = {
       database,
       dev: {

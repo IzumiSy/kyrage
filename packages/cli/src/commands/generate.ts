@@ -150,8 +150,8 @@ const generateMigrationFromIntrospection = async (props: {
 }) => {
   const { client, config } = props;
   const introspector = getIntrospector(client);
-  const tables = await introspector.getTables();
-  const constraintAttributes = await introspector.getConstraints();
+  const { tables, indexes, constraints } =
+    await introspector.introspect(config);
 
   // カラム制約の判定
   const columnConstraintPredicate =
@@ -177,9 +177,11 @@ const generateMigrationFromIntrospection = async (props: {
           table.name,
           colName
         );
+        const primaryKey = hasColumnConstraint(constraints.primaryKey);
+        const unique = hasColumnConstraint(constraints.unique);
 
         // このカラムが複合主キーに含まれているかチェック
-        const isInCompositePrimaryKey = constraintAttributes.primaryKey.some(
+        const isInCompositePrimaryKey = constraints.primaryKey.some(
           (pk) =>
             pk.table === table.name &&
             pk.columns.length > 1 &&
@@ -197,9 +199,9 @@ const generateMigrationFromIntrospection = async (props: {
           {
             type: colDef.dataType,
             notNull: effectiveNotNull,
-            primaryKey: hasColumnConstraint(constraintAttributes.primaryKey),
-            unique: hasColumnConstraint(constraintAttributes.unique),
             defaultSql: colDef.default ?? undefined,
+            primaryKey,
+            unique,
           },
         ];
       })
@@ -232,27 +234,17 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const indexes = await introspector.getIndexes();
-
   const diff = diffSchema({
     current: {
       tables: dbTables,
       indexes,
-      primaryKeyConstraints: constraintAttributes.primaryKey,
-      uniqueConstraints: constraintAttributes.unique,
-      foreignKeyConstraints: constraintAttributes.foreignKey,
+      uniqueConstraints: constraints.unique,
+      primaryKeyConstraints: constraints.primaryKey,
+      foreignKeyConstraints: constraints.foreignKey,
     },
     ideal: {
+      ...config,
       tables: configTables,
-      indexes: config.indexes.map((i) => ({
-        table: i.table,
-        name: i.name,
-        columns: i.columns,
-        unique: i.unique,
-      })),
-      primaryKeyConstraints: config.primaryKeyConstraints || [],
-      uniqueConstraints: config.uniqueConstraints || [],
-      foreignKeyConstraints: config.foreignKeyConstraints || [],
     },
   });
 
