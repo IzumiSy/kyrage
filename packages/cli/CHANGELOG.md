@@ -1,5 +1,13 @@
 # @izumisy/kyrage
 
+## 1.2.2
+
+### Patch Changes
+
+- [#92](https://github.com/IzumiSy/kyrage/pull/92) [`4f5050f`](https://github.com/IzumiSy/kyrage/commit/4f5050f621bfee351b75ec9427e18abf2cc161d5) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Fix CockroachDB dialect
+
+  The changes that fix CockroachDB dialect includes the update for internal introspection mechanism that filters out auto-generated indexes and uinque constraints, which leads to unwanted diff between the database and user-defined configuration.
+
 ## 1.2.1
 
 ### Patch Changes
