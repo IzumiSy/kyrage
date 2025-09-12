@@ -234,20 +234,6 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  /*
-  // DEBUGGING -- START
-  console.log("config", {
-    unique: config.uniqueConstraints,
-    indexes: config.indexes,
-  });
-  console.log("-----");
-  console.log("remote", {
-    unique: constraints.unique,
-    indexes: indexes,
-  });
-  // DEBUGGING -- END
-  */
-
   const diff = diffSchema({
     current: {
       tables: dbTables,
