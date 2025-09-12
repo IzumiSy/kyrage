@@ -150,7 +150,8 @@ const generateMigrationFromIntrospection = async (props: {
 }) => {
   const { client, config } = props;
   const introspector = getIntrospector(client);
-  const { tables, indexes, constraints } = await introspector.introspect();
+  const { tables, indexes, constraints } =
+    await introspector.introspect(config);
 
   // カラム制約の判定
   const columnConstraintPredicate =
@@ -233,6 +234,7 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
+  /*
   // DEBUGGING -- START
   console.log("config", {
     unique: config.uniqueConstraints,
@@ -244,6 +246,7 @@ const generateMigrationFromIntrospection = async (props: {
     indexes: indexes,
   });
   // DEBUGGING -- END
+  */
 
   const diff = diffSchema({
     current: {

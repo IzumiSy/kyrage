@@ -13,9 +13,8 @@ vi.mock("fs/promises", async () => {
 const { database, client } = await setupTestDB();
 
 it("generate with planned apply", async () => {
-  const loggerStdout = vi
-    .spyOn(defaultConsolaLogger, "stdout")
-    .mockImplementation(() => void 0);
+  const loggerStdout = vi.spyOn(defaultConsolaLogger, "stdout");
+  // .mockImplementation(() => void 0);
 
   // 1st phase
   {
@@ -139,7 +138,10 @@ it("generate with planned apply", async () => {
     `alter table "members" drop constraint "members_name_unique"`,
     `alter table "members" drop constraint "uq_members_name_email"`,
     `alter table "category" drop constraint "pk_category_id_member_id"`,
+    `drop index "category_name_unique"`,
     `drop index "idx_members_name_email"`,
+    `drop index "uq_members_name_email"`,
+    `drop index "members_name_unique"`,
     `drop table "category"`,
     `create table "posts" ("id" uuid not null, "content" text, "author_id" uuid not null)`,
     `create unique index "idx_members_id_email" on "members" ("id", "email")`,

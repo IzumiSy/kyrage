@@ -2,6 +2,7 @@ import { Dialect } from "kysely";
 import { DBClient } from "../client";
 import { StartableContainer } from "../dev/container";
 import { ReferentialActions } from "../operation";
+import { ConfigValue } from "../config/loader";
 
 export type ColumnExtraAttribute = {
   schema?: string;
@@ -13,13 +14,14 @@ export type ColumnExtraAttribute = {
 
 type ColumnExtraAttributes = ReadonlyArray<ColumnExtraAttribute>;
 
-export type IndexAttributes = ReadonlyArray<{
+export type IndexAttribute = {
   schema?: string;
   table: string;
   name: string;
   columns: ReadonlyArray<string>;
   unique: boolean;
-}>;
+};
+export type IndexAttributes = ReadonlyArray<IndexAttribute>;
 
 export type ConstraintAttribute = {
   schema?: string;
@@ -47,12 +49,18 @@ export type ConstraintAttributes = {
   foreignKey: ReadonlyArray<ForeignKeyConstraintAttribute>;
 };
 
+type IntrospectResult = {
+  tables: ColumnExtraAttributes;
+  indexes: IndexAttributes;
+  constraints: ConstraintAttributes;
+};
+
+export type IntrospectProps = {
+  config: ConfigValue;
+};
+
 export type IntrospectorDriver = {
-  introspect: () => Promise<{
-    tables: ColumnExtraAttributes;
-    indexes: IndexAttributes;
-    constraints: ConstraintAttributes;
-  }>;
+  introspect: (props: IntrospectProps) => Promise<IntrospectResult>;
   convertTypeName: (typeName: string) => string;
 };
 

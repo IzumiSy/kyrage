@@ -1,4 +1,5 @@
 import { DBClient } from "./client";
+import { ConfigValue } from "./config/loader";
 import { getDialect } from "./dialect/factory";
 import { ColumnExtraAttribute } from "./dialect/types";
 
@@ -13,14 +14,14 @@ export const getIntrospector = (client: DBClient) => {
   const kyrageDialect = getDialect(client.getDialect());
   const extIntrospectorDriver = kyrageDialect.createIntrospectionDriver(client);
 
-  const introspect = async () => {
+  const introspect = async (config: ConfigValue) => {
     await using db = client.getDB();
     const kyselyIntrospection = await db.introspection.getTables();
     const {
       tables: extTables,
       indexes,
       constraints,
-    } = await extIntrospectorDriver.introspect();
+    } = await extIntrospectorDriver.introspect({ config });
 
     const getTables = () => {
       return kyselyIntrospection.map((table) => {

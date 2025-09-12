@@ -28,15 +28,7 @@ export class CockroachDBKyrageDialect implements KyrageDialect {
   createIntrospectionDriver(client: DBClient) {
     return {
       convertTypeName: convertPSQLTypeName,
-      introspect: async () => {
-        const { tables, indexes, constraints } = await doPSQLintrospect(client);
-
-        return {
-          tables,
-          indexes,
-          constraints,
-        };
-      },
+      introspect: doPSQLintrospect(client),
     };
   }
 
