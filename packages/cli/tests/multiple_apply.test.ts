@@ -11,15 +11,6 @@ vi.mock("fs/promises", async () => {
 });
 
 const { database, client } = await setupTestDB();
-const initialTables = [
-  defineTable("members", {
-    id: column("uuid", { primaryKey: true }),
-  }),
-];
-const config = defineConfigForTest({
-  database,
-  tables: initialTables,
-});
 
 describe("apply migrations in multiple times", () => {
   it("should update DB in multiple times by the schema in config", async () => {
@@ -27,7 +18,15 @@ describe("apply migrations in multiple times", () => {
     const deps = {
       client,
       logger: defaultConsolaLogger,
-      config,
+      config: defineConfigForTest({
+        database,
+        tables: [
+          defineTable("members", {
+            id: column("uuid", { primaryKey: true }),
+            name: column("text"),
+          }),
+        ],
+      }),
     };
 
     await executeGenerate(deps, {
@@ -39,14 +38,23 @@ describe("apply migrations in multiple times", () => {
       pretty: false,
     });
 
-    const tables = await db.introspection.getTables();
-    expect(tables).toHaveLength(1);
-    expect(tables[0].name).toBe("members");
-    expect(tables[0].columns).toHaveLength(1);
+    expect(await db.introspection.getTables()).toEqual([
+      expect.objectContaining({
+        name: "members",
+        columns: expect.arrayContaining([
+          expect.objectContaining({ name: "id", dataType: "uuid" }),
+          expect.objectContaining({ name: "name", dataType: "text" }),
+        ]),
+      }),
+    ]);
 
     const updateConfig = defineConfigForTest({
       database,
       tables: [
+        defineTable("members", {
+          id: column("uuid", { primaryKey: true }),
+          email: column("text"),
+        }),
         defineTable("posts", {
           id: column("uuid", { primaryKey: true }),
           title: column("text"),
@@ -67,8 +75,21 @@ describe("apply migrations in multiple times", () => {
       pretty: false,
     });
 
-    const updatedTables = await db.introspection.getTables();
-    expect(updatedTables[0].name).toBe("posts");
-    expect(updatedTables[0].columns).toHaveLength(2);
+    expect(await db.introspection.getTables()).toEqual([
+      expect.objectContaining({
+        name: "members",
+        columns: expect.arrayContaining([
+          expect.objectContaining({ name: "id", dataType: "uuid" }),
+          expect.objectContaining({ name: "email", dataType: "text" }),
+        ]),
+      }),
+      expect.objectContaining({
+        name: "posts",
+        columns: expect.arrayContaining([
+          expect.objectContaining({ name: "id", dataType: "uuid" }),
+          expect.objectContaining({ name: "title", dataType: "text" }),
+        ]),
+      }),
+    ]);
   });
 });
