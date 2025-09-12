@@ -12,42 +12,6 @@ vi.mock("fs/promises", async () => {
 });
 
 const { database, client } = await setupTestDB();
-const membersTable = defineTable(
-  "members",
-  {
-    id: column("uuid", { primaryKey: true }),
-    name: column("text", { notNull: true }),
-    email: column("text", { unique: true, notNull: true }),
-  },
-  (t) => [t.index(["name", "email"], { unique: true })]
-);
-const config = defineConfigForTest({
-  database,
-  tables: [
-    membersTable,
-    defineTable(
-      "orders",
-      {
-        customer_id: column("uuid", { notNull: true }),
-        product_id: column("uuid", { notNull: true }),
-        order_date: column("date", { notNull: true }),
-      },
-      (t) => [
-        t.primaryKey(["customer_id", "product_id", "order_date"], {
-          name: "pk_orders_customer_id_product_id_order_date",
-        }),
-        t.unique(["customer_id", "product_id"], {
-          name: "uq_customer_product",
-        }),
-        t.reference("customer_id", membersTable, "id", {
-          onDelete: "cascade",
-          onUpdate: "cascade",
-          name: "fk_orders_customer_id",
-        }),
-      ]
-    ),
-  ],
-});
 
 beforeAll(async () => {
   await using db = client.getDB();
@@ -74,10 +38,46 @@ beforeAll(async () => {
 describe("generate", () => {
   it("should not generate a new migration", async () => {
     const beforeVol = vol.toJSON();
+
+    const membersTable = defineTable(
+      "members",
+      {
+        id: column("uuid", { primaryKey: true }),
+        name: column("text", { notNull: true }),
+        email: column("text", { unique: true, notNull: true }),
+      },
+      (t) => [t.index(["name", "email"], { unique: true })]
+    );
     const deps = {
       client,
       logger: defaultConsolaLogger,
-      config,
+      config: defineConfigForTest({
+        database,
+        tables: [
+          membersTable,
+          defineTable(
+            "orders",
+            {
+              customer_id: column("uuid", { notNull: true }),
+              product_id: column("uuid", { notNull: true }),
+              order_date: column("date", { notNull: true }),
+            },
+            (t) => [
+              t.primaryKey(["customer_id", "product_id", "order_date"], {
+                name: "pk_orders_customer_id_product_id_order_date",
+              }),
+              t.unique(["customer_id", "product_id"], {
+                name: "uq_customer_product",
+              }),
+              t.reference("customer_id", membersTable, "id", {
+                onDelete: "cascade",
+                onUpdate: "cascade",
+                name: "fk_orders_customer_id",
+              }),
+            ]
+          ),
+        ],
+      }),
     };
 
     await executeGenerate(deps, {

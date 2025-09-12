@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { sql } from "kysely";
-import { setupTable, setupTestDB } from "./helper";
+import { applyTable, setupTestDB } from "./helper";
 import { column, defineTable } from "../src";
 
 vi.mock("fs/promises", async () => {
@@ -15,7 +15,7 @@ describe(`${dialectName} introspector driver`, async () => {
   const introspector = dialect.createIntrospectionDriver(client);
 
   it.skip("should introspect table columns correctly", async () => {
-    const deps = await setupTable({ client, database }, [
+    const deps = await applyTable({ client, database }, [
       defineTable("test_table", {
         id: column("uuid", { primaryKey: true }),
         name: column("varchar(255)", { notNull: true }),
@@ -61,7 +61,7 @@ describe(`${dialectName} introspector driver`, async () => {
   });
 
   it("should introspect indexes correctly", async () => {
-    const deps = await setupTable({ client, database }, [
+    const deps = await applyTable({ client, database }, [
       defineTable(
         "test_table_with_indexes",
         {
@@ -121,7 +121,7 @@ describe(`${dialectName} introspector driver`, async () => {
       email: column("text", { unique: true }),
       username: column("text"),
     });
-    const deps = await setupTable({ client, database }, [
+    const deps = await applyTable({ client, database }, [
       defineTable(
         "posts",
         {

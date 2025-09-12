@@ -1,7 +1,7 @@
 import { describe, it, vi, expect } from "vitest";
 import { executeGenerate } from "../src/commands/generate";
 import { readdir } from "fs/promises";
-import { setupTable, setupTestDB } from "./helper";
+import { applyTable, setupTestDB } from "./helper";
 import { defineTable, column } from "../src/config/builder";
 
 vi.mock("fs/promises", async () => {
@@ -13,7 +13,7 @@ const { database, client } = await setupTestDB();
 
 describe("Composite Primary Key", () => {
   it("should not generate unnecessary migrations for nullable columns in composite primary key", async () => {
-    const deps = await setupTable({ client, database }, [
+    const deps = await applyTable({ client, database }, [
       defineTable(
         "posts",
         {
