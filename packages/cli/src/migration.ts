@@ -12,6 +12,7 @@ import { join } from "path";
 import { DBClient } from "./client";
 import z from "zod";
 import { Operation, operationSchema } from "./operation";
+import * as R from "ramda";
 
 export const migrationDirName = "migrations";
 export const schemaDiffSchema = z.object({
@@ -104,10 +105,15 @@ export async function buildMigrationFromDiff(
   db: Kysely<any>,
   diff: SchemaDiff
 ) {
-  // Sort operations by dependency to ensure correct execution order
-  const sortedOperations = sortOperationsByDependency(diff.operations);
+  const operations = R.pipe(
+    // Filter out redundant DROP INDEX operations that would fail due to
+    // automatic index deletion when dropping constraints
+    filterRedundantDropIndexOperations,
+    // Sort operations by dependency to ensure correct execution order
+    sortOperationsByDependency
+  )(diff.operations);
 
-  for (const operation of sortedOperations) {
+  for (const operation of operations) {
     await executeOperation(db, operation);
   }
 }
@@ -369,6 +375,46 @@ const OPERATION_PRIORITY = {
   create_unique_constraint: 11,
   create_foreign_key_constraint: 12, // Foreign keys must be created last
 } as const;
+
+/**
+ * Filter out redundant DROP INDEX operations that would fail due to
+ * automatic index deletion when dropping unique/primary key constraints.
+ *
+ * This prevents "index does not exist" errors in databases like PostgreSQL
+ * and MySQL where dropping a constraint automatically drops its backing index.
+ */
+export const filterRedundantDropIndexOperations = (
+  operations: ReadonlyArray<Operation>
+): ReadonlyArray<Operation> => {
+  // Build a map of constraints being dropped and their potential index names
+  const droppedConstraintIndexes = new Set<string>();
+
+  // First pass: identify constraints being dropped
+  operations.forEach((operation) => {
+    if (
+      operation.type === "drop_unique_constraint" ||
+      operation.type === "drop_primary_key_constraint"
+    ) {
+      // In most databases, constraint name often matches index name
+      // Store as table.indexName for uniqueness
+      droppedConstraintIndexes.add(`${operation.table}.${operation.name}`);
+    }
+  });
+
+  // Second pass: filter out redundant drop_index operations
+  return operations.filter((operation) => {
+    if (operation.type === "drop_index") {
+      const indexKey = `${operation.table}.${operation.name}`;
+
+      // Skip this drop_index if there's a corresponding constraint drop
+      if (droppedConstraintIndexes.has(indexKey)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+};
 
 /**
  * Sort operations by dependency to ensure correct execution order.
