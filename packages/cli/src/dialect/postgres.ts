@@ -124,26 +124,22 @@ export const convertPSQLTypeName = (typeName: string) => {
 export const introspectPSQLTables = async (db: PlannableKysely) => {
   const { rows } = await sql`
     SELECT
-      n.nspname AS table_schema,
-      c.relname AS table_name,
-      a.attname AS column_name,
-      pg_get_expr(d.adbin, d.adrelid) AS column_default,
-      CASE 
-        WHEN t.typname = 'varchar' OR t.typname = 'char' THEN a.atttypmod - 4
-        ELSE NULL 
-      END AS character_maximum_length
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    JOIN pg_attribute a ON a.attrelid = c.oid
-    LEFT JOIN pg_attrdef d ON d.adrelid = c.oid AND d.adnum = a.attnum
-    JOIN pg_type t ON t.oid = a.atttypid
-    WHERE c.relkind = 'r'
-      AND n.nspname = 'public'
-      AND a.attnum > 0
-      AND NOT a.attisdropped
-    ORDER BY c.relname, a.attnum;
+      table_schema,
+      table_name,
+      column_name,
+      column_default,
+      character_maximum_length
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name IN (
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_type = 'BASE TABLE'
+      )
+    ORDER BY table_name, ordinal_position;
   `
-    .$castTo<PostgresColumnInfo>()
+    .$castTo<InformationSchemaColumnInfo>()
     .execute(db);
 
   return rows.map((row) => ({
@@ -158,7 +154,7 @@ export const introspectPSQLTables = async (db: PlannableKysely) => {
   }));
 };
 
-type PostgresColumnInfo = {
+type InformationSchemaColumnInfo = {
   table_schema: string;
   table_name: string;
   column_name: string;
