@@ -1,5 +1,22 @@
 import { ConfigValue } from "../config/loader";
 import { IndexAttributes, ConstraintAttributes } from "./types";
+import * as R from "ramda";
+import { StartableContainer } from "../dev/container";
+
+/**
+ * A helper function to create a DevDatabaseContainer from a StartableContainer builder.
+ */
+export const makeDevDatabaseContainer = (builder: () => StartableContainer) => {
+  return {
+    start: async () => {
+      const sc = await builder().start();
+      return {
+        stop: () => sc.stop(),
+        getConnectionString: () => sc.getConnectionUri(),
+      };
+    },
+  };
+};
 
 /*
  * Some databases automatically create unique constraints for unique indexes, and vice versa (e.g., CockroachDB),

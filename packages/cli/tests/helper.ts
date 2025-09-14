@@ -34,7 +34,7 @@ export const setupTestDB = async () => {
   const startedContainer = await container.start();
   const database = {
     dialect: dialect.getName(),
-    connectionString: startedContainer.getConnectionUri(),
+    connectionString: startedContainer.getConnectionString(),
   };
   const client = getClient({
     database,

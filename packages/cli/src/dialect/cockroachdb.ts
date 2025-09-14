@@ -9,6 +9,7 @@ import {
   PostgresDialect,
 } from "kysely";
 import { convertPSQLTypeName, doPSQLintrospect } from "./postgres";
+import { makeDevDatabaseContainer } from "./shared";
 
 export class CockroachDBKyrageDialect implements KyrageDialect {
   getName() {
@@ -33,7 +34,7 @@ export class CockroachDBKyrageDialect implements KyrageDialect {
   }
 
   createDevDatabaseContainer(image: string) {
-    return new CockroachDbContainer(image);
+    return makeDevDatabaseContainer(() => new CockroachDbContainer(image));
   }
 }
 
