@@ -71,4 +71,5 @@ export interface KyrageDialect<T extends string = string> {
   parseDevDatabaseConfig: (
     config: unknown
   ) => import("../dev/types").DevDatabaseConfig;
+  hasReusableDevDatabase: () => Promise<boolean>;
 }

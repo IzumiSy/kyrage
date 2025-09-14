@@ -10,6 +10,7 @@ import {
 } from "./shared";
 import { ContainerDevDatabaseProvider } from "../dev/providers/container";
 import { DevDatabaseProvider, DevDatabaseConfig } from "../dev/types";
+import { hasRunningDevStartContainer } from "../dev/container";
 
 export class PostgresKyrageDialect implements KyrageDialect {
   getName() {
@@ -42,6 +43,10 @@ export class PostgresKyrageDialect implements KyrageDialect {
       defaultImage: "postgres:16",
     })(config);
     return parsed.container;
+  }
+
+  async hasReusableDevDatabase(): Promise<boolean> {
+    return hasRunningDevStartContainer(this.getName());
   }
 }
 

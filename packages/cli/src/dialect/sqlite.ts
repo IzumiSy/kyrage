@@ -37,6 +37,11 @@ export class SQLiteKyrageDialect implements KyrageDialect {
     const parsed = parseFileDevDatabaseConfig(config);
     return parsed.file;
   }
+
+  async hasReusableDevDatabase(): Promise<boolean> {
+    // File-based dialects don't support reusable dev databases
+    return false;
+  }
 }
 
 export const doSQLiteIntrospect =

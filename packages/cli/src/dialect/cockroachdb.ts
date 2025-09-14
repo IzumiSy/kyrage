@@ -12,6 +12,7 @@ import { convertPSQLTypeName, doPSQLintrospect } from "./postgres";
 import { parseContainerDevDatabaseConfig } from "./shared";
 import { ContainerDevDatabaseProvider } from "../dev/providers/container";
 import { DevDatabaseProvider, DevDatabaseConfig } from "../dev/types";
+import { hasRunningDevStartContainer } from "../dev/container";
 
 export class CockroachDBKyrageDialect implements KyrageDialect {
   getName() {
@@ -44,6 +45,10 @@ export class CockroachDBKyrageDialect implements KyrageDialect {
       defaultImage: "cockroachdb/cockroach:latest-v24.3",
     })(config);
     return parsed.container;
+  }
+
+  async hasReusableDevDatabase(): Promise<boolean> {
+    return hasRunningDevStartContainer(this.getName());
   }
 }
 

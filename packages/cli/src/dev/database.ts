@@ -1,13 +1,11 @@
 import { type Logger, nullLogger } from "../logger";
 import { type CommonDependencies } from "../commands/common";
 import { type DBClient, getClient } from "../client";
-import {
-  createDevDatabaseManager,
-  hasRunningDevStartContainer,
-} from "./container";
+import { createDevDatabaseManager } from "./container";
 import { DevDatabaseInstance } from "./types";
 import { executeApply } from "../commands/apply";
 import { getPendingMigrations } from "../migration";
+import { getDialect } from "../dialect/factory";
 
 export interface DatabaseStartupResult {
   client: DBClient;
@@ -34,7 +32,7 @@ async function prepareDevManager(
   options: StartDevDatabaseOptions
 ) {
   const { config } = dependencies;
-  const dialect = config.database.dialect;
+  const kyrageDialect = getDialect(config.database.dialect);
 
   switch (options.mode) {
     // Always reuse existing dev database container/environment
@@ -42,7 +40,7 @@ async function prepareDevManager(
       const containerType = "dev-start" as const;
       const manager = await createDevDatabaseManager(
         config.dev!,
-        dialect,
+        config.database.dialect,
         containerType
       );
 
@@ -55,11 +53,8 @@ async function prepareDevManager(
 
     // Generate a new dev database environment if needed, but reuse existing one if available
     case "generate-dev": {
-      // For container-based dialects, check for existing dev-start environments
-      const hasDevStart =
-        dialect !== "sqlite"
-          ? await hasRunningDevStartContainer(dialect)
-          : false;
+      // Use dialect-specific logic to check for existing dev-start environments
+      const hasDevStart = await kyrageDialect.hasReusableDevDatabase();
 
       const containerType = hasDevStart
         ? ("dev-start" as const)
@@ -68,7 +63,7 @@ async function prepareDevManager(
       return {
         manager: await createDevDatabaseManager(
           config.dev!,
-          dialect,
+          config.database.dialect,
           containerType
         ),
         containerType,
