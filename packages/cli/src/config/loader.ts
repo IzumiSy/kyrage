@@ -6,6 +6,7 @@ import {
   uniqueConstraintSchema,
   foreignKeyConstraintSchema,
 } from "../operation";
+import { buildContainerDevDatabaseConfigSchema } from "../dev/providers/container";
 
 const columnSchema = z.object({
   type: z.string(),
@@ -37,12 +38,10 @@ const databaseSchema = z.object({
 });
 export type DatabaseValue = z.infer<typeof databaseSchema>;
 
-const devDatabaseSchema = z.object({
-  container: z.object({
-    image: z.string(),
-    name: z.string().optional(),
-  }),
-});
+const devDatabaseSchema = z.union([
+  // Container-based configuration
+  buildContainerDevDatabaseConfigSchema({ defaultImage: "" }),
+]);
 export type DevDatabaseValue = z.infer<typeof devDatabaseSchema>;
 
 export const configSchema = z.object({

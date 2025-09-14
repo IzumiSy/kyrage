@@ -12,36 +12,61 @@ import {
   configSchema,
 } from "../src/config/loader";
 import { getContainerRuntimeClient } from "testcontainers";
-import { ManagedKey } from "../src/dev/container";
 import { getDialect } from "../src/dialect/factory";
 import { executeApply } from "../src/commands/apply";
 import { executeGenerate } from "../src/commands/generate";
 import { defaultConsolaLogger, Logger } from "../src/logger";
+import { KyrageDialect } from "../src/dialect/types";
+import { ManagedKey } from "../src/dev/providers/container";
+
+const getConfigForTest = (kyrageDialect: KyrageDialect) => {
+  switch (kyrageDialect.getName()) {
+    case "postgres":
+      return {
+        container: {
+          image: "postgres:16",
+        },
+      };
+    case "cockroachdb":
+      return {
+        container: {
+          image: "cockroachdb/cockroach:latest-v24.3",
+        },
+      };
+    default:
+      throw new Error("unsupported dialect specified");
+  }
+};
 
 const getContainer = () => {
-  const targetDialect = (process.env.TEST_DIALECT as DialectEnum) || "postgres";
-  const kyrageDialect = getDialect(targetDialect);
+  const kyrageDialect = getDialect(
+    (process.env.TEST_DIALECT as DialectEnum) || "postgres"
+  );
+
   return {
     dialect: kyrageDialect,
-    container: kyrageDialect.createDevDatabaseContainer(
-      kyrageDialect.getDevDatabaseImageName()
+    provider: kyrageDialect.createDevDatabaseProvider(),
+    config: kyrageDialect.parseDevDatabaseConfig(
+      getConfigForTest(kyrageDialect)
     ),
   };
 };
 
 export const setupTestDB = async () => {
-  const { container, dialect } = getContainer();
-  const startedContainer = await container.start();
+  const { provider, dialect, config } = getContainer();
+  const instance = await provider.setup(config, "one-off");
+  await instance.start();
+
   const database = {
     dialect: dialect.getName(),
-    connectionString: startedContainer.getConnectionUri(),
+    connectionString: instance.getConnectionString(),
   };
   const client = getClient({
     database,
   });
 
   afterAll(async () => {
-    await startedContainer.stop();
+    await instance.stop();
   });
 
   return {

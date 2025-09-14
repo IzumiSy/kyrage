@@ -1,21 +1,37 @@
 import { type Logger, nullLogger } from "../logger";
 import { type CommonDependencies } from "../commands/common";
 import { type DBClient, getClient } from "../client";
-import {
-  createContainerManager,
-  type DevDatabaseManager,
-  hasRunningDevStartContainer,
-} from "./container";
+import { DevDatabaseInstance, DevDatabaseManageType } from "./types";
 import { executeApply } from "../commands/apply";
 import { getPendingMigrations } from "../migration";
+import { getDialect } from "../dialect/factory";
+import { DevDatabaseValue, DialectEnum } from "../config/loader";
 
-export interface DatabaseStartupResult {
-  client: DBClient;
-  manager: DevDatabaseManager;
-  cleanup: () => Promise<void>;
-}
+/**
+ * Create a new dev database manager using the dialect-driven approach
+ *
+ * This replaces the old createContainerManager function with a more flexible
+ * system that delegates dev database management to the appropriate dialect.
+ */
+export const createDevDatabaseManager = async (
+  devConfig: NonNullable<DevDatabaseValue>,
+  dialect: DialectEnum,
+  manageType: DevDatabaseManageType
+) => {
+  const kyrageDialect = getDialect(dialect);
 
-export type StartDevDatabaseOptions = {
+  // Get the provider from the dialect and delegate setup to the provider
+  const instance = await kyrageDialect
+    .createDevDatabaseProvider()
+    .setup(kyrageDialect.parseDevDatabaseConfig(devConfig), manageType);
+
+  return {
+    manageType,
+    instance,
+  };
+};
+
+type StartDevDatabaseOptions = {
   logger: Logger;
 } & (
   | {
@@ -34,40 +50,48 @@ async function prepareDevManager(
   options: StartDevDatabaseOptions
 ) {
   const { config } = dependencies;
-  const dialect = config.database.dialect;
+  const kyrageDialect = getDialect(config.database.dialect);
 
   switch (options.mode) {
-    // Always reuse existing dev database container
+    // Always reuse existing dev database container/environment
     case "dev-start": {
-      const containerType = "dev-start" as const;
-      const manager = createContainerManager(
+      const { instance, manageType } = await createDevDatabaseManager(
         config.dev!,
-        dialect,
-        containerType
+        config.database.dialect,
+        "dev-start" as const
       );
 
       return {
-        manager,
-        containerType,
-        result: { reused: await manager.exists() },
+        manageType,
+        manager: instance,
+        result: { reused: instance.isAvailable() },
       };
     }
 
-    // Generate a new dev database container if needed, but reuse existing one if available
+    // Generate a new dev database environment if needed, but reuse existing one if available
     case "generate-dev": {
-      const hasDevStart = await hasRunningDevStartContainer(dialect);
-      const containerType = hasDevStart
-        ? ("dev-start" as const)
-        : ("one-off" as const);
+      // Use dialect-specific logic to check for existing dev-start environments
+      const hasDevStart = await kyrageDialect.hasReusableDevDatabase();
+      const { instance, manageType } = await createDevDatabaseManager(
+        config.dev!,
+        config.database.dialect,
+        hasDevStart ? ("dev-start" as const) : ("one-off" as const)
+      );
 
       return {
-        manager: createContainerManager(config.dev!, dialect, containerType),
-        containerType,
+        manageType,
+        manager: instance,
         result: { reused: hasDevStart },
       };
     }
   }
 }
+
+type DatabaseStartupResult = {
+  client: DBClient;
+  manager: DevDatabaseInstance;
+  cleanup: () => Promise<void>;
+};
 
 /**
  * Start development database with migrations applied
@@ -86,8 +110,8 @@ export async function startDevDatabase(
 
   // コンテナマネージャーの作成と準備
   const {
+    manageType,
     manager: devManager,
-    containerType,
     result: devManagerResult,
   } = await prepareDevManager(dependencies, options);
   if (devManagerResult.reused) {
@@ -140,7 +164,7 @@ export async function startDevDatabase(
         );
         break;
       case "generate-dev":
-        if (containerType === "dev-start") {
+        if (manageType === "dev-start") {
           reporter.info("Dev start container remains running");
         } else {
           await devManager.stop();

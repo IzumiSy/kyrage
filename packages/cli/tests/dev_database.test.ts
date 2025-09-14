@@ -9,8 +9,8 @@ import { executeGenerate } from "../src/commands/generate";
 import { executeDevStart } from "../src/commands/dev";
 import { defaultConsolaLogger } from "../src/logger";
 import { readdir } from "fs/promises";
-import { removeAllKyrageManagedContainers } from "../src/dev/container";
 import { vol } from "memfs";
+import { removeAllKyrageManagedContainers } from "../src/dev/providers/container";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");

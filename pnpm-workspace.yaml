@@ -1,3 +1,13 @@
 packages:
   - packages/*
   - examples/*
+
+ignoredBuiltDependencies:
+  - '@swc/core'
+  - cpu-features
+  - esbuild
+  - protobufjs
+  - ssh2
+
+onlyBuiltDependencies:
+  - better-sqlite3

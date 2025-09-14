@@ -7,6 +7,7 @@ import {
   getPendingMigrations,
 } from "../migration";
 import { format } from "sql-formatter";
+import { defaultConsolaLogger } from "../logger";
 
 export interface ApplyOptions {
   plan: boolean;
@@ -98,7 +99,6 @@ export const applyCmd = defineCommand({
         pretty: ctx.args.pretty,
       });
     } catch (error) {
-      const { defaultConsolaLogger } = await import("../logger");
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
     }
