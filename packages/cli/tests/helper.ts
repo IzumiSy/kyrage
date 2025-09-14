@@ -26,7 +26,11 @@ const getContainer = () => {
   const provider = kyrageDialect.createDevDatabaseProvider();
 
   // Parse empty config - dialect will provide appropriate defaults
-  const parsedConfig = kyrageDialect.parseDevDatabaseConfig({});
+  const parsedConfig = kyrageDialect.parseDevDatabaseConfig({
+    container: {
+      image: "postgres:16",
+    },
+  });
 
   return {
     dialect: kyrageDialect,

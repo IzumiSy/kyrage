@@ -9,9 +9,10 @@ import {
   PostgresDialect,
 } from "kysely";
 import { convertPSQLTypeName, doPSQLintrospect } from "./postgres";
-import { parseContainerDevDatabaseConfig } from "./shared";
-import { ContainerDevDatabaseProvider } from "../dev/providers/container";
-import { DevDatabaseProvider, DevDatabaseConfig } from "../dev/types";
+import {
+  buildContainerDevDatabaseConfigSchema,
+  ContainerDevDatabaseProvider,
+} from "../dev/providers/container";
 import { hasRunningDevStartContainer } from "../dev/container";
 
 export class CockroachDBKyrageDialect implements KyrageDialect {
@@ -32,19 +33,18 @@ export class CockroachDBKyrageDialect implements KyrageDialect {
     };
   }
 
-  createDevDatabaseProvider(): DevDatabaseProvider {
+  createDevDatabaseProvider() {
     return new ContainerDevDatabaseProvider(
       this.getName(),
       (image) => new CockroachDbContainer(image)
     );
   }
 
-  parseDevDatabaseConfig(config: unknown): DevDatabaseConfig {
+  parseDevDatabaseConfig(config: unknown) {
     // CockroachDB supports container-based dev databases only
-    const parsed = parseContainerDevDatabaseConfig({
+    return buildContainerDevDatabaseConfigSchema({
       defaultImage: "cockroachdb/cockroach:latest-v24.3",
-    })(config);
-    return parsed.container;
+    }).parse(config);
   }
 
   async hasReusableDevDatabase(): Promise<boolean> {

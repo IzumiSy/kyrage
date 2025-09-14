@@ -1,7 +1,6 @@
 import {
   DevDatabaseProvider,
   DevDatabaseInstance,
-  DevDatabaseConfig,
   DevDatabaseManageType,
   DevDatabaseStatus,
 } from "../types";
@@ -15,10 +14,20 @@ import {
 import { DialectEnum } from "../../config/loader";
 import { StartedTestContainer } from "testcontainers/build/test-container";
 import { GenericContainer, getContainerRuntimeClient } from "testcontainers";
+import z from "zod";
 
-export type ContainerDevDatabaseConfig = DevDatabaseConfig & {
-  image: string;
-};
+export const buildContainerDevDatabaseConfigSchema = (options: {
+  defaultImage: string;
+}) =>
+  z.object({
+    container: z.object({
+      image: z.string().default(options.defaultImage),
+      name: z.string().optional(),
+    }),
+  });
+export type ContainerDevDatabaseConfig = z.infer<
+  ReturnType<typeof buildContainerDevDatabaseConfigSchema>
+>;
 
 type ConnectableStartedContainer = StartedTestContainer & {
   getConnectionUri: () => string;
@@ -43,16 +52,14 @@ export class ContainerDevDatabaseProvider implements DevDatabaseProvider {
   ) {}
 
   async setup(
-    config: DevDatabaseConfig,
+    config: ContainerDevDatabaseConfig,
     manageType: DevDatabaseManageType
   ): Promise<DevDatabaseInstance> {
-    const containerConfig = config as ContainerDevDatabaseConfig;
-
     return new ContainerDevDatabaseInstance({
       dialect: this.dialect,
       manageType: manageType,
-      containerName: config.name,
-      containerFactory: () => this.containerFactory(containerConfig.image),
+      containerName: config.container.name,
+      containerFactory: () => this.containerFactory(config.container.image),
     });
   }
 

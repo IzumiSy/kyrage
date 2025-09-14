@@ -1,15 +1,23 @@
 import {
   DevDatabaseProvider,
   DevDatabaseInstance,
-  DevDatabaseConfig,
   DevDatabaseManageType,
   DevDatabaseStatus,
 } from "../types";
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as os from "os";
+import z from "zod";
 
-export type FileDevDatabaseConfig = DevDatabaseConfig;
+export const buildFileDevDatabaseConfig = () =>
+  z.object({
+    file: z.object({
+      name: z.string().optional(),
+    }),
+  });
+export type FileDevDatabaseConfig = z.infer<
+  ReturnType<typeof buildFileDevDatabaseConfig>
+>;
 
 /**
  * File-based dev database provider
@@ -19,12 +27,12 @@ export type FileDevDatabaseConfig = DevDatabaseConfig;
  */
 export class FileDevDatabaseProvider implements DevDatabaseProvider {
   async setup(
-    config: DevDatabaseConfig,
+    config: FileDevDatabaseConfig,
     manageType: DevDatabaseManageType
   ): Promise<DevDatabaseInstance> {
     return new FileDevDatabaseInstance({
       manageType: manageType,
-      name: config.name,
+      name: config.file.name,
     });
   }
 

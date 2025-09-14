@@ -1,7 +1,6 @@
 import { ConfigValue } from "../config/loader";
 import { IndexAttributes, ConstraintAttributes } from "./types";
 import * as R from "ramda";
-import { z } from "zod";
 
 /**
  * Shared parsing functions for dev database configurations
@@ -12,6 +11,7 @@ import { z } from "zod";
  *
  * Used by PostgreSQL, CockroachDB, and other container-based dialects.
  */
+/*
 export const parseContainerDevDatabaseConfig =
   (options: { defaultImage: string }) => (config: unknown) => {
     return z
@@ -25,22 +25,22 @@ export const parseContainerDevDatabaseConfig =
       })
       .parse(config);
   };
+*/
 
 /**
  * Parse file-based dev database configuration
  *
  * Used by SQLite, DuckDB, and other file-based dialects.
  */
+/*
 export const parseFileDevDatabaseConfig = (config: unknown) => {
   return z
     .object({
-      file: z.object({
-        path: z.string().optional(),
-        mode: z.enum(["memory", "file"]).default("file"),
-      }),
+      file: z.object({}),
     })
     .parse(config);
 };
+*/
 
 /*
  * Some databases automatically create unique constraints for unique indexes, and vice versa (e.g., CockroachDB),
