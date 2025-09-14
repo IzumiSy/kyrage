@@ -9,10 +9,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as os from "os";
 
-export type FileDevDatabaseConfig = DevDatabaseConfig & {
-  mode: "memory" | "file";
-  filePath?: string;
-};
+export type FileDevDatabaseConfig = DevDatabaseConfig;
 
 /**
  * File-based dev database provider
@@ -25,20 +22,29 @@ export class FileDevDatabaseProvider implements DevDatabaseProvider {
     config: DevDatabaseConfig,
     manageType: DevDatabaseManageType
   ): Promise<DevDatabaseInstance> {
-    const fileConfig = config as FileDevDatabaseConfig;
-
     return new FileDevDatabaseInstance({
       manageType: manageType,
-      mode: fileConfig.mode,
-      filePath: fileConfig.filePath,
       name: config.name,
     });
   }
 
-  async hasExisting(): Promise<boolean> {
-    // SQLite doesn't have persistent dev-start environments like containers
-    // Each environment is created fresh from files
-    return false;
+  async hasExisting(manageType: DevDatabaseManageType): Promise<boolean> {
+    if (manageType === "dev-start") {
+      // dev-startの固定パスファイルが存在するかチェック
+      const devStartPath = this.getDevStartPath();
+      try {
+        await fs.access(devStartPath);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false; // one-offは常に新規作成（memory）
+  }
+
+  private getDevStartPath(name?: string): string {
+    const basename = name || "default";
+    return path.join(os.tmpdir(), `kyrage___dev-${basename}.db`);
   }
 
   async cleanup(): Promise<void> {
@@ -46,7 +52,7 @@ export class FileDevDatabaseProvider implements DevDatabaseProvider {
     try {
       const tempDir = os.tmpdir();
       const files = await fs.readdir(tempDir);
-      const kyrageFiles = files.filter((f) => f.startsWith("kyrage-dev-"));
+      const kyrageFiles = files.filter((f) => f.startsWith("kyrage___dev-"));
 
       await Promise.allSettled(
         kyrageFiles.map((f) => fs.unlink(path.join(tempDir, f)))
@@ -69,18 +75,18 @@ class FileDevDatabaseInstance implements DevDatabaseInstance {
   constructor(
     private options: {
       manageType: DevDatabaseManageType;
-      mode: "memory" | "file";
-      filePath?: string;
       name?: string;
     }
   ) {}
 
   async start(): Promise<void> {
-    if (this.options.mode === "memory") {
-      this.connectionString = ":memory:";
-    } else {
-      this.filePath = this.options.filePath || this.generateTempPath();
+    if (this.options.manageType === "dev-start") {
+      // dev-start: 固定名の再利用可能ファイル（tmpdir内）
+      this.filePath = this.getDevStartPath();
       this.connectionString = this.filePath;
+    } else {
+      // one-off: メモリベース（高速、自動削除）
+      this.connectionString = ":memory:";
     }
   }
 
@@ -90,7 +96,7 @@ class FileDevDatabaseInstance implements DevDatabaseInstance {
   }
 
   async remove(): Promise<void> {
-    if (this.filePath && this.options.mode === "file") {
+    if (this.filePath) {
       try {
         await fs.unlink(this.filePath);
       } catch {
@@ -113,10 +119,18 @@ class FileDevDatabaseInstance implements DevDatabaseInstance {
       return { type: "unavailable" };
     }
 
+    if (this.connectionString === ":memory:") {
+      return {
+        type: "file",
+        filePath: ":memory:",
+        mode: "memory",
+      };
+    }
+
     return {
       type: "file",
       filePath: this.connectionString,
-      mode: this.options.mode,
+      mode: "file",
     };
   }
 
@@ -124,13 +138,8 @@ class FileDevDatabaseInstance implements DevDatabaseInstance {
     return !!this.connectionString;
   }
 
-  private generateTempPath(): string {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substr(2, 9);
-    const basename = this.options.name ? `${this.options.name}-` : "";
-    return path.join(
-      os.tmpdir(),
-      `kyrage-dev-${basename}${timestamp}-${random}.db`
-    );
+  private getDevStartPath(): string {
+    const basename = this.options.name || "default";
+    return path.join(os.tmpdir(), `kyrage___dev-${basename}.db`);
   }
 }
