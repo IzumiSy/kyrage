@@ -55,7 +55,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24",
     "@types/pg": "^8.15.5",
-    "@types/ramda": "^0.31.0",
+    "@types/ramda": "^0.31.1",
     "memfs": "^4.38.2",
     "prettier": "^3",
     "tsup": "^8.5.0",
