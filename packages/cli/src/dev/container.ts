@@ -1,7 +1,7 @@
 import { getContainerRuntimeClient } from "testcontainers";
 import { DevDatabaseValue, DialectEnum } from "../config/loader";
 import { getDialect } from "../dialect/factory";
-import { DevDatabaseInstance, DevDatabaseManageType } from "./types";
+import { DevDatabaseManageType } from "./types";
 
 export const DialectKey = "kyrage.dialect";
 export const ManagedKey = "kyrage.managed";
@@ -53,11 +53,16 @@ export const createDevDatabaseManager = async (
   devConfig: NonNullable<DevDatabaseValue>,
   dialect: DialectEnum,
   manageType: DevDatabaseManageType
-): Promise<DevDatabaseInstance> => {
+) => {
   const kyrageDialect = getDialect(dialect);
 
   // Get the provider from the dialect and delegate setup to the provider
-  return kyrageDialect
+  const instance = await kyrageDialect
     .createDevDatabaseProvider()
     .setup(kyrageDialect.parseDevDatabaseConfig(devConfig), manageType);
+
+  return {
+    manageType,
+    instance,
+  };
 };

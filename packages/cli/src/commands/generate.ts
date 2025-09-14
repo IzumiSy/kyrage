@@ -2,7 +2,7 @@ import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
 import { mkdir, writeFile, unlink } from "fs/promises";
 import { join } from "path";
-import { type Logger } from "../logger";
+import { defaultConsolaLogger, type Logger } from "../logger";
 import {
   migrationDirName,
   getPendingMigrations,
@@ -389,7 +389,6 @@ export const generateCmd = defineCommand({
         squash: ctx.args.squash,
       });
     } catch (error) {
-      const { defaultConsolaLogger } = await import("../logger");
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
     }

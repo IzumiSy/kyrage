@@ -37,17 +37,16 @@ async function prepareDevManager(
   switch (options.mode) {
     // Always reuse existing dev database container/environment
     case "dev-start": {
-      const containerType = "dev-start" as const;
-      const manager = await createDevDatabaseManager(
+      const { instance, manageType } = await createDevDatabaseManager(
         config.dev!,
         config.database.dialect,
-        containerType
+        "dev-start" as const
       );
 
       return {
-        manager,
-        containerType,
-        result: { reused: manager.isAvailable() },
+        manageType,
+        manager: instance,
+        result: { reused: instance.isAvailable() },
       };
     }
 
@@ -55,18 +54,15 @@ async function prepareDevManager(
     case "generate-dev": {
       // Use dialect-specific logic to check for existing dev-start environments
       const hasDevStart = await kyrageDialect.hasReusableDevDatabase();
-
-      const containerType = hasDevStart
-        ? ("dev-start" as const)
-        : ("one-off" as const);
+      const { instance, manageType } = await createDevDatabaseManager(
+        config.dev!,
+        config.database.dialect,
+        hasDevStart ? ("dev-start" as const) : ("one-off" as const)
+      );
 
       return {
-        manager: await createDevDatabaseManager(
-          config.dev!,
-          config.database.dialect,
-          containerType
-        ),
-        containerType,
+        manageType,
+        manager: instance,
         result: { reused: hasDevStart },
       };
     }
@@ -90,8 +86,8 @@ export async function startDevDatabase(
 
   // コンテナマネージャーの作成と準備
   const {
+    manageType,
     manager: devManager,
-    containerType,
     result: devManagerResult,
   } = await prepareDevManager(dependencies, options);
   if (devManagerResult.reused) {
@@ -144,7 +140,7 @@ export async function startDevDatabase(
         );
         break;
       case "generate-dev":
-        if (containerType === "dev-start") {
+        if (manageType === "dev-start") {
           reporter.info("Dev start container remains running");
         } else {
           await devManager.stop();

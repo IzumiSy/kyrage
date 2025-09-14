@@ -2,6 +2,8 @@ import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
 import { startDevDatabase } from "../dev/database";
 import type { DevDatabaseInstance } from "../dev/types";
+import { createDevDatabaseManager } from "../dev/container";
+import { defaultConsolaLogger } from "../logger";
 
 export interface DevDependencies extends CommonDependencies {
   manager: DevDatabaseInstance;
@@ -70,8 +72,7 @@ async function createDevDependencies() {
   }
 
   // Use the new dev database manager system
-  const { createDevDatabaseManager } = await import("../dev/container");
-  const manager = await createDevDatabaseManager(
+  const { instance } = await createDevDatabaseManager(
     commonDeps.config.dev,
     commonDeps.config.database.dialect,
     "dev-start"
@@ -79,7 +80,7 @@ async function createDevDependencies() {
 
   return {
     ...commonDeps,
-    manager,
+    manager: instance,
   };
 }
 
@@ -93,7 +94,6 @@ const devStartCmd = defineCommand({
       const dependencies = await createCommonDependencies();
       await executeDevStart(dependencies);
     } catch (error) {
-      const { defaultConsolaLogger } = await import("../logger");
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
     }
@@ -110,7 +110,6 @@ const devStatusCmd = defineCommand({
       const dependencies = await createDevDependencies();
       await executeDevStatus(dependencies);
     } catch (error) {
-      const { defaultConsolaLogger } = await import("../logger");
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
     }
@@ -127,7 +126,6 @@ const devGetUrlCmd = defineCommand({
       const dependencies = await createDevDependencies();
       await executeDevGetUrl(dependencies);
     } catch (error) {
-      const { defaultConsolaLogger } = await import("../logger");
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
     }
@@ -144,7 +142,6 @@ const devCleanCmd = defineCommand({
       const dependencies = await createDevDependencies();
       await executeDevClean(dependencies);
     } catch (error) {
-      const { defaultConsolaLogger } = await import("../logger");
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
     }

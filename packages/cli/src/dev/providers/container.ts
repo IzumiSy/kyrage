@@ -14,7 +14,7 @@ import {
 } from "../container";
 import { DialectEnum } from "../../config/loader";
 import { StartedTestContainer } from "testcontainers/build/test-container";
-import { GenericContainer } from "testcontainers";
+import { GenericContainer, getContainerRuntimeClient } from "testcontainers";
 
 export type ContainerDevDatabaseConfig = DevDatabaseConfig & {
   image: string;
@@ -138,9 +138,7 @@ class ContainerDevDatabaseInstance implements DevDatabaseInstance {
 
     try {
       // Use runtime client to inspect container
-      const runtime = await import("testcontainers").then((m) =>
-        m.getContainerRuntimeClient()
-      );
+      const runtime = await getContainerRuntimeClient();
       const runningContainer = await runtime.container.fetchByLabel(
         DialectKey,
         this.options.dialect,
