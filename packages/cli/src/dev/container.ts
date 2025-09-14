@@ -164,37 +164,6 @@ export class ContainerDevDatabaseManager<C extends StartableContainer>
   }
 }
 
-export class ConnectionStringDevDatabaseManager implements DevDatabaseManager {
-  constructor(private connectionString: string) {}
-
-  async start() {
-    // No-op for connection string
-  }
-
-  async stop() {
-    // No-op for connection string
-  }
-
-  async remove() {
-    // No-op for connection string (外部の接続文字列は削除できない)
-  }
-
-  async exists() {
-    // 常に存在すると仮定（外部接続文字列なので）
-    return true;
-  }
-
-  getConnectionString() {
-    return this.connectionString;
-  }
-
-  async getStatus() {
-    return {
-      type: "connectionString" as const,
-    };
-  }
-}
-
 /**
  * コンテナマネージャーを作成する共通関数
  */
@@ -203,9 +172,7 @@ export const createContainerManager = (
   dialect: DialectEnum,
   manageType: "dev-start" | "one-off"
 ) => {
-  if ("connectionString" in devConfig) {
-    return new ConnectionStringDevDatabaseManager(devConfig.connectionString);
-  } else if ("container" in devConfig) {
+  if ("container" in devConfig) {
     return new ContainerDevDatabaseManager(
       {
         dialect,
