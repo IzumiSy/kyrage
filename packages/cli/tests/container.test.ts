@@ -14,7 +14,7 @@ describe("DevDatabaseManager", () => {
   };
 
   it("should start and stop container successfully", async () => {
-    const manager = await createDevDatabaseManager(
+    const { instance: manager } = await createDevDatabaseManager(
       options,
       "postgres",
       "dev-start"
