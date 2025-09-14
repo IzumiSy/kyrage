@@ -28,7 +28,7 @@ const indexSchema = z.object({
 });
 export type IndexSchema = z.infer<typeof indexSchema>;
 
-const dialectEnum = z.enum(["postgres", "cockroachdb"]);
+const dialectEnum = z.enum(["postgres", "cockroachdb", "sqlite"]);
 export type DialectEnum = z.infer<typeof dialectEnum>;
 
 const databaseSchema = z.object({
