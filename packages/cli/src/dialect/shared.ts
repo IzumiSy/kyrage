@@ -1,21 +1,45 @@
 import { ConfigValue } from "../config/loader";
 import { IndexAttributes, ConstraintAttributes } from "./types";
 import * as R from "ramda";
-import { StartableContainer } from "../dev/container";
+import { z } from "zod";
 
 /**
- * A helper function to create a DevDatabaseContainer from a StartableContainer builder.
+ * Shared parsing functions for dev database configurations
  */
-export const makeDevDatabaseContainer = (builder: () => StartableContainer) => {
-  return {
-    start: async () => {
-      const sc = await builder().start();
-      return {
-        stop: () => sc.stop(),
-        getConnectionString: () => sc.getConnectionUri(),
-      };
-    },
+
+/**
+ * Parse container-based dev database configuration with dialect-specific defaults
+ *
+ * Used by PostgreSQL, CockroachDB, and other container-based dialects.
+ */
+export const parseContainerDevDatabaseConfig =
+  (options: { defaultImage: string }) => (config: unknown) => {
+    return z
+      .object({
+        container: z
+          .object({
+            image: z.string().default(options.defaultImage),
+            name: z.string().optional(),
+          })
+          .default(() => ({ image: options.defaultImage })),
+      })
+      .parse(config);
   };
+
+/**
+ * Parse file-based dev database configuration
+ *
+ * Used by SQLite, DuckDB, and other file-based dialects.
+ */
+export const parseFileDevDatabaseConfig = (config: unknown) => {
+  return z
+    .object({
+      file: z.object({
+        path: z.string().optional(),
+        mode: z.enum(["memory", "file"]).default("file"),
+      }),
+    })
+    .parse(config);
 };
 
 /*

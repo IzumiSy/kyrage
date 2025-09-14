@@ -1,37 +1,7 @@
-import {
-  GenericContainer,
-  getContainerRuntimeClient,
-  StartedTestContainer,
-} from "testcontainers";
+import { getContainerRuntimeClient } from "testcontainers";
 import { DevDatabaseValue, DialectEnum } from "../config/loader";
 import { getDialect } from "../dialect/factory";
-
-type DevStatus =
-  | {
-      type: "container";
-      imageName: string;
-      containerID: string;
-    }
-  | {
-      type: "connectionString";
-    };
-
-export type DevDatabaseManager = {
-  start: () => Promise<void>;
-  stop: () => Promise<void>;
-  remove: () => Promise<void>;
-  exists: () => Promise<boolean>;
-  getConnectionString: () => string;
-  getStatus: () => Promise<DevStatus | null>;
-};
-
-type ConnectableStartedContainer = StartedTestContainer & {
-  getConnectionUri: () => string;
-};
-
-export type StartableContainer = Omit<GenericContainer, "start"> & {
-  start: () => Promise<ConnectableStartedContainer>;
-};
+import { DevDatabaseInstance, DevDatabaseManageType } from "./types";
 
 export const DialectKey = "kyrage.dialect";
 export const ManagedKey = "kyrage.managed";
@@ -73,119 +43,21 @@ export const removeAllKyrageManagedContainers = async () => {
   );
 };
 
-export const CannotGetConnectionStringError = new Error(
-  "Dev database is not started or unavailable"
-);
-
-export class ContainerDevDatabaseManager<C extends StartableContainer>
-  implements DevDatabaseManager
-{
-  protected startedContainer: ConnectableStartedContainer | null = null;
-  protected container: C;
-
-  constructor(
-    private options: {
-      dialect: DialectEnum;
-      containerName?: string;
-      manageType?: "dev-start" | "one-off"; // コンテナの種類を識別
-    },
-    createContainer: () => C
-  ) {
-    const container = createContainer();
-    const manageType = this.options.manageType || "one-off";
-
-    container.withLabels({
-      [DialectKey]: this.options.dialect,
-      [ManagedKey]: "true",
-      [DevStartKey]: manageType,
-    });
-
-    // dev-start コンテナは常にreuse、one-offは再利用しない
-    if (manageType === "dev-start") {
-      container.withReuse();
-    }
-
-    if (this.options.containerName) {
-      container.withName(this.options.containerName);
-    }
-
-    this.container = container;
-  }
-
-  /**
-   * 実行中のコンテナを取得する共通処理
-   */
-  private async findRunningContainer() {
-    const runtime = await getContainerRuntimeClient();
-    return runtime.container.fetchByLabel(DialectKey, this.options.dialect, {
-      status: ["running"],
-    });
-  }
-
-  async exists() {
-    return !!(await this.findRunningContainer());
-  }
-
-  async start() {
-    this.startedContainer = await this.container.start();
-  }
-
-  getConnectionString() {
-    if (!this.startedContainer) {
-      throw CannotGetConnectionStringError;
-    }
-    return this.startedContainer.getConnectionUri();
-  }
-
-  async stop() {
-    if (this.startedContainer) {
-      await this.startedContainer.stop();
-      this.startedContainer = null;
-    }
-  }
-
-  async remove() {
-    await removeAllKyrageManagedContainers();
-    this.startedContainer = null;
-  }
-
-  async getStatus() {
-    const runningContainer = await this.findRunningContainer();
-    if (!runningContainer) {
-      return null;
-    }
-
-    const r = await runningContainer.inspect();
-    return {
-      type: "container" as const,
-      imageName: r.Config.Image,
-      containerID: r.Id,
-    };
-  }
-}
-
 /**
- * コンテナマネージャーを作成する共通関数
+ * Create a new dev database manager using the dialect-driven approach
+ *
+ * This replaces the old createContainerManager function with a more flexible
+ * system that delegates dev database management to the appropriate dialect.
  */
-export const createContainerManager = (
+export const createDevDatabaseManager = async (
   devConfig: NonNullable<DevDatabaseValue>,
   dialect: DialectEnum,
-  manageType: "dev-start" | "one-off"
-) => {
-  if ("container" in devConfig) {
-    return new ContainerDevDatabaseManager(
-      {
-        dialect,
-        containerName:
-          manageType === "dev-start" ? devConfig.container.name : undefined,
-        manageType,
-      },
-      () =>
-        getDialect(dialect).createDevDatabaseContainer(
-          devConfig.container.image
-        )
-    );
-  } else {
-    throw new Error("Invalid dev database configuration");
-  }
+  manageType: DevDatabaseManageType
+): Promise<DevDatabaseInstance> => {
+  const kyrageDialect = getDialect(dialect);
+
+  // Get the provider from the dialect and delegate setup to the provider
+  return kyrageDialect
+    .createDevDatabaseProvider()
+    .setup(kyrageDialect.parseDevDatabaseConfig(devConfig), manageType);
 };

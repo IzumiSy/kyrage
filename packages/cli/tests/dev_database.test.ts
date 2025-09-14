@@ -35,6 +35,7 @@ describe.skip("generate with dev database", () => {
     const configBase = {
       database,
       dev: {
+        type: "container" as const,
         container: {
           image: "postgres:16",
         },
@@ -83,6 +84,7 @@ describe.skip("generate with dev database", () => {
     const configBase = {
       database,
       dev: {
+        type: "container" as const,
         container: {
           image: "postgres:16",
         },

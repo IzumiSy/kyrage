@@ -37,12 +37,22 @@ const databaseSchema = z.object({
 });
 export type DatabaseValue = z.infer<typeof databaseSchema>;
 
-const devDatabaseSchema = z.object({
-  container: z.object({
-    image: z.string(),
-    name: z.string().optional(),
+const devDatabaseSchema = z.union([
+  // Container-based configuration (PostgreSQL, CockroachDB)
+  z.object({
+    container: z.object({
+      image: z.string().optional(), // Uses dialect default if not specified
+      name: z.string().optional(),
+    }),
   }),
-});
+  // File-based configuration (SQLite)
+  z.object({
+    file: z.object({
+      path: z.string().optional(),
+      mode: z.enum(["memory", "file"]).default("file"),
+    }),
+  }),
+]);
 export type DevDatabaseValue = z.infer<typeof devDatabaseSchema>;
 
 export const configSchema = z.object({

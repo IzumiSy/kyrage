@@ -9,15 +9,13 @@ import {
   PostgresDialect,
 } from "kysely";
 import { convertPSQLTypeName, doPSQLintrospect } from "./postgres";
-import { makeDevDatabaseContainer } from "./shared";
+import { parseContainerDevDatabaseConfig } from "./shared";
+import { ContainerDevDatabaseProvider } from "../dev/providers/container";
+import { DevDatabaseProvider, DevDatabaseConfig } from "../dev/types";
 
 export class CockroachDBKyrageDialect implements KyrageDialect {
   getName() {
     return "cockroachdb" as const;
-  }
-
-  getDevDatabaseImageName() {
-    return "cockroachdb/cockroach:latest-v24.3";
   }
 
   createKyselyDialect(connectionString: string) {
@@ -33,8 +31,19 @@ export class CockroachDBKyrageDialect implements KyrageDialect {
     };
   }
 
-  createDevDatabaseContainer(image: string) {
-    return makeDevDatabaseContainer(() => new CockroachDbContainer(image));
+  createDevDatabaseProvider(): DevDatabaseProvider {
+    return new ContainerDevDatabaseProvider(
+      this.getName(),
+      (image) => new CockroachDbContainer(image)
+    );
+  }
+
+  parseDevDatabaseConfig(config: unknown): DevDatabaseConfig {
+    // CockroachDB supports container-based dev databases only
+    const parsed = parseContainerDevDatabaseConfig({
+      defaultImage: "cockroachdb/cockroach:latest-v24.3",
+    })(config);
+    return parsed.container;
   }
 }
 

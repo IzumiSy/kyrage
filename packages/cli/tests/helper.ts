@@ -21,27 +21,35 @@ import { defaultConsolaLogger, Logger } from "../src/logger";
 const getContainer = () => {
   const targetDialect = (process.env.TEST_DIALECT as DialectEnum) || "postgres";
   const kyrageDialect = getDialect(targetDialect);
+
+  // Use the new provider system for testing
+  const provider = kyrageDialect.createDevDatabaseProvider();
+
+  // Parse empty config - dialect will provide appropriate defaults
+  const parsedConfig = kyrageDialect.parseDevDatabaseConfig({});
+
   return {
     dialect: kyrageDialect,
-    container: kyrageDialect.createDevDatabaseContainer(
-      kyrageDialect.getDevDatabaseImageName()
-    ),
+    provider,
+    config: parsedConfig,
   };
 };
 
 export const setupTestDB = async () => {
-  const { container, dialect } = getContainer();
-  const startedContainer = await container.start();
+  const { provider, dialect, config } = getContainer();
+  const instance = await provider.setup(config, "one-off");
+  await instance.start();
+
   const database = {
     dialect: dialect.getName(),
-    connectionString: startedContainer.getConnectionString(),
+    connectionString: instance.getConnectionString(),
   };
   const client = getClient({
     database,
   });
 
   afterAll(async () => {
-    await startedContainer.stop();
+    await instance.stop();
   });
 
   return {

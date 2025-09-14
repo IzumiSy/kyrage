@@ -63,19 +63,12 @@ export type IntrospectorDriver = {
   convertTypeName: (typeName: string) => string;
 };
 
-export type StartedDevDatabaseContainer = {
-  stop: () => Promise<unknown>;
-  getConnectionString: () => string;
-};
-
-export type DevDatabaseContainer = {
-  start: () => Promise<StartedDevDatabaseContainer>;
-};
-
 export interface KyrageDialect<T extends string = string> {
   getName: () => T;
-  getDevDatabaseImageName: () => string;
   createKyselyDialect: (connectionString: string) => Dialect;
   createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;
-  createDevDatabaseContainer: (image: string) => DevDatabaseContainer;
+  createDevDatabaseProvider: () => import("../dev/types").DevDatabaseProvider;
+  parseDevDatabaseConfig: (
+    config: unknown
+  ) => import("../dev/types").DevDatabaseConfig;
 }

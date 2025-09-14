@@ -2,16 +2,16 @@ import { type Logger, nullLogger } from "../logger";
 import { type CommonDependencies } from "../commands/common";
 import { type DBClient, getClient } from "../client";
 import {
-  createContainerManager,
-  type DevDatabaseManager,
+  createDevDatabaseManager,
   hasRunningDevStartContainer,
 } from "./container";
+import { DevDatabaseInstance } from "./types";
 import { executeApply } from "../commands/apply";
 import { getPendingMigrations } from "../migration";
 
 export interface DatabaseStartupResult {
   client: DBClient;
-  manager: DevDatabaseManager;
+  manager: DevDatabaseInstance;
   cleanup: () => Promise<void>;
 }
 
@@ -37,10 +37,10 @@ async function prepareDevManager(
   const dialect = config.database.dialect;
 
   switch (options.mode) {
-    // Always reuse existing dev database container
+    // Always reuse existing dev database container/environment
     case "dev-start": {
       const containerType = "dev-start" as const;
-      const manager = createContainerManager(
+      const manager = await createDevDatabaseManager(
         config.dev!,
         dialect,
         containerType
@@ -49,19 +49,28 @@ async function prepareDevManager(
       return {
         manager,
         containerType,
-        result: { reused: await manager.exists() },
+        result: { reused: manager.isAvailable() },
       };
     }
 
-    // Generate a new dev database container if needed, but reuse existing one if available
+    // Generate a new dev database environment if needed, but reuse existing one if available
     case "generate-dev": {
-      const hasDevStart = await hasRunningDevStartContainer(dialect);
+      // For container-based dialects, check for existing dev-start environments
+      const hasDevStart =
+        dialect !== "sqlite"
+          ? await hasRunningDevStartContainer(dialect)
+          : false;
+
       const containerType = hasDevStart
         ? ("dev-start" as const)
         : ("one-off" as const);
 
       return {
-        manager: createContainerManager(config.dev!, dialect, containerType),
+        manager: await createDevDatabaseManager(
+          config.dev!,
+          dialect,
+          containerType
+        ),
         containerType,
         result: { reused: hasDevStart },
       };

@@ -1,11 +1,10 @@
 import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
-import { createContainerManager } from "../dev/container";
 import { startDevDatabase } from "../dev/database";
-import type { DevDatabaseManager } from "../dev/container";
+import type { DevDatabaseInstance } from "../dev/types";
 
 export interface DevDependencies extends CommonDependencies {
-  manager: DevDatabaseManager;
+  manager: DevDatabaseInstance;
 }
 
 export async function executeDevStatus(dependencies: DevDependencies) {
@@ -23,7 +22,7 @@ export async function executeDevStatus(dependencies: DevDependencies) {
 export async function executeDevGetUrl(dependencies: DevDependencies) {
   const { manager, logger } = dependencies;
 
-  if (!(await manager.exists())) {
+  if (!manager.isAvailable()) {
     logger.reporter.info("No running dev containers found");
     return;
   }
@@ -36,7 +35,7 @@ export async function executeDevGetUrl(dependencies: DevDependencies) {
 export async function executeDevClean(dependencies: DevDependencies) {
   const { manager, logger } = dependencies;
 
-  if (!(await manager.exists())) {
+  if (!manager.isAvailable()) {
     logger.reporter.info("No dev containers found");
     return;
   }
@@ -66,11 +65,13 @@ export async function executeDevStart(dependencies: CommonDependencies) {
 async function createDevDependencies() {
   const commonDeps = await createCommonDependencies();
 
-  if (!commonDeps.config.dev || !("container" in commonDeps.config.dev)) {
-    throw new Error("No dev database container configuration found");
+  if (!commonDeps.config.dev) {
+    throw new Error("No dev database configuration found");
   }
 
-  const manager = createContainerManager(
+  // Use the new dev database manager system
+  const { createDevDatabaseManager } = await import("../dev/container");
+  const manager = await createDevDatabaseManager(
     commonDeps.config.dev,
     commonDeps.config.database.dialect,
     "dev-start"
