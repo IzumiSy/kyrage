@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { findAllKyrageManagedContainerIDs } from "./helper";
 import { createDevDatabaseManager } from "../src/dev/database";
 
-describe.skip("DevDatabaseManager", () => {
+describe("DevDatabaseManager", () => {
   const expected = {
     connectionPattern: /^postgres:\/\/.*:\d+\/.*$/,
   };
