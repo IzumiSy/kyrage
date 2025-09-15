@@ -1,5 +1,15 @@
 # @izumisy/kyrage
 
+## 1.3.0
+
+### Minor Changes
+
+- [#102](https://github.com/IzumiSy/kyrage/pull/102) [`862401d`](https://github.com/IzumiSy/kyrage/commit/862401d8f1fa7fecc73bf8f79400269a5ef49d9e) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Remove `connectionString` support from Dev Database configuration
+
+### Patch Changes
+
+- [#111](https://github.com/IzumiSy/kyrage/pull/111) [`c3cae2b`](https://github.com/IzumiSy/kyrage/commit/c3cae2b45d3364fedf2af5071d07aa9c7c4eed70) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Update dependecies
+
 ## 1.2.3
 
 ### Patch Changes
