@@ -17,26 +17,38 @@ import { getDialect } from "../src/dialect/factory";
 import { executeApply } from "../src/commands/apply";
 import { executeGenerate } from "../src/commands/generate";
 import { defaultConsolaLogger, Logger } from "../src/logger";
+import { KyrageDialect } from "../src/dialect/types";
+
+const getConfigForTest = (kyrageDialect: KyrageDialect) => {
+  switch (kyrageDialect.getName()) {
+    case "postgres":
+      return {
+        container: {
+          image: "postgres:16",
+        },
+      };
+    case "cockroachdb":
+      return {
+        container: {
+          image: "cockroachdb/cockroach:latest-v24.3",
+        },
+      };
+    default:
+      throw new Error("unsupported dialect specified");
+  }
+};
 
 const getContainer = () => {
-  const targetDialect = (process.env.TEST_DIALECT as DialectEnum) || "postgres";
-  const kyrageDialect = getDialect(targetDialect);
-
-  // Use the new provider system for testing
-  const provider = kyrageDialect.createDevDatabaseProvider();
-
-  // Parse empty config - dialect will provide appropriate defaults
-  const parsedConfig = kyrageDialect.parseDevDatabaseConfig({
-    // TODO: here should be switched by dialect
-    container: {
-      image: "postgres:16",
-    },
-  });
+  const kyrageDialect = getDialect(
+    (process.env.TEST_DIALECT as DialectEnum) || "postgres"
+  );
 
   return {
     dialect: kyrageDialect,
-    provider,
-    config: parsedConfig,
+    provider: kyrageDialect.createDevDatabaseProvider(),
+    config: kyrageDialect.parseDevDatabaseConfig(
+      getConfigForTest(kyrageDialect)
+    ),
   };
 };
 

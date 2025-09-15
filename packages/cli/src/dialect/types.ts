@@ -2,6 +2,7 @@ import { Dialect } from "kysely";
 import { DBClient } from "../client";
 import { ReferentialActions } from "../operation";
 import { ConfigValue } from "../config/loader";
+import { DevDatabaseProvider, DevDatabaseConfig } from "../dev/types";
 
 export type ColumnExtraAttribute = {
   schema?: string;
@@ -67,9 +68,7 @@ export interface KyrageDialect<T extends string = string> {
   getName: () => T;
   createKyselyDialect: (connectionString: string) => Dialect;
   createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;
-  createDevDatabaseProvider: () => import("../dev/types").DevDatabaseProvider;
-  parseDevDatabaseConfig: (
-    config: unknown
-  ) => import("../dev/types").DevDatabaseConfig;
+  createDevDatabaseProvider: () => DevDatabaseProvider;
+  parseDevDatabaseConfig: (config: unknown) => DevDatabaseConfig;
   hasReusableDevDatabase: () => Promise<boolean>;
 }
