@@ -2,46 +2,6 @@ import { ConfigValue } from "../config/loader";
 import { IndexAttributes, ConstraintAttributes } from "./types";
 import * as R from "ramda";
 
-/**
- * Shared parsing functions for dev database configurations
- */
-
-/**
- * Parse container-based dev database configuration with dialect-specific defaults
- *
- * Used by PostgreSQL, CockroachDB, and other container-based dialects.
- */
-/*
-export const parseContainerDevDatabaseConfig =
-  (options: { defaultImage: string }) => (config: unknown) => {
-    return z
-      .object({
-        container: z
-          .object({
-            image: z.string().default(options.defaultImage),
-            name: z.string().optional(),
-          })
-          .default(() => ({ image: options.defaultImage })),
-      })
-      .parse(config);
-  };
-*/
-
-/**
- * Parse file-based dev database configuration
- *
- * Used by SQLite, DuckDB, and other file-based dialects.
- */
-/*
-export const parseFileDevDatabaseConfig = (config: unknown) => {
-  return z
-    .object({
-      file: z.object({}),
-    })
-    .parse(config);
-};
-*/
-
 /*
  * Some databases automatically create unique constraints for unique indexes, and vice versa (e.g., CockroachDB),
  * and there is no way to distinguish between automatically generated unique constraints and user-defined unique constraints.

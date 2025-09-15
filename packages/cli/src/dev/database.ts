@@ -1,19 +1,37 @@
 import { type Logger, nullLogger } from "../logger";
 import { type CommonDependencies } from "../commands/common";
 import { type DBClient, getClient } from "../client";
-import { createDevDatabaseManager } from "./container";
-import { DevDatabaseInstance } from "./types";
+import { DevDatabaseInstance, DevDatabaseManageType } from "./types";
 import { executeApply } from "../commands/apply";
 import { getPendingMigrations } from "../migration";
 import { getDialect } from "../dialect/factory";
+import { DevDatabaseValue, DialectEnum } from "../config/loader";
 
-export interface DatabaseStartupResult {
-  client: DBClient;
-  manager: DevDatabaseInstance;
-  cleanup: () => Promise<void>;
-}
+/**
+ * Create a new dev database manager using the dialect-driven approach
+ *
+ * This replaces the old createContainerManager function with a more flexible
+ * system that delegates dev database management to the appropriate dialect.
+ */
+export const createDevDatabaseManager = async (
+  devConfig: NonNullable<DevDatabaseValue>,
+  dialect: DialectEnum,
+  manageType: DevDatabaseManageType
+) => {
+  const kyrageDialect = getDialect(dialect);
 
-export type StartDevDatabaseOptions = {
+  // Get the provider from the dialect and delegate setup to the provider
+  const instance = await kyrageDialect
+    .createDevDatabaseProvider()
+    .setup(kyrageDialect.parseDevDatabaseConfig(devConfig), manageType);
+
+  return {
+    manageType,
+    instance,
+  };
+};
+
+type StartDevDatabaseOptions = {
   logger: Logger;
 } & (
   | {
@@ -68,6 +86,12 @@ async function prepareDevManager(
     }
   }
 }
+
+type DatabaseStartupResult = {
+  client: DBClient;
+  manager: DevDatabaseInstance;
+  cleanup: () => Promise<void>;
+};
 
 /**
  * Start development database with migrations applied

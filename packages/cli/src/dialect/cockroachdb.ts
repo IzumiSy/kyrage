@@ -12,8 +12,8 @@ import { convertPSQLTypeName, doPSQLintrospect } from "./postgres";
 import {
   buildContainerDevDatabaseConfigSchema,
   ContainerDevDatabaseProvider,
+  hasRunningDevStartContainer,
 } from "../dev/providers/container";
-import { hasRunningDevStartContainer } from "../dev/container";
 
 export class CockroachDBKyrageDialect implements KyrageDialect {
   getName() {

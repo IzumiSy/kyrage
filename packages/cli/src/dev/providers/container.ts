@@ -4,13 +4,6 @@ import {
   DevDatabaseManageType,
   DevDatabaseStatus,
 } from "../types";
-import {
-  hasRunningDevStartContainer,
-  removeAllKyrageManagedContainers,
-  DialectKey,
-  ManagedKey,
-  DevStartKey,
-} from "../container";
 import { DialectEnum } from "../../config/loader";
 import { StartedTestContainer } from "testcontainers/build/test-container";
 import { GenericContainer, getContainerRuntimeClient } from "testcontainers";
@@ -74,6 +67,10 @@ export class ContainerDevDatabaseProvider implements DevDatabaseProvider {
     await removeAllKyrageManagedContainers();
   }
 }
+
+export const DialectKey = "kyrage.dialect";
+export const ManagedKey = "kyrage.managed";
+export const DevStartKey = "kyrage.managed-by";
 
 /**
  * Container-based dev database instance
@@ -171,3 +168,39 @@ class ContainerDevDatabaseInstance implements DevDatabaseInstance {
     return !!this.startedContainer;
   }
 }
+
+/**
+ * dev start コンテナが実行中かどうかを確認する
+ */
+export const hasRunningDevStartContainer = async (
+  dialect: DialectEnum
+): Promise<boolean> => {
+  const runtime = await getContainerRuntimeClient();
+  const allContainers = await runtime.container.list();
+
+  return allContainers.some(
+    (container) =>
+      container.Labels[ManagedKey] === "true" &&
+      container.Labels[DevStartKey] === "dev-start" &&
+      container.Labels[DialectKey] === dialect &&
+      container.State === "running"
+  );
+};
+
+/**
+ * 全てのkyrage管理コンテナを削除する
+ */
+export const removeAllKyrageManagedContainers = async () => {
+  const runtime = await getContainerRuntimeClient();
+  const allContainers = await runtime.container.list();
+
+  const kyrageManagedContainers = allContainers
+    .filter((container) => container.Labels[ManagedKey] === "true")
+    .map((container) => container.Id);
+
+  await Promise.allSettled(
+    kyrageManagedContainers.map(async (id) =>
+      runtime.container.getById(id).remove({ force: true })
+    )
+  );
+};
