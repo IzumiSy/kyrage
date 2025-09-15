@@ -27,6 +27,7 @@ const getContainer = () => {
 
   // Parse empty config - dialect will provide appropriate defaults
   const parsedConfig = kyrageDialect.parseDevDatabaseConfig({
+    // TODO: here should be switched by dialect
     container: {
       image: "postgres:16",
     },
