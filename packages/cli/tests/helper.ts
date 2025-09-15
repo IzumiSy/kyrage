@@ -12,12 +12,12 @@ import {
   configSchema,
 } from "../src/config/loader";
 import { getContainerRuntimeClient } from "testcontainers";
-import { ManagedKey } from "../src/dev/container";
 import { getDialect } from "../src/dialect/factory";
 import { executeApply } from "../src/commands/apply";
 import { executeGenerate } from "../src/commands/generate";
 import { defaultConsolaLogger, Logger } from "../src/logger";
 import { KyrageDialect } from "../src/dialect/types";
+import { ManagedKey } from "../src/dev/providers/container";
 
 const getConfigForTest = (kyrageDialect: KyrageDialect) => {
   switch (kyrageDialect.getName()) {

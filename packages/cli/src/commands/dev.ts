@@ -1,8 +1,7 @@
 import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
-import { startDevDatabase } from "../dev/database";
+import { createDevDatabaseManager, startDevDatabase } from "../dev/database";
 import type { DevDatabaseInstance } from "../dev/types";
-import { createDevDatabaseManager } from "../dev/container";
 import { defaultConsolaLogger } from "../logger";
 
 export interface DevDependencies extends CommonDependencies {

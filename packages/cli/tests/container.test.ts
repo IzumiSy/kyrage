@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { createDevDatabaseManager } from "../src/dev/container";
 import { findAllKyrageManagedContainerIDs } from "./helper";
+import { createDevDatabaseManager } from "../src/dev/database";
 
 describe.skip("DevDatabaseManager", () => {
   const expected = {
