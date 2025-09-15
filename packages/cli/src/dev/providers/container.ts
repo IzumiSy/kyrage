@@ -124,8 +124,8 @@ class ContainerDevDatabaseInstance implements DevDatabaseInstance {
   }
 
   async remove(): Promise<void> {
-    await this.stop();
-    // Container removal is handled by the cleanup process
+    await removeAllKyrageManagedContainers();
+    this.startedContainer = null;
   }
 
   getConnectionString(): string {
