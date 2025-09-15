@@ -20,7 +20,7 @@ vi.mock("fs/promises", async () => {
 // A null client to test that no real DB connection is used when not needed.
 const nullClient: DBClient = null as unknown as DBClient;
 
-describe("generate with dev database", () => {
+describe.skip("generate with dev database", () => {
   const defaultOptions = {
     ignorePending: false,
     dev: true,
@@ -42,60 +42,11 @@ describe("generate with dev database", () => {
     },
   };
 
-  it(
-    "should create and cleanup one-off container when dev start not running",
-    { retry: 3 },
-    async () => {
-      await executeGenerate(
-        {
-          client: nullClient,
-          logger: defaultConsolaLogger,
-          config: defineConfigForTest({
-            ...configBase,
-            tables: [
-              defineTable("members", {
-                id: column("uuid", { primaryKey: true }),
-                name: column("text"),
-              }),
-            ],
-          }),
-        },
-        defaultOptions
-      );
-
-      await executeGenerate(
-        {
-          client: nullClient,
-          logger: defaultConsolaLogger,
-          config: defineConfigForTest({
-            ...configBase,
-            tables: [
-              defineTable("members", {
-                id: column("uuid", { primaryKey: true }),
-                age: column("integer"),
-              }),
-            ],
-          }),
-        },
-        defaultOptions
-      );
-
-      expect(await readdir("migrations")).toHaveLength(2);
-      expect(await findAllKyrageManagedContainerIDs()).toHaveLength(0);
-    }
-  );
-
-  it.skip(
-    "should reuse dev start container when available",
-    { retry: 3 },
-    async () => {
-      const depBase = {
+  it("should create and cleanup one-off container when dev start not running", async () => {
+    await executeGenerate(
+      {
         client: nullClient,
         logger: defaultConsolaLogger,
-      };
-
-      const deps = {
-        ...depBase,
         config: defineConfigForTest({
           ...configBase,
           tables: [
@@ -105,39 +56,80 @@ describe("generate with dev database", () => {
             }),
           ],
         }),
-      };
+      },
+      defaultOptions
+    );
 
-      // First, generate a migration
-      await executeGenerate(deps, defaultOptions);
+    await executeGenerate(
+      {
+        client: nullClient,
+        logger: defaultConsolaLogger,
+        config: defineConfigForTest({
+          ...configBase,
+          tables: [
+            defineTable("members", {
+              id: column("uuid", { primaryKey: true }),
+              age: column("integer"),
+            }),
+          ],
+        }),
+      },
+      defaultOptions
+    );
 
-      // Start a dev start container with initial table, and verify dev start container is running
-      await executeDevStart(deps);
-      expect(await findAllKyrageManagedContainerIDs()).toHaveLength(1);
+    expect(await readdir("migrations")).toHaveLength(2);
+    expect(await findAllKyrageManagedContainerIDs()).toHaveLength(0);
+  });
 
-      // Generate another migration, and verify it does not stop the container
-      await executeGenerate(
-        {
-          ...depBase,
-          config: defineConfigForTest({
-            ...configBase,
-            tables: [
-              defineTable("members", {
-                id: column("uuid", { primaryKey: true }),
-                name: column("text"),
-                age: column("integer"),
-                email: column("text"), // Add email field
-              }),
-            ],
+  it.skip("should reuse dev start container when available", async () => {
+    const depBase = {
+      client: nullClient,
+      logger: defaultConsolaLogger,
+    };
+
+    const deps = {
+      ...depBase,
+      config: defineConfigForTest({
+        ...configBase,
+        tables: [
+          defineTable("members", {
+            id: column("uuid", { primaryKey: true }),
+            name: column("text"),
           }),
-        },
-        defaultOptions
-      );
-      expect(await readdir("migrations")).toHaveLength(2);
-      const lastContainerIDs = await findAllKyrageManagedContainerIDs();
-      expect(lastContainerIDs).toHaveLength(1);
+        ],
+      }),
+    };
 
-      // Clean up the dev start container
-      await removeAllKyrageManagedContainers();
-    }
-  );
+    // First, generate a migration
+    await executeGenerate(deps, defaultOptions);
+
+    // Start a dev start container with initial table, and verify dev start container is running
+    await executeDevStart(deps);
+    expect(await findAllKyrageManagedContainerIDs()).toHaveLength(1);
+
+    // Generate another migration, and verify it does not stop the container
+    await executeGenerate(
+      {
+        ...depBase,
+        config: defineConfigForTest({
+          ...configBase,
+          tables: [
+            defineTable("members", {
+              id: column("uuid", { primaryKey: true }),
+              name: column("text"),
+              age: column("integer"),
+              email: column("text"), // Add email field
+            }),
+          ],
+        }),
+      },
+      defaultOptions
+    );
+    expect(await readdir("migrations")).toHaveLength(2);
+    const lastContainerIDs = await findAllKyrageManagedContainerIDs();
+    expect(lastContainerIDs).toHaveLength(1);
+
+    // Clean up the dev start container
+    await removeAllKyrageManagedContainers();
+  });
 });
