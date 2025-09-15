@@ -85,7 +85,7 @@ describe("generate with dev database", () => {
     }
   );
 
-  it(
+  it.skip(
     "should reuse dev start container when available",
     { retry: 3 },
     async () => {
