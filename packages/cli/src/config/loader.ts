@@ -7,6 +7,7 @@ import {
   foreignKeyConstraintSchema,
 } from "../operations/shared/types";
 import { buildContainerDevDatabaseConfigSchema } from "../dev/providers/container";
+import { buildFileDevDatabaseConfig } from "../dev/providers/file";
 
 const columnSchema = z.object({
   type: z.string(),
@@ -29,7 +30,7 @@ const indexSchema = z.object({
 });
 export type IndexSchema = z.infer<typeof indexSchema>;
 
-const dialectEnum = z.enum(["postgres", "cockroachdb"]);
+const dialectEnum = z.enum(["postgres", "cockroachdb", "sqlite"]);
 export type DialectEnum = z.infer<typeof dialectEnum>;
 
 const databaseSchema = z.object({
@@ -41,6 +42,8 @@ export type DatabaseValue = z.infer<typeof databaseSchema>;
 const devDatabaseSchema = z.union([
   // Container-based configuration
   buildContainerDevDatabaseConfigSchema({ defaultImage: "" }),
+  // File-based configuration
+  buildFileDevDatabaseConfig(),
 ]);
 export type DevDatabaseValue = z.infer<typeof devDatabaseSchema>;
 
