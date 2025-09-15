@@ -1,11 +1,11 @@
 import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
-import { createContainerManager } from "../dev/container";
-import { startDevDatabase } from "../dev/database";
-import type { DevDatabaseManager } from "../dev/container";
+import { createDevDatabaseManager, startDevDatabase } from "../dev/database";
+import type { DevDatabaseInstance } from "../dev/types";
+import { defaultConsolaLogger } from "../logger";
 
 export interface DevDependencies extends CommonDependencies {
-  manager: DevDatabaseManager;
+  manager: DevDatabaseInstance;
 }
 
 export async function executeDevStatus(dependencies: DevDependencies) {
@@ -23,7 +23,7 @@ export async function executeDevStatus(dependencies: DevDependencies) {
 export async function executeDevGetUrl(dependencies: DevDependencies) {
   const { manager, logger } = dependencies;
 
-  if (!(await manager.exists())) {
+  if (!manager.isAvailable()) {
     logger.reporter.info("No running dev containers found");
     return;
   }
@@ -36,7 +36,7 @@ export async function executeDevGetUrl(dependencies: DevDependencies) {
 export async function executeDevClean(dependencies: DevDependencies) {
   const { manager, logger } = dependencies;
 
-  if (!(await manager.exists())) {
+  if (!manager.isAvailable()) {
     logger.reporter.info("No dev containers found");
     return;
   }
@@ -66,11 +66,12 @@ export async function executeDevStart(dependencies: CommonDependencies) {
 async function createDevDependencies() {
   const commonDeps = await createCommonDependencies();
 
-  if (!commonDeps.config.dev || !("container" in commonDeps.config.dev)) {
-    throw new Error("No dev database container configuration found");
+  if (!commonDeps.config.dev) {
+    throw new Error("No dev database configuration found");
   }
 
-  const manager = createContainerManager(
+  // Use the new dev database manager system
+  const { instance } = await createDevDatabaseManager(
     commonDeps.config.dev,
     commonDeps.config.database.dialect,
     "dev-start"
@@ -78,7 +79,7 @@ async function createDevDependencies() {
 
   return {
     ...commonDeps,
-    manager,
+    manager: instance,
   };
 }
 
@@ -92,7 +93,6 @@ const devStartCmd = defineCommand({
       const dependencies = await createCommonDependencies();
       await executeDevStart(dependencies);
     } catch (error) {
-      const { defaultConsolaLogger } = await import("../logger");
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
     }
@@ -109,7 +109,6 @@ const devStatusCmd = defineCommand({
       const dependencies = await createDevDependencies();
       await executeDevStatus(dependencies);
     } catch (error) {
-      const { defaultConsolaLogger } = await import("../logger");
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
     }
@@ -126,7 +125,6 @@ const devGetUrlCmd = defineCommand({
       const dependencies = await createDevDependencies();
       await executeDevGetUrl(dependencies);
     } catch (error) {
-      const { defaultConsolaLogger } = await import("../logger");
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
     }
@@ -143,7 +141,6 @@ const devCleanCmd = defineCommand({
       const dependencies = await createDevDependencies();
       await executeDevClean(dependencies);
     } catch (error) {
-      const { defaultConsolaLogger } = await import("../logger");
       defaultConsolaLogger.reporter.error(error as Error);
       process.exit(1);
     }

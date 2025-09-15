@@ -1,8 +1,8 @@
 import { Dialect } from "kysely";
 import { DBClient } from "../client";
-import { StartableContainer } from "../dev/container";
 import { ReferentialActions } from "../operation";
 import { ConfigValue } from "../config/loader";
+import { DevDatabaseProvider, DevDatabaseConfig } from "../dev/types";
 
 export type ColumnExtraAttribute = {
   schema?: string;
@@ -66,8 +66,9 @@ export type IntrospectorDriver = {
 
 export interface KyrageDialect<T extends string = string> {
   getName: () => T;
-  getDevDatabaseImageName: () => string;
   createKyselyDialect: (connectionString: string) => Dialect;
   createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;
-  createDevDatabaseContainer: (image: string) => StartableContainer;
+  createDevDatabaseProvider: () => DevDatabaseProvider;
+  parseDevDatabaseConfig: (config: unknown) => DevDatabaseConfig;
+  hasReusableDevDatabase: () => Promise<boolean>;
 }

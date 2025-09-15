@@ -1,23 +1,22 @@
 import { describe, it, expect } from "vitest";
-import {
-  CannotGetConnectionStringError,
-  createContainerManager,
-} from "../src/dev/container";
-import { findAllKyrageManagedContainerIDs } from "./helper";
+import { createDevDatabaseManager } from "../src/dev/database";
 
 describe("DevDatabaseManager", () => {
   const expected = {
     connectionPattern: /^postgres:\/\/.*:\d+\/.*$/,
   };
   const options = {
-    dialect: "postgres" as const,
     container: {
       image: "postgres:16",
     },
   };
 
   it("should start and stop container successfully", async () => {
-    const manager = createContainerManager(options, "postgres", "dev-start");
+    const { instance: manager } = await createDevDatabaseManager(
+      options,
+      "postgres",
+      "dev-start"
+    );
 
     await manager.start();
     expect(manager.getConnectionString()).toMatch(expected.connectionPattern);
@@ -28,13 +27,14 @@ describe("DevDatabaseManager", () => {
       containerID: expect.any(String),
     });
 
-    const exists = await manager.exists();
+    const exists = manager.isAvailable();
     expect(exists).toBe(true);
 
     await manager.stop();
     expect(() => manager.getConnectionString()).toThrowError(
-      CannotGetConnectionStringError
+      "Container is not started"
     );
-    expect(await findAllKyrageManagedContainerIDs()).toEqual([]);
+
+    expect(await manager.getStatus()).toEqual({ type: "unavailable" });
   });
 });
