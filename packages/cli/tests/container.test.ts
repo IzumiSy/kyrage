@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { findAllKyrageManagedContainerIDs } from "./helper";
 import { createDevDatabaseManager } from "../src/dev/database";
 
 describe("DevDatabaseManager", () => {
@@ -35,7 +34,7 @@ describe("DevDatabaseManager", () => {
     expect(() => manager.getConnectionString()).toThrowError(
       "Container is not started"
     );
-    await manager.remove();
-    expect(await findAllKyrageManagedContainerIDs()).toEqual([]);
+
+    expect(await manager.getStatus()).toEqual({ type: "unavailable" });
   });
 });
