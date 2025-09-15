@@ -2,7 +2,6 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   defineConfigForTest,
   findAllKyrageManagedContainerIDs,
-  setupTestDB,
 } from "./helper";
 import { defineTable, column } from "../src/config/builder";
 import { executeGenerate } from "../src/commands/generate";
@@ -11,17 +10,17 @@ import { defaultConsolaLogger } from "../src/logger";
 import { readdir } from "fs/promises";
 import { vol } from "memfs";
 import { removeAllKyrageManagedContainers } from "../src/dev/providers/container";
+import { DBClient } from "../src/client";
 
 vi.mock("fs/promises", async () => {
   const memfs = await import("memfs");
   return memfs.fs.promises;
 });
 
-// `setupTestDB` is not really necessary in this test to use dev database,
-// However, it can be just useful for setting up a test database environment.
-const { database, client } = await setupTestDB();
+// A null client to test that no real DB connection is used when not needed.
+const nullClient: DBClient = null as unknown as DBClient;
 
-describe.skip("generate with dev database", () => {
+describe("generate with dev database", () => {
   const defaultOptions = {
     ignorePending: false,
     dev: true,
@@ -31,19 +30,22 @@ describe.skip("generate with dev database", () => {
     vol.reset();
   });
 
-  it("should create and cleanup one-off container when dev start not running", async () => {
-    const configBase = {
-      database,
-      dev: {
-        container: {
-          image: "postgres:16",
-        },
+  const configBase = {
+    database: {
+      dialect: "postgres" as const,
+      connectionString: "(justplaceholding)",
+    },
+    dev: {
+      container: {
+        image: "postgres:16",
       },
-    };
+    },
+  };
 
+  it("should create and cleanup one-off container when dev start not running", async () => {
     await executeGenerate(
       {
-        client,
+        client: nullClient,
         logger: defaultConsolaLogger,
         config: defineConfigForTest({
           ...configBase,
@@ -60,7 +62,7 @@ describe.skip("generate with dev database", () => {
 
     await executeGenerate(
       {
-        client,
+        client: nullClient,
         logger: defaultConsolaLogger,
         config: defineConfigForTest({
           ...configBase,
@@ -80,16 +82,8 @@ describe.skip("generate with dev database", () => {
   });
 
   it("should reuse dev start container when available", async () => {
-    const configBase = {
-      database,
-      dev: {
-        container: {
-          image: "postgres:16",
-        },
-      },
-    };
     const depBase = {
-      client,
+      client: nullClient,
       logger: defaultConsolaLogger,
     };
 
