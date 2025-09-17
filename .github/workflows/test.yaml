@@ -32,6 +32,7 @@ jobs:
         dialect:
           - postgres
           - cockroachdb
+          - sqlite
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
