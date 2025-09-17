@@ -151,13 +151,13 @@ class ContainerDevDatabaseInstance implements DevDatabaseInstance {
     if (runningContainer) {
       const r = await runningContainer.inspect();
       return {
-        type: "container",
+        type: "container" as const,
         imageName: r.Config.Image,
         containerID: r.Id,
       };
     }
 
-    return { type: "unavailable" };
+    return { type: "unavailable" as const };
   }
 
   async isAvailable(): Promise<boolean> {

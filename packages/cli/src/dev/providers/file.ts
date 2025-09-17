@@ -129,26 +129,27 @@ class FileDevDatabaseInstance implements DevDatabaseInstance {
 
   async getStatus(): Promise<DevDatabaseStatus> {
     if (!this.connectionString) {
-      return { type: "unavailable" };
+      return { type: "unavailable" as const };
     }
 
     if (this.connectionString === ":memory:") {
       return {
-        type: "file",
+        type: "file" as const,
         filePath: ":memory:",
         mode: "memory",
       };
     }
 
     return {
-      type: "file",
+      type: "file" as const,
       filePath: this.connectionString,
       mode: "file",
     };
   }
 
-  isAvailable(): boolean {
-    return !!this.connectionString;
+  async isAvailable(): Promise<boolean> {
+    const status = await this.getStatus();
+    return status.type === "file";
   }
 
   private getDevStartPath(): string {
