@@ -112,7 +112,7 @@ export interface DevDatabaseInstance {
    *
    * @returns true if environment is available and connectable
    */
-  isAvailable(): boolean;
+  isAvailable(): Promise<boolean>;
 }
 
 /**

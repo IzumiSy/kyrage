@@ -136,36 +136,29 @@ class ContainerDevDatabaseInstance implements DevDatabaseInstance {
   }
 
   async getStatus(): Promise<DevDatabaseStatus> {
-    if (!this.startedContainer) {
-      return { type: "unavailable" };
+    // Use runtime client to inspect container
+    const runtime = await getContainerRuntimeClient();
+    const runningContainer = await runtime.container.fetchByLabel(
+      DialectKey,
+      this.options.dialect,
+      { status: ["running"] }
+    );
+
+    if (runningContainer) {
+      const r = await runningContainer.inspect();
+      return {
+        type: "container",
+        imageName: r.Config.Image,
+        containerID: r.Id,
+      };
     }
 
-    try {
-      // Use runtime client to inspect container
-      const runtime = await getContainerRuntimeClient();
-      const runningContainer = await runtime.container.fetchByLabel(
-        DialectKey,
-        this.options.dialect,
-        { status: ["running"] }
-      );
-
-      if (runningContainer) {
-        const r = await runningContainer.inspect();
-        return {
-          type: "container",
-          imageName: r.Config.Image,
-          containerID: r.Id,
-        };
-      }
-
-      return { type: "unavailable" };
-    } catch {
-      return { type: "unavailable" };
-    }
+    return { type: "unavailable" };
   }
 
-  isAvailable(): boolean {
-    return !!this.startedContainer;
+  async isAvailable(): Promise<boolean> {
+    const status = await this.getStatus();
+    return status.type === "container";
   }
 }
 

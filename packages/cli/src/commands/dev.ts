@@ -23,7 +23,7 @@ export async function executeDevStatus(dependencies: DevDependencies) {
 export async function executeDevGetUrl(dependencies: DevDependencies) {
   const { manager, logger } = dependencies;
 
-  if (!manager.isAvailable()) {
+  if (!(await manager.isAvailable())) {
     logger.reporter.info("No running dev containers found");
     return;
   }
@@ -36,7 +36,7 @@ export async function executeDevGetUrl(dependencies: DevDependencies) {
 export async function executeDevClean(dependencies: DevDependencies) {
   const { manager, logger } = dependencies;
 
-  if (!manager.isAvailable()) {
+  if (!(await manager.isAvailable())) {
     logger.reporter.info("No dev containers found");
     return;
   }
