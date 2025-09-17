@@ -9,11 +9,16 @@ import * as path from "path";
 import * as os from "os";
 import z from "zod";
 
+const defaultName = "default";
 export const buildFileDevDatabaseConfig = () =>
   z.object({
-    file: z.object({
-      name: z.string().optional(),
-    }),
+    file: z
+      .object({
+        name: z.string().default(defaultName),
+      })
+      .default({
+        name: defaultName,
+      }),
   });
 export type FileDevDatabaseConfig = z.infer<
   ReturnType<typeof buildFileDevDatabaseConfig>
@@ -32,7 +37,7 @@ export class FileDevDatabaseProvider implements DevDatabaseProvider {
   ): Promise<DevDatabaseInstance> {
     return new FileDevDatabaseInstance({
       manageType: manageType,
-      name: config.file.name,
+      name: config.file?.name,
     });
   }
 
@@ -51,7 +56,7 @@ export class FileDevDatabaseProvider implements DevDatabaseProvider {
   }
 
   private getDevStartPath(name?: string): string {
-    const basename = name || "default";
+    const basename = name || defaultName;
     return path.join(os.tmpdir(), `kyrage___dev-${basename}.db`);
   }
 
@@ -147,7 +152,7 @@ class FileDevDatabaseInstance implements DevDatabaseInstance {
   }
 
   private getDevStartPath(): string {
-    const basename = this.options.name || "default";
+    const basename = this.options.name || defaultName;
     return path.join(os.tmpdir(), `kyrage___dev-${basename}.db`);
   }
 }
