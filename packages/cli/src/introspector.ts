@@ -23,34 +23,34 @@ export const getIntrospector = (client: DBClient) => {
     } = await extIntrospectorDriver.introspect({ config });
 
     const getTables = () =>
-      kyselyIntrospection.map((table) => ({
-        schema: table.schema,
-        name: table.name,
-        columns: Object.fromEntries(
-          table.columns.map((column) => {
-            const ex = extTables.filter(
-              (c) => c.table === table.name && c.name === column.name
-            );
-            const extraInfo = ex[0] || {};
+      kyselyIntrospection.map((table) => {
+        const columns: Record<string, any> = {};
 
-            return [
-              column.name,
-              {
-                schema: table.schema,
-                table: table.name,
-                name: column.name,
-                dataType: extIntrospectorDriver.convertTypeName(
-                  column.dataType
-                ),
-                default: extraInfo.default ?? null,
-                characterMaximumLength:
-                  extraInfo.characterMaximumLength ?? null,
-                notNull: !column.isNullable,
-              },
-            ];
-          })
-        ),
-      }));
+        for (const column of table.columns) {
+          const extraInfo = extTables.find(
+            (c) => c.table === table.name && c.name === column.name
+          );
+          if (!extraInfo) {
+            continue;
+          }
+
+          columns[column.name] = {
+            schema: table.schema,
+            table: table.name,
+            name: column.name,
+            dataType: extIntrospectorDriver.convertTypeName(column.dataType),
+            default: extraInfo.default ?? null,
+            characterMaximumLength: extraInfo.characterMaximumLength ?? null,
+            notNull: !column.isNullable,
+          };
+        }
+
+        return {
+          schema: table.schema,
+          name: table.name,
+          columns,
+        };
+      });
 
     const notInternalTable = (p: { table: string }) =>
       !p.table.startsWith("kysely_");
