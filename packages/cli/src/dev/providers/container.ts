@@ -8,7 +8,6 @@ import { DialectEnum } from "../../config/loader";
 import { StartedTestContainer } from "testcontainers/build/test-container";
 import { GenericContainer, getContainerRuntimeClient } from "testcontainers";
 import z from "zod";
-import { ru } from "zod/locales";
 
 export const buildContainerDevDatabaseConfigSchema = (options: {
   defaultImage: string;
