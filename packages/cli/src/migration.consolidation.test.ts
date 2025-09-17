@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { consolidateCreateTableWithConstraints } from "./diff";
 import { ops, Operation } from "./operation";
+import { consolidateCreateTableWithConstraints } from "./migration";
 
 describe("consolidateCreateTableWithConstraints", () => {
   it("should consolidate primary key constraint into create_table operation", () => {

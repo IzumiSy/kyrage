@@ -513,7 +513,7 @@ export const sortOperationsByDependency = (
  * This allows Kysely's CreateTableBuilder to create tables with constraints
  * in a single SQL statement for better performance and atomicity.
  */
-const consolidateCreateTableWithConstraints = (
+export const consolidateCreateTableWithConstraints = (
   operations: ReadonlyArray<Operation>
 ): ReadonlyArray<Operation> => {
   const consolidatedOps: Operation[] = [];
