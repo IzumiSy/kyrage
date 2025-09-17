@@ -27,14 +27,16 @@ export class CockroachDBKyrageDialect implements KyrageDialect {
   }
 
   createIntrospectionDriver(client: DBClient) {
+    const systemGeneratedColumnNames = ["rowid"];
+
     return {
       convertTypeName: convertPSQLTypeName,
       introspect: async (props: IntrospectProps) => {
         const r = await doPSQLintrospect(client)(props);
+
+        // Filter only user-defined columns
         const tables = r.tables.filter(
-          (t) =>
-            // Remove system generated columns
-            t.name !== "rowid"
+          (t) => !systemGeneratedColumnNames.includes(t.name)
         );
 
         return {
