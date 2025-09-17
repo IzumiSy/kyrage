@@ -25,21 +25,21 @@ export async function executeApply(
     plan: options.plan,
   });
 
+  const provider = createMigrationProvider({
+    migrationsResolver: async () => {
+      if (options.plan) {
+        return await getPendingMigrations(client);
+      } else {
+        return await getAllMigrations();
+      }
+    },
+    options: {
+      plan: options.plan,
+    },
+  });
   const migrator = new Migrator({
     db,
-    provider: createMigrationProvider({
-      db,
-      migrationsResolver: async () => {
-        if (options.plan) {
-          return await getPendingMigrations(client);
-        } else {
-          return await getAllMigrations();
-        }
-      },
-      options: {
-        plan: options.plan,
-      },
-    }),
+    provider,
   });
 
   const { results: migrationResults, error: migrationError } =
