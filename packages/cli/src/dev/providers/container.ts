@@ -16,10 +16,14 @@ export const buildContainerDevDatabaseConfigSchema = (options: {
   defaultImage: string;
 }) =>
   z.object({
-    container: z.object({
-      image: z.string().default(options.defaultImage),
-      name: z.string().optional(),
-    }),
+    container: z
+      .object({
+        image: z.string().default(options.defaultImage),
+        name: z.string().optional(),
+      })
+      .default({
+        image: options.defaultImage,
+      }),
   });
 export type ContainerDevDatabaseConfig = z.infer<
   ReturnType<typeof buildContainerDevDatabaseConfigSchema>
