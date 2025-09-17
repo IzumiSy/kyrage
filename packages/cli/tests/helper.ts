@@ -34,11 +34,7 @@ const getConfigForTest = (kyrageDialect: KyrageDialect) => {
         },
       };
     case "sqlite":
-      return {
-        file: {
-          name: "test",
-        },
-      };
+      return {};
     default:
       throw new Error("unsupported dialect specified");
   }
