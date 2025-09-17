@@ -1,5 +1,21 @@
 # @izumisy/kyrage
 
+## 1.3.1
+
+### Patch Changes
+
+- [#119](https://github.com/IzumiSy/kyrage/pull/119) [`55b769a`](https://github.com/IzumiSy/kyrage/commit/55b769a0cacdc3cb12458271f704b95877c65a24) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Fix CockroachDB dialect to filter out system-generated `rowid` column during introspection
+
+  CockroachDB automatically generates a `rowid` column for tables without an explicit primary key. This system-generated column was being included in introspection results, causing unwanted diffs between the actual database schema and user-defined configuration. The CockroachDB dialect now filters out the `rowid` column to match user expectations and prevent false positives in schema comparisons.
+
+- [#121](https://github.com/IzumiSy/kyrage/pull/121) [`5fcfb5b`](https://github.com/IzumiSy/kyrage/commit/5fcfb5bd5160e31308eb655f6963b985ef20e41a) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Fix container detection for dev database commands by properly matching multiple Docker labels. This resolves the issue where users would see "No running dev containers found" even when containers were actually running.
+
+  The `kyrage dev status`, `kyrage dev clean`, and `kyrage dev get-url` commands were unable to detect running containers due to incomplete label matching in the container detection logic.
+
+- [#116](https://github.com/IzumiSy/kyrage/pull/116) [`75fca73`](https://github.com/IzumiSy/kyrage/commit/75fca730d71a131a122ae3c69365fd0cdc56bb1e) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Fix migration provider to use the acquired DB connection by Kysely migrator
+
+  Resolves issue where migration provider was not using the acquired DB connection passed to the Migration interface's up method, which is required for databases with connection limits like SQLite.
+
 ## 1.3.0
 
 ### Minor Changes
