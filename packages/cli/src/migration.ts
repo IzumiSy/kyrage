@@ -72,7 +72,6 @@ export const getPendingMigrations = async (client: DBClient) => {
 };
 
 type CreateMigrationProviderProps = {
-  db: Kysely<any>;
   migrationsResolver: () => Promise<
     ReadonlyArray<z.infer<typeof migrationSchema>>
   >;
@@ -90,8 +89,8 @@ export const createMigrationProvider = (
       const migrations: Record<string, Migration> = {};
       migrationFiles.forEach((migration) => {
         migrations[migration.id] = {
-          up: async () => {
-            await buildMigrationFromDiff(props.db, migration.diff);
+          up: async (db) => {
+            await buildMigrationFromDiff(db, migration.diff);
           },
         };
       });
