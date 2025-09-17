@@ -427,131 +427,13 @@ export function diffSchema(props: {
     ideal: props.ideal.foreignKeyConstraints,
   });
 
-  const allOperations = [
-    ...tableOperations,
-    ...indexOperations,
-    ...primaryKeyOperations,
-    ...uniqueOperations,
-    ...foreignKeyOperations,
-  ];
-
-  // Consolidate constraint operations into create_table operations when possible
-  const consolidatedOperations =
-    consolidateCreateTableWithConstraints(allOperations);
-
   return {
-    operations: consolidatedOperations,
+    operations: [
+      ...tableOperations,
+      ...indexOperations,
+      ...primaryKeyOperations,
+      ...uniqueOperations,
+      ...foreignKeyOperations,
+    ],
   };
 }
-
-/**
- * Consolidate constraint creation operations into create_table operations
- * when they target the same table being created in the same migration.
- * This allows Kysely's CreateTableBuilder to create tables with constraints
- * in a single SQL statement for better performance and atomicity.
- */
-export const consolidateCreateTableWithConstraints = (
-  operations: ReadonlyArray<Operation>
-): ReadonlyArray<Operation> => {
-  const consolidatedOps: Operation[] = [];
-  const processedConstraints = new Set<string>();
-
-  for (const operation of operations) {
-    if (operation.type === "create_table") {
-      // Collect related constraint operations for this table
-      const relatedConstraints = collectTableConstraints(
-        operations,
-        operation.table
-      );
-
-      // Create enhanced create_table operation with constraints
-      const enhancedOperation: Operation = {
-        ...operation,
-        ...(Object.keys(relatedConstraints.constraints).length > 0 && {
-          constraints: relatedConstraints.constraints,
-        }),
-      };
-
-      consolidatedOps.push(enhancedOperation);
-
-      // Mark processed constraints
-      relatedConstraints.processedIds.forEach((id) =>
-        processedConstraints.add(id)
-      );
-    } else if (isConstraintCreateOperation(operation)) {
-      // Only add constraint operations that haven't been consolidated
-      const operationId = getConstraintOperationId(operation);
-      if (!processedConstraints.has(operationId)) {
-        consolidatedOps.push(operation);
-      }
-    } else {
-      // Pass through all other operations unchanged
-      consolidatedOps.push(operation);
-    }
-  }
-
-  return consolidatedOps;
-};
-
-/**
- * Collect constraint operations that can be consolidated into a create_table operation.
- * Foreign key constraints are excluded because they may reference tables that haven't been created yet.
- */
-const collectTableConstraints = (
-  operations: ReadonlyArray<Operation>,
-  tableName: string
-) => {
-  const constraints: {
-    primaryKey?: Omit<PrimaryKeyConstraintSchema, "table">;
-    unique?: Array<Omit<UniqueConstraintSchema, "table">>;
-  } = {};
-  const processedIds: string[] = [];
-
-  for (const operation of operations) {
-    if (operation.table === tableName) {
-      if (operation.type === "create_primary_key_constraint") {
-        const { table, ...constraintData } = operation;
-        constraints.primaryKey = constraintData;
-        processedIds.push(getConstraintOperationId(operation));
-      } else if (operation.type === "create_unique_constraint") {
-        const { table, ...constraintData } = operation;
-        if (!constraints.unique) constraints.unique = [];
-        constraints.unique.push(constraintData);
-        processedIds.push(getConstraintOperationId(operation));
-      }
-      // Note: Foreign key constraints are intentionally excluded from consolidation
-      // because they may reference tables that haven't been created yet, which would
-      // cause dependency order issues. Foreign keys will be created separately
-      // after all tables are created.
-    }
-  }
-
-  return { constraints, processedIds };
-};
-
-/**
- * Check if an operation is a constraint creation operation that can be consolidated.
- * Foreign key constraints are excluded from consolidation.
- */
-const isConstraintCreateOperation = (operation: Operation): boolean => {
-  return (
-    operation.type === "create_primary_key_constraint" ||
-    operation.type === "create_unique_constraint"
-  );
-  // Note: create_foreign_key_constraint is intentionally excluded
-};
-
-/**
- * Generate a unique ID for a constraint operation that can be consolidated.
- */
-const getConstraintOperationId = (operation: Operation): string => {
-  if (
-    operation.type === "create_primary_key_constraint" ||
-    operation.type === "create_unique_constraint"
-  ) {
-    return `${operation.type}:${operation.table}:${operation.name}`;
-  }
-  throw new Error(
-    `Invalid consolidatable constraint operation type: ${(operation as any).type}`
-  );
-};
