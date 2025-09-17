@@ -290,4 +290,45 @@ describe("consolidateCreateTableWithConstraints", () => {
     });
     expect(result[0]).not.toHaveProperty("constraints");
   });
+
+  it("should consolidate constraints even when create_table comes after constraints (order independence)", () => {
+    const operations: Operation[] = [
+      // Constraint operations come BEFORE create_table
+      ops.createPrimaryKeyConstraint({
+        table: "users",
+        name: "pk_users_id",
+        columns: ["id"],
+      }),
+      ops.createUniqueConstraint({
+        table: "users",
+        name: "uk_users_email",
+        columns: ["email"],
+      }),
+      ops.createTable("users", {
+        id: { type: "uuid" },
+        email: { type: "text" },
+        name: { type: "text" },
+      }),
+    ];
+
+    const result = consolidateCreateTableWithConstraints(operations);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      type: "create_table",
+      table: "users",
+      constraints: {
+        primaryKey: {
+          name: "pk_users_id",
+          columns: ["id"],
+        },
+        unique: [
+          {
+            name: "uk_users_email",
+            columns: ["email"],
+          },
+        ],
+      },
+    });
+  });
 });
