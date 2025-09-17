@@ -1,5 +1,5 @@
 import { CockroachDbContainer } from "@testcontainers/cockroachdb";
-import { KyrageDialect } from "./types";
+import { IntrospectProps, KyrageDialect } from "./types";
 import { Pool } from "pg";
 import { DBClient } from "../client";
 import {
@@ -29,7 +29,20 @@ export class CockroachDBKyrageDialect implements KyrageDialect {
   createIntrospectionDriver(client: DBClient) {
     return {
       convertTypeName: convertPSQLTypeName,
-      introspect: doPSQLintrospect(client),
+      introspect: async (props: IntrospectProps) => {
+        const r = await doPSQLintrospect(client)(props);
+        const tables = r.tables.filter(
+          (t) =>
+            // Remove system generated columns
+            t.name !== "rowid"
+        );
+
+        return {
+          tables,
+          indexes: r.indexes,
+          constraints: r.constraints,
+        };
+      },
     };
   }
 
