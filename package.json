@@ -6,6 +6,7 @@
   },
   "scripts": {
     "build": "turbo build",
+    "dev": "turbo dev",
     "test": "turbo test",
     "type-check": "turbo type-check",
     "changeset:publish": "pnpm build && changeset publish"
