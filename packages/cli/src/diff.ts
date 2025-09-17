@@ -436,7 +436,8 @@ export function diffSchema(props: {
   ];
 
   // Consolidate constraint operations into create_table operations when possible
-  const consolidatedOperations = consolidateCreateTableWithConstraints(allOperations);
+  const consolidatedOperations =
+    consolidateCreateTableWithConstraints(allOperations);
 
   return {
     operations: consolidatedOperations,
@@ -458,20 +459,25 @@ export const consolidateCreateTableWithConstraints = (
   for (const operation of operations) {
     if (operation.type === "create_table") {
       // Collect related constraint operations for this table
-      const relatedConstraints = collectTableConstraints(operations, operation.table);
-      
+      const relatedConstraints = collectTableConstraints(
+        operations,
+        operation.table
+      );
+
       // Create enhanced create_table operation with constraints
       const enhancedOperation: Operation = {
         ...operation,
         ...(Object.keys(relatedConstraints.constraints).length > 0 && {
-          constraints: relatedConstraints.constraints
-        })
+          constraints: relatedConstraints.constraints,
+        }),
       };
-      
+
       consolidatedOps.push(enhancedOperation);
-      
+
       // Mark processed constraints
-      relatedConstraints.processedIds.forEach(id => processedConstraints.add(id));
+      relatedConstraints.processedIds.forEach((id) =>
+        processedConstraints.add(id)
+      );
     } else if (isConstraintCreateOperation(operation)) {
       // Only add constraint operations that haven't been consolidated
       const operationId = getConstraintOperationId(operation);
@@ -528,8 +534,10 @@ const collectTableConstraints = (
  * Foreign key constraints are excluded from consolidation.
  */
 const isConstraintCreateOperation = (operation: Operation): boolean => {
-  return operation.type === "create_primary_key_constraint" ||
-         operation.type === "create_unique_constraint";
+  return (
+    operation.type === "create_primary_key_constraint" ||
+    operation.type === "create_unique_constraint"
+  );
   // Note: create_foreign_key_constraint is intentionally excluded
 };
 
@@ -537,9 +545,13 @@ const isConstraintCreateOperation = (operation: Operation): boolean => {
  * Generate a unique ID for a constraint operation that can be consolidated.
  */
 const getConstraintOperationId = (operation: Operation): string => {
-  if (operation.type === "create_primary_key_constraint" ||
-      operation.type === "create_unique_constraint") {
+  if (
+    operation.type === "create_primary_key_constraint" ||
+    operation.type === "create_unique_constraint"
+  ) {
     return `${operation.type}:${operation.table}:${operation.name}`;
   }
-  throw new Error(`Invalid consolidatable constraint operation type: ${(operation as any).type}`);
+  throw new Error(
+    `Invalid consolidatable constraint operation type: ${(operation as any).type}`
+  );
 };
