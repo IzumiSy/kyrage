@@ -27,7 +27,7 @@ describe("DevDatabaseManager", () => {
       containerID: expect.any(String),
     });
 
-    const exists = manager.isAvailable();
+    const exists = await manager.isAvailable();
     expect(exists).toBe(true);
 
     await manager.stop();

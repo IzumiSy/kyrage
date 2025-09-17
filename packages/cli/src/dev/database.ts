@@ -64,7 +64,7 @@ async function prepareDevManager(
       return {
         manageType,
         manager: instance,
-        result: { reused: instance.isAvailable() },
+        result: { reused: await instance.isAvailable() },
       };
     }
 
