@@ -160,6 +160,7 @@ async function executeCreateTable(
     operation.table
   );
 
+  // Add columns
   for (const [colName, colDef] of Object.entries(operation.columns)) {
     const dataType = colDef.type;
     assertDataType(dataType);
@@ -171,6 +172,31 @@ async function executeCreateTable(
       }
       return c;
     });
+  }
+
+  // Add constraints if present
+  if (operation.constraints) {
+    // Primary Key Constraint
+    if (operation.constraints.primaryKey) {
+      builder = builder.addPrimaryKeyConstraint(
+        operation.constraints.primaryKey.name,
+        operation.constraints.primaryKey.columns as Array<string>
+      );
+    }
+
+    // Unique Constraints
+    if (operation.constraints.unique) {
+      for (const uniqueConstraint of operation.constraints.unique) {
+        builder = builder.addUniqueConstraint(
+          uniqueConstraint.name,
+          uniqueConstraint.columns as Array<string>
+        );
+      }
+    }
+
+    // Note: Foreign key constraints are intentionally not processed here
+    // to avoid dependency order issues. They will be created separately
+    // after all tables are created.
   }
 
   await builder.execute();
@@ -363,18 +389,18 @@ const OPERATION_PRIORITY = {
   drop_column: 4,
   drop_table: 5,
 
-  // 3. Create tables and columns
-  create_table: 6,
+  // 3. Create tables and columns (consolidated constraints handled here)
+  create_table: 6, // Now handles constraints via CreateTableBuilder
   add_column: 7,
 
   // 4. Alter columns
   alter_column: 8,
 
-  // 5. Create indexes and constraints last (lowest priority)
+  // 5. Create indexes and constraints (fallback for non-consolidated cases)
   create_index: 9,
-  create_primary_key_constraint: 10,
-  create_unique_constraint: 11,
-  create_foreign_key_constraint: 12, // Foreign keys must be created last
+  create_primary_key_constraint: 10, // For existing tables only
+  create_unique_constraint: 11, // For existing tables only
+  create_foreign_key_constraint: 12, // For existing tables only
 } as const;
 
 /**

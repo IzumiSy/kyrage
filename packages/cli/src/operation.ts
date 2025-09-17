@@ -77,6 +77,11 @@ export const operationSchema = z.discriminatedUnion("type", [
     type: z.literal("create_table"),
     table: z.string(),
     columns: z.record(z.string(), tableColumnAttributesSchema),
+    constraints: z.object({
+      primaryKey: primaryKeyConstraintSchema.omit({ table: true }).optional(),
+      unique: z.array(uniqueConstraintSchema.omit({ table: true })).readonly().optional(),
+      // Note: Foreign key constraints are intentionally excluded to avoid dependency order issues
+    }).optional(),
   }),
   z.object({
     type: z.literal("drop_table"),
@@ -149,11 +154,17 @@ export type Operation = z.infer<typeof operationSchema>;
 export const ops = {
   createTable: (
     table: string,
-    columns: Record<string, TableColumnAttributes>
+    columns: Record<string, TableColumnAttributes>,
+    constraints?: {
+      primaryKey?: Omit<PrimaryKeyConstraintSchema, "table">;
+      unique?: ReadonlyArray<Omit<UniqueConstraintSchema, "table">>;
+      // Note: Foreign key constraints are intentionally excluded to avoid dependency order issues
+    }
   ) => ({
     type: "create_table" as const,
     table,
     columns,
+    ...(constraints && { constraints }),
   }),
 
   dropTable: (table: string) => ({
