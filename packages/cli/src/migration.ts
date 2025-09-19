@@ -11,7 +11,12 @@ import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 import { DBClient } from "./client";
 import z from "zod";
-import { Operation, operationSchema } from "./operation";
+import {
+  Operation,
+  operationSchema,
+  PrimaryKeyConstraintSchema,
+  UniqueConstraintSchema,
+} from "./operation";
 import * as R from "ramda";
 
 export const migrationDirName = "migrations";
@@ -105,6 +110,8 @@ export async function buildMigrationFromDiff(
   diff: SchemaDiff
 ) {
   const buildOperations = R.pipe(
+    // Consolidate constraint operations into create_table operations when possible
+    consolidateCreateTableWithConstraints,
     // Filter out operations for tables that will be dropped
     filterOperationsForDroppedTables,
     // Filter out redundant DROP INDEX operations that would fail due to
@@ -160,6 +167,7 @@ async function executeCreateTable(
     operation.table
   );
 
+  // Add columns
   for (const [colName, colDef] of Object.entries(operation.columns)) {
     const dataType = colDef.type;
     assertDataType(dataType);
@@ -171,6 +179,31 @@ async function executeCreateTable(
       }
       return c;
     });
+  }
+
+  // Add constraints if present
+  if (operation.constraints) {
+    // Primary Key Constraint
+    if (operation.constraints.primaryKey) {
+      builder = builder.addPrimaryKeyConstraint(
+        operation.constraints.primaryKey.name,
+        operation.constraints.primaryKey.columns as Array<string>
+      );
+    }
+
+    // Unique Constraints
+    if (operation.constraints.unique) {
+      for (const uniqueConstraint of operation.constraints.unique) {
+        builder = builder.addUniqueConstraint(
+          uniqueConstraint.name,
+          uniqueConstraint.columns as Array<string>
+        );
+      }
+    }
+
+    // Note: Foreign key constraints are intentionally not processed here
+    // to avoid dependency order issues. They will be created separately
+    // after all tables are created.
   }
 
   await builder.execute();
@@ -363,18 +396,18 @@ const OPERATION_PRIORITY = {
   drop_column: 4,
   drop_table: 5,
 
-  // 3. Create tables and columns
-  create_table: 6,
+  // 3. Create tables and columns (consolidated constraints handled here)
+  create_table: 6, // Now handles constraints via CreateTableBuilder
   add_column: 7,
 
   // 4. Alter columns
   alter_column: 8,
 
-  // 5. Create indexes and constraints last (lowest priority)
+  // 5. Create indexes and constraints (fallback for non-consolidated cases)
   create_index: 9,
-  create_primary_key_constraint: 10,
-  create_unique_constraint: 11,
-  create_foreign_key_constraint: 12, // Foreign keys must be created last
+  create_primary_key_constraint: 10, // For existing tables only
+  create_unique_constraint: 11, // For existing tables only
+  create_foreign_key_constraint: 12, // For existing tables only
 } as const;
 
 /**
@@ -473,3 +506,115 @@ export const sortOperationsByDependency = (
 
     return a.table.localeCompare(b.table);
   });
+
+/**
+ * Consolidate constraint creation operations into create_table operations
+ * when they target the same table being created in the same migration.
+ * This allows Kysely's CreateTableBuilder to create tables with constraints
+ * in a single SQL statement for better performance and atomicity.
+ */
+export const consolidateCreateTableWithConstraints = (
+  operations: ReadonlyArray<Operation>
+): ReadonlyArray<Operation> => {
+  const consolidatedOps: Operation[] = [];
+  const processedConstraints = new Set<string>();
+
+  for (const operation of operations) {
+    if (operation.type === "create_table") {
+      // Collect related constraint operations for this table
+      const relatedConstraints = collectTableConstraints(
+        operations,
+        operation.table
+      );
+
+      // Create enhanced create_table operation with constraints
+      const enhancedOperation: Operation = {
+        ...operation,
+        ...(Object.keys(relatedConstraints.constraints).length > 0 && {
+          constraints: relatedConstraints.constraints,
+        }),
+      };
+
+      consolidatedOps.push(enhancedOperation);
+
+      // Mark processed constraints
+      relatedConstraints.processedIds.forEach((id) =>
+        processedConstraints.add(id)
+      );
+    } else if (isConstraintCreateOperation(operation)) {
+      // Only add constraint operations that haven't been consolidated
+      const operationId = getConstraintOperationId(operation);
+      if (!processedConstraints.has(operationId)) {
+        consolidatedOps.push(operation);
+      }
+    } else {
+      // Pass through all other operations unchanged
+      consolidatedOps.push(operation);
+    }
+  }
+
+  return consolidatedOps;
+};
+
+/**
+ * Collect constraint operations that can be consolidated into a create_table operation.
+ * Foreign key constraints are excluded because they may reference tables that haven't been created yet.
+ */
+const collectTableConstraints = (
+  operations: ReadonlyArray<Operation>,
+  tableName: string
+) => {
+  const constraints: {
+    primaryKey?: Omit<PrimaryKeyConstraintSchema, "table">;
+    unique?: Array<Omit<UniqueConstraintSchema, "table">>;
+  } = {};
+  const processedIds: string[] = [];
+
+  for (const operation of operations) {
+    if (operation.table === tableName) {
+      if (operation.type === "create_primary_key_constraint") {
+        const { table, ...constraintData } = operation;
+        constraints.primaryKey = constraintData;
+        processedIds.push(getConstraintOperationId(operation));
+      } else if (operation.type === "create_unique_constraint") {
+        const { table, ...constraintData } = operation;
+        if (!constraints.unique) constraints.unique = [];
+        constraints.unique.push(constraintData);
+        processedIds.push(getConstraintOperationId(operation));
+      }
+      // Note: Foreign key constraints are intentionally excluded from consolidation
+      // because they may reference tables that haven't been created yet, which would
+      // cause dependency order issues. Foreign keys will be created separately
+      // after all tables are created.
+    }
+  }
+
+  return { constraints, processedIds };
+};
+
+/**
+ * Check if an operation is a constraint creation operation that can be consolidated.
+ * Foreign key constraints are excluded from consolidation.
+ */
+const isConstraintCreateOperation = (operation: Operation): boolean => {
+  return (
+    operation.type === "create_primary_key_constraint" ||
+    operation.type === "create_unique_constraint"
+  );
+  // Note: create_foreign_key_constraint is intentionally excluded
+};
+
+/**
+ * Generate a unique ID for a constraint operation that can be consolidated.
+ */
+const getConstraintOperationId = (operation: Operation): string => {
+  if (
+    operation.type === "create_primary_key_constraint" ||
+    operation.type === "create_unique_constraint"
+  ) {
+    return `${operation.type}:${operation.table}:${operation.name}`;
+  }
+  throw new Error(
+    `Invalid consolidatable constraint operation type: ${(operation as any).type}`
+  );
+};

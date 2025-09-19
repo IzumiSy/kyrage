@@ -111,14 +111,9 @@ it("generate with planned apply", async () => {
 
   [
     // 1st phase
-    `create table "category" ("id" uuid not null, "member_id" uuid not null, "name" text)`,
-    `create table "members" ("id" uuid not null, "name" text, "email" text)`,
+    `create table "category" ("id" uuid not null, "member_id" uuid not null, "name" text, constraint "pk_category_id_member_id" primary key ("id", "member_id"), constraint "category_name_unique" unique ("name"))`,
+    `create table "members" ("id" uuid not null, "name" text, "email" text, constraint "members_id_primary_key" primary key ("id"), constraint "uq_members_name_email" unique ("name", "email"), constraint "members_name_unique" unique ("name"))`,
     `create index "idx_members_name_email" on "members" ("name", "email")`,
-    `alter table "category" add constraint "pk_category_id_member_id" primary key ("id", "member_id")`,
-    `alter table "members" add constraint "members_id_primary_key" primary key ("id")`,
-    `alter table "category" add constraint "category_name_unique" unique ("name")`,
-    `alter table "members" add constraint "uq_members_name_email" unique ("name", "email")`,
-    `alter table "members" add constraint "members_name_unique" unique ("name")`,
     `alter table "category" add constraint "category_member_fk" foreign key ("member_id") references "members" ("id") on delete cascade`,
 
     // 2nd phase
@@ -126,9 +121,8 @@ it("generate with planned apply", async () => {
     `alter table "members" drop constraint "uq_members_name_email"`,
     `drop index "idx_members_name_email"`,
     `drop table "category"`,
-    `create table "posts" ("id" uuid not null, "content" text, "author_id" uuid not null)`,
+    `create table "posts" ("id" uuid not null, "content" text, "author_id" uuid not null, constraint "posts_id_primary_key" primary key ("id"))`,
     `create unique index "idx_members_id_email" on "members" ("id", "email")`,
-    `alter table "posts" add constraint "posts_id_primary_key" primary key ("id")`,
     `alter table "members" add constraint "members_email_unique" unique ("email")`,
     `alter table "posts" add constraint "posts_author_fk" foreign key ("author_id") references "members" ("id") on delete set null on update cascade`,
   ].forEach((expectedCall, index) => {
