@@ -1,5 +1,6 @@
 import z from "zod";
 import { IndexSchema } from "./config/loader";
+import { createTableOp } from "./operations/table/createTable";
 
 const tableColumnAttributesSchema = z
   .object({
@@ -101,11 +102,7 @@ export const operationSchema = z.discriminatedUnion("type", [
   // Table operations with constraints
   createTableWithConstraintsSchema,
   // Table operations
-  z.object({
-    type: z.literal("create_table"),
-    table: z.string(),
-    columns: z.record(z.string(), tableColumnAttributesSchema),
-  }),
+  createTableOp.schema,
   z.object({
     type: z.literal("drop_table"),
     table: z.string(),

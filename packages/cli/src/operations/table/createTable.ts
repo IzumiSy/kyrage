@@ -1,18 +1,34 @@
 import z from "zod";
-import { Kysely, CreateTableBuilder, sql } from "kysely";
+import { CreateTableBuilder, sql } from "kysely";
 import {
   tableColumnAttributesSchema,
   TableColumnAttributes,
 } from "../shared/types";
 import { assertDataType } from "../shared/utils";
+import { defineOperation } from "../shared/operation";
 
-export const createTableSchema = z.object({
-  type: z.literal("create_table"),
-  table: z.string(),
-  columns: z.record(z.string(), tableColumnAttributesSchema),
+export const createTableOp = defineOperation({
+  typeName: "create_table",
+  schema: z.object({
+    type: z.literal("create_table"),
+    table: z.string(),
+    columns: z.record(z.string(), tableColumnAttributesSchema),
+  }),
+  execute: async (db, operation) => {
+    let builder = db.schema.createTable(operation.table);
+    builder = addColumnsToTableBuilder(builder, operation.columns);
+    await builder.execute();
+  },
 });
 
-export type CreateTableOperation = z.infer<typeof createTableSchema>;
+export const createTable = (
+  table: string,
+  columns: Record<string, TableColumnAttributes>
+) => ({
+  type: "create_table" as const,
+  table,
+  columns,
+});
 
 // カラム追加の共通処理
 export function addColumnsToTableBuilder(
@@ -34,25 +50,3 @@ export function addColumnsToTableBuilder(
   }
   return result;
 }
-
-export async function executeCreateTable(
-  db: Kysely<any>,
-  operation: CreateTableOperation
-) {
-  let builder: CreateTableBuilder<string, any> = db.schema.createTable(
-    operation.table
-  );
-
-  builder = addColumnsToTableBuilder(builder, operation.columns);
-
-  await builder.execute();
-}
-
-export const createTable = (
-  table: string,
-  columns: Record<string, TableColumnAttributes>
-): CreateTableOperation => ({
-  type: "create_table" as const,
-  table,
-  columns,
-});

@@ -1,59 +1,36 @@
 import z from "zod";
 import { Kysely } from "kysely";
-
-// Import all individual operation modules
-import { createTableSchema, executeCreateTable } from "./table/createTable";
-import {
-  createTableWithConstraintsSchema,
-  executeCreateTableWithConstraints,
-} from "./table/createTableWithConstraints";
-import { dropTableSchema, executeDropTable } from "./table/dropTable";
-import { addColumnSchema, executeAddColumn } from "./column/addColumn";
-import { dropColumnSchema, executeDropColumn } from "./column/dropColumn";
-import { alterColumnSchema, executeAlterColumn } from "./column/alterColumn";
-import { createIndexSchema, executeCreateIndex } from "./index/createIndex";
-import { dropIndexSchema, executeDropIndex } from "./index/dropIndex";
-import {
-  createPrimaryKeyConstraintSchema,
-  executeCreatePrimaryKeyConstraint,
-} from "./constraint/createPrimaryKeyConstraint";
-import {
-  dropPrimaryKeyConstraintSchema,
-  executeDropPrimaryKeyConstraint,
-} from "./constraint/dropPrimaryKeyConstraint";
-import {
-  createUniqueConstraintSchema,
-  executeCreateUniqueConstraint,
-} from "./constraint/createUniqueConstraint";
-import {
-  dropUniqueConstraintSchema,
-  executeDropUniqueConstraint,
-} from "./constraint/dropUniqueConstraint";
-import {
-  createForeignKeyConstraintSchema,
-  executeCreateForeignKeyConstraint,
-} from "./constraint/createForeignKeyConstraint";
-import {
-  dropForeignKeyConstraintSchema,
-  executeDropForeignKeyConstraint,
-} from "./constraint/dropForeignKeyConstraint";
+import { createTableWithConstraintsOp } from "./table/createTableWithConstraints";
+import { dropTableOp } from "./table/dropTable";
+import { addColumnOp } from "./column/addColumn";
+import { dropColumnOp } from "./column/dropColumn";
+import { alterColumnOp } from "./column/alterColumn";
+import { createIndexOp } from "./index/createIndex";
+import { dropIndexOp } from "./index/dropIndex";
+import { createPrimaryKeyConstraintOp } from "./constraint/createPrimaryKeyConstraint";
+import { dropPrimaryKeyConstraintOp } from "./constraint/dropPrimaryKeyConstraint";
+import { createUniqueConstraintOp } from "./constraint/createUniqueConstraint";
+import { dropUniqueConstraintOp } from "./constraint/dropUniqueConstraint";
+import { createForeignKeyConstraintOp } from "./constraint/createForeignKeyConstraint";
+import { dropForeignKeyConstraintOp } from "./constraint/dropForeignKeyConstraint";
+import { createTableOp } from "./table/createTable";
 
 // ===== SCHEMA DEFINITIONS =====
 export const operationSchema = z.discriminatedUnion("type", [
-  createTableWithConstraintsSchema,
-  createTableSchema,
-  dropTableSchema,
-  addColumnSchema,
-  dropColumnSchema,
-  alterColumnSchema,
-  createIndexSchema,
-  dropIndexSchema,
-  createPrimaryKeyConstraintSchema,
-  dropPrimaryKeyConstraintSchema,
-  createUniqueConstraintSchema,
-  dropUniqueConstraintSchema,
-  createForeignKeyConstraintSchema,
-  dropForeignKeyConstraintSchema,
+  createTableWithConstraintsOp.schema,
+  createTableOp.schema,
+  dropTableOp.schema,
+  addColumnOp.schema,
+  dropColumnOp.schema,
+  alterColumnOp.schema,
+  createIndexOp.schema,
+  dropIndexOp.schema,
+  createPrimaryKeyConstraintOp.schema,
+  dropPrimaryKeyConstraintOp.schema,
+  createUniqueConstraintOp.schema,
+  dropUniqueConstraintOp.schema,
+  createForeignKeyConstraintOp.schema,
+  dropForeignKeyConstraintOp.schema,
 ]);
 
 export type Operation = z.infer<typeof operationSchema>;
@@ -62,33 +39,33 @@ export type Operation = z.infer<typeof operationSchema>;
 export async function executeOperation(db: Kysely<any>, operation: Operation) {
   switch (operation.type) {
     case "create_table_with_constraints":
-      return executeCreateTableWithConstraints(db, operation);
+      return createTableWithConstraintsOp.execute(db, operation);
     case "create_table":
-      return executeCreateTable(db, operation);
+      return createTableOp.execute(db, operation);
     case "drop_table":
-      return executeDropTable(db, operation);
+      return dropTableOp.execute(db, operation);
     case "add_column":
-      return executeAddColumn(db, operation);
+      return addColumnOp.execute(db, operation);
     case "drop_column":
-      return executeDropColumn(db, operation);
+      return dropColumnOp.execute(db, operation);
     case "alter_column":
-      return executeAlterColumn(db, operation);
+      return alterColumnOp.execute(db, operation);
     case "create_index":
-      return executeCreateIndex(db, operation);
+      return createIndexOp.execute(db, operation);
     case "drop_index":
-      return executeDropIndex(db, operation);
+      return dropIndexOp.execute(db, operation);
     case "create_primary_key_constraint":
-      return executeCreatePrimaryKeyConstraint(db, operation);
+      return createPrimaryKeyConstraintOp.execute(db, operation);
     case "drop_primary_key_constraint":
-      return executeDropPrimaryKeyConstraint(db, operation);
+      return dropPrimaryKeyConstraintOp.execute(db, operation);
     case "create_unique_constraint":
-      return executeCreateUniqueConstraint(db, operation);
+      return createUniqueConstraintOp.execute(db, operation);
     case "drop_unique_constraint":
-      return executeDropUniqueConstraint(db, operation);
+      return dropUniqueConstraintOp.execute(db, operation);
     case "create_foreign_key_constraint":
-      return executeCreateForeignKeyConstraint(db, operation);
+      return createForeignKeyConstraintOp.execute(db, operation);
     case "drop_foreign_key_constraint":
-      return executeDropForeignKeyConstraint(db, operation);
+      return dropForeignKeyConstraintOp.execute(db, operation);
     default:
       throw new Error(`Unknown operation type: ${(operation as any).type}`);
   }

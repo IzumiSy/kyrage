@@ -1,32 +1,25 @@
 import z from "zod";
-import { Kysely } from "kysely";
 import {
   uniqueConstraintSchema,
   UniqueConstraintSchema,
 } from "../shared/types";
+import { defineOperation } from "../shared/operation";
 
-export const createUniqueConstraintSchema = z.object({
-  ...uniqueConstraintSchema.shape,
-  type: z.literal("create_unique_constraint"),
+export const createUniqueConstraintOp = defineOperation({
+  typeName: "create_unique_constraint",
+  schema: z.object({
+    ...uniqueConstraintSchema.shape,
+    type: z.literal("create_unique_constraint"),
+  }),
+  execute: async (db, operation) => {
+    await db.schema
+      .alterTable(operation.table)
+      .addUniqueConstraint(operation.name, operation.columns as Array<string>)
+      .execute();
+  },
 });
 
-export type CreateUniqueConstraintOperation = z.infer<
-  typeof createUniqueConstraintSchema
->;
-
-export async function executeCreateUniqueConstraint(
-  db: Kysely<any>,
-  operation: CreateUniqueConstraintOperation
-) {
-  await db.schema
-    .alterTable(operation.table)
-    .addUniqueConstraint(operation.name, operation.columns as Array<string>)
-    .execute();
-}
-
-export const createUniqueConstraint = (
-  value: UniqueConstraintSchema
-): CreateUniqueConstraintOperation => ({
+export const createUniqueConstraint = (value: UniqueConstraintSchema) => ({
   ...value,
   type: "create_unique_constraint" as const,
 });

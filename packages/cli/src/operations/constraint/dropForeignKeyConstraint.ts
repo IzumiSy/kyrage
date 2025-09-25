@@ -1,29 +1,22 @@
 import z from "zod";
-import { Kysely } from "kysely";
 import { tableOpSchemaBase, TableOpValue } from "../shared/types";
+import { defineOperation } from "../shared/operation";
 
-export const dropForeignKeyConstraintSchema = z.object({
-  ...tableOpSchemaBase.shape,
-  type: z.literal("drop_foreign_key_constraint"),
+export const dropForeignKeyConstraintOp = defineOperation({
+  typeName: "drop_foreign_key_constraint",
+  schema: z.object({
+    ...tableOpSchemaBase.shape,
+    type: z.literal("drop_foreign_key_constraint"),
+  }),
+  execute: async (db, operation) => {
+    await db.schema
+      .alterTable(operation.table)
+      .dropConstraint(operation.name)
+      .execute();
+  },
 });
 
-export type DropForeignKeyConstraintOperation = z.infer<
-  typeof dropForeignKeyConstraintSchema
->;
-
-export async function executeDropForeignKeyConstraint(
-  db: Kysely<any>,
-  operation: DropForeignKeyConstraintOperation
-) {
-  await db.schema
-    .alterTable(operation.table)
-    .dropConstraint(operation.name)
-    .execute();
-}
-
-export const dropForeignKeyConstraint = (
-  value: TableOpValue
-): DropForeignKeyConstraintOperation => ({
+export const dropForeignKeyConstraint = (value: TableOpValue) => ({
   ...value,
   type: "drop_foreign_key_constraint" as const,
 });

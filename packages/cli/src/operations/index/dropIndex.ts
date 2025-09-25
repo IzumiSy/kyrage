@@ -1,22 +1,19 @@
 import z from "zod";
-import { Kysely } from "kysely";
 import { tableOpSchemaBase, TableOpValue } from "../shared/types";
+import { defineOperation } from "../shared/operation";
 
-export const dropIndexSchema = z.object({
-  ...tableOpSchemaBase.shape,
-  type: z.literal("drop_index"),
+export const dropIndexOp = defineOperation({
+  typeName: "drop_index",
+  schema: z.object({
+    ...tableOpSchemaBase.shape,
+    type: z.literal("drop_index"),
+  }),
+  execute: async (db, operation) => {
+    await db.schema.dropIndex(operation.name).execute();
+  },
 });
 
-export type DropIndexOperation = z.infer<typeof dropIndexSchema>;
-
-export async function executeDropIndex(
-  db: Kysely<any>,
-  operation: DropIndexOperation
-) {
-  await db.schema.dropIndex(operation.name).execute();
-}
-
-export const dropIndex = (value: TableOpValue): DropIndexOperation => ({
+export const dropIndex = (value: TableOpValue) => ({
   ...value,
   type: "drop_index" as const,
 });
