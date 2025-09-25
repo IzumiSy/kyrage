@@ -14,18 +14,16 @@ export const createTableSchema = z.object({
 
 export type CreateTableOperation = z.infer<typeof createTableSchema>;
 
-export async function executeCreateTable(
-  db: Kysely<any>,
-  operation: CreateTableOperation
-) {
-  let builder: CreateTableBuilder<string, any> = db.schema.createTable(
-    operation.table
-  );
-
-  for (const [colName, colDef] of Object.entries(operation.columns)) {
+// カラム追加の共通処理
+export function addColumnsToTableBuilder(
+  builder: CreateTableBuilder<string, any>,
+  columns: Record<string, TableColumnAttributes>
+): CreateTableBuilder<string, any> {
+  let result = builder;
+  for (const [colName, colDef] of Object.entries(columns)) {
     const dataType = colDef.type;
     assertDataType(dataType);
-    builder = builder.addColumn(colName, dataType, (col) => {
+    result = result.addColumn(colName, dataType, (col) => {
       let c = col;
       if (colDef.notNull) c = c.notNull();
       if (typeof colDef.defaultSql === "string") {
@@ -34,6 +32,18 @@ export async function executeCreateTable(
       return c;
     });
   }
+  return result;
+}
+
+export async function executeCreateTable(
+  db: Kysely<any>,
+  operation: CreateTableOperation
+) {
+  let builder: CreateTableBuilder<string, any> = db.schema.createTable(
+    operation.table
+  );
+
+  builder = addColumnsToTableBuilder(builder, operation.columns);
 
   await builder.execute();
 }

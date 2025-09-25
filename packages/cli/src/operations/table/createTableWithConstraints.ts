@@ -1,10 +1,10 @@
 import z from "zod";
-import { Kysely, CreateTableBuilder, sql } from "kysely";
+import { Kysely, CreateTableBuilder } from "kysely";
 import {
   tableColumnAttributesSchema,
   TableColumnAttributes,
 } from "../shared/types";
-import { assertDataType } from "../shared/utils";
+import { addColumnsToTableBuilder } from "./createTable";
 
 export const createTableWithConstraintsSchema = z.object({
   type: z.literal("create_table_with_constraints"),
@@ -43,19 +43,8 @@ export async function executeCreateTableWithConstraints(
     operation.table
   );
 
-  // カラム追加
-  for (const [colName, colDef] of Object.entries(operation.columns)) {
-    const dataType = colDef.type;
-    assertDataType(dataType);
-    builder = builder.addColumn(colName, dataType, (col) => {
-      let c = col;
-      if (colDef.notNull) c = c.notNull();
-      if (typeof colDef.defaultSql === "string") {
-        c = c.defaultTo(sql.raw(colDef.defaultSql));
-      }
-      return c;
-    });
-  }
+  // カラム追加（共通関数を使用）
+  builder = addColumnsToTableBuilder(builder, operation.columns);
 
   // Primary KeyとUnique制約のみをInlineで追加
   if (operation.constraints) {
