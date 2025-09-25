@@ -15,6 +15,9 @@ import { createForeignKeyConstraintOp } from "./constraint/createForeignKeyConst
 import { dropForeignKeyConstraintOp } from "./constraint/dropForeignKeyConstraint";
 import { createTableOp } from "./table/createTable";
 
+/**
+ * All available operations
+ */
 const operations = [
   createTableWithConstraintsOp,
   createTableOp,
