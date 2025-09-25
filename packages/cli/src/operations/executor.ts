@@ -15,7 +15,6 @@ import { createForeignKeyConstraintOp } from "./constraint/createForeignKeyConst
 import { dropForeignKeyConstraintOp } from "./constraint/dropForeignKeyConstraint";
 import { createTableOp } from "./table/createTable";
 
-// ===== SCHEMA DEFINITIONS =====
 export const operationSchema = z.discriminatedUnion("type", [
   createTableWithConstraintsOp.schema,
   createTableOp.schema,
@@ -35,7 +34,6 @@ export const operationSchema = z.discriminatedUnion("type", [
 
 export type Operation = z.infer<typeof operationSchema>;
 
-// ===== EXECUTION LOGIC =====
 export async function executeOperation(db: Kysely<any>, operation: Operation) {
   switch (operation.type) {
     case "create_table_with_constraints":
@@ -70,8 +68,6 @@ export async function executeOperation(db: Kysely<any>, operation: Operation) {
       throw new Error(`Unknown operation type: ${(operation as any).type}`);
   }
 }
-
-// ===== PIPELINE PROCESSING =====
 
 // Operation priority for dependency sorting
 const OPERATION_PRIORITY = {
