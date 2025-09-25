@@ -20,12 +20,19 @@ Traditional migration tools often use object-based diff structures (e.g., `{ add
 ```typescript
 type Operation = 
   | { type: "create_table"; table: string; columns: Record<string, TableColumnAttributes> }
+  | { type: "create_table_with_constraints"; table: string; columns: Record<string, TableColumnAttributes>; constraints?: ConstraintDef }
   | { type: "drop_table"; table: string }
   | { type: "add_column"; table: string; column: string; attributes: TableColumnAttributes }
   | { type: "drop_column"; table: string; column: string; attributes: TableColumnAttributes }
   | { type: "alter_column"; table: string; column: string; before: TableColumnAttributes; after: TableColumnAttributes }
   | { type: "create_index"; table: string; name: string; columns: ReadonlyArray<string>; unique: boolean }
-  | { type: "drop_index"; table: string; name: string };
+  | { type: "drop_index"; table: string; name: string }
+  | { type: "create_primary_key_constraint"; table: string; name: string; columns: ReadonlyArray<string> }
+  | { type: "drop_primary_key_constraint"; table: string; name: string }
+  | { type: "create_unique_constraint"; table: string; name: string; columns: ReadonlyArray<string> }
+  | { type: "drop_unique_constraint"; table: string; name: string }
+  | { type: "create_foreign_key_constraint"; table: string; name: string; columns: ReadonlyArray<string>; referencedTable: string; referencedColumns: ReadonlyArray<string> }
+  | { type: "drop_foreign_key_constraint"; table: string; name: string };
 
 type SchemaDiff = {
   operations: Operation[];
@@ -140,13 +147,82 @@ function diffSchema(props: {
 - Return unified operation array for consistent processing
 
 **Operation Types**:
-- Table operations: `create_table`, `drop_table`
+- Table operations: `create_table`, `create_table_with_constraints`, `drop_table`
 - Column operations: `add_column`, `drop_column`, `alter_column`  
 - Index operations: `create_index`, `drop_index`
+- Constraint operations: `create_primary_key_constraint`, `drop_primary_key_constraint`, `create_unique_constraint`, `drop_unique_constraint`, `create_foreign_key_constraint`, `drop_foreign_key_constraint`
 
-### 4. Migration Execution (`migration.ts`)
+### 4. Operation Reconciliation (`operations/reconciler.ts`)
 
-**Purpose**: Execute Operation arrays against database
+**Purpose**: Optimize and reorganize operations for efficient execution
+
+**Core Pipeline**:
+```typescript
+export const buildReconciledOperations = R.pipe(
+  filterOperationsForDroppedTables,
+  mergeTableCreationWithConstraints,
+  filterRedundantDropIndexOperations,
+  sortOperationsByDependency
+);
+```
+
+**Optimization Strategies**:
+
+1. **Table Creation Merging**: Combines `create_table` operations with `create_primary_key_constraint` and `create_unique_constraint` operations into a single `create_table_with_constraints` operation for better SQL efficiency.
+
+2. **Dependency Ordering**: Sorts operations by priority to ensure safe execution:
+   - Drop operations (foreign keys → unique → primary key → indexes → columns → tables)
+   - Create operations (tables → columns → indexes → constraints)
+
+3. **Redundant Operation Filtering**: Removes unnecessary operations (e.g., dropping indexes when constraint drops will automatically drop them).
+
+**Benefits**:
+- Reduces number of SQL statements executed
+- Ensures dependency-safe operation ordering
+- Eliminates redundant database operations
+- Atomic table creation with constraints
+
+### 5. Operation Definition Pattern (`operations/shared/operation.ts`)
+
+**Purpose**: Standardized operation implementation with type safety and schema validation
+
+**Core Pattern**:
+```typescript
+export const defineOperation = <const T extends string, S extends z.ZodType>(
+  props: DefineOperationProps<T, S>
+) => props;
+
+// Example operation definition
+export const createTableOp = defineOperation({
+  typeName: "create_table",
+  schema: z.object({
+    type: z.literal("create_table"),
+    table: z.string(),
+    columns: z.record(z.string(), tableColumnAttributesSchema),
+  }),
+  execute: async (db, operation) => {
+    let builder = db.schema.createTable(operation.table);
+    builder = addColumnsToTableBuilder(builder, operation.columns);
+    await builder.execute();
+  },
+});
+```
+
+**Architecture Benefits**:
+- **Type Safety**: Operation schemas are validated at runtime using Zod
+- **Consistent Structure**: All operations follow the same `typeName`, `schema`, `execute` pattern  
+- **Automatic Registration**: Operations are automatically registered in the executor through the `operations` array
+- **Modular Implementation**: Each operation is self-contained with its own validation and execution logic
+- **Developer Experience**: IntelliSense support for operation parameters through schema inference
+
+**Operation Components**:
+- `typeName`: Unique identifier matching the operation type discriminant
+- `schema`: Zod schema for runtime validation and TypeScript type inference
+- `execute`: Async function that performs the actual database operation using Kysely
+
+### 6. Migration Execution (`migration.ts`)
+
+**Purpose**: Execute reconciled Operation arrays against database
 
 **Architecture**:
 ```typescript
@@ -154,104 +230,66 @@ async function buildMigrationFromDiff(
   db: Kysely<any>, 
   diff: SchemaDiff
 ) {
-  for (const operation of diff.operations) {
+  // Apply operation reconciliation before execution
+  const reconciledOperations = buildReconciledOperations(diff.operations);
+  
+  for (const operation of reconciledOperations) {
     await executeOperation(db, operation);
   }
 }
 
-async function executeOperation(
-  db: Kysely<any>, 
-  operation: Operation
-) {
-  switch (operation.type) {
-    case "create_table": return executeCreateTable(db, operation);
-    case "drop_table": return executeDropTable(db, operation);
-    case "add_column": return executeAddColumn(db, operation);
-    // ... handle all operation types
+// Dynamic operation execution using type-safe dispatch
+async function executeOperation(db: Kysely<any>, operation: Operation) {
+  const execute = getOperationExecutor(operation.type);
+  return await execute(db, operation);
+}
+
+function getOperationExecutor<T extends Operation["type"]>(operationType: T) {
+  const operation = operations.find((op) => op.typeName === operationType);
+  if (!operation) {
+    throw new Error(`Unknown operation type: ${operationType}`);
   }
+
+  return operation.execute as (
+    db: Kysely<any>,
+    operation: Extract<Operation, { type: T }>
+  ) => Promise<void>;
 }
 ```
 
 **Benefits**: 
 - Single execution path for all operations
-- Type-safe operation handling with exhaustive switch
+- Type-safe operation handling with dynamic dispatch
+- Modular operation implementations through `defineOperation` pattern
 - Consistent error handling and transaction management
+- Automatic operation registration and schema validation
 
-### 5. Development Database Management (`dev/container.ts`)
+### 7. Development Database Management (`dev/container.ts`)
 
-**Purpose**: Manage ephemeral and persistent development database containers with smart reuse detection
+**Purpose**: Container-based development database lifecycle management
 
-**Architecture**:
-```typescript
-export type DevDatabaseManager = {
-  start: () => Promise<void>;
-  stop: () => Promise<void>;
-  remove: () => Promise<void>;
-  exists: () => Promise<boolean>;
-  getConnectionString: () => string;
-  getStatus: () => Promise<DevStatus | null>;
-};
+**Features**:
+- Automatic container creation with dialect-specific configurations
+- Smart container reuse and detection for `generate --dev`
+- Baseline migration application to ensure accurate schema comparison
+- Container cleanup and status management
+- Support for PostgreSQL and CockroachDB containers
 
-// Unified container manager using dialect factory
-export function createContainerManager(
-  devConfig: NonNullable<DevDatabaseValue>,
-  dialect: DialectEnum,
-  manageType: "dev-start" | "one-off"
-): DevDatabaseManager;
+**Architecture**: Integrates with dialect factory to provide database-specific container configurations while maintaining a unified interface.
 
-// Smart container detection for reuse
-export async function hasRunningDevStartContainer(
-  dialect: DialectEnum
-): Promise<boolean>;
-```
+### 8. Development Commands (`commands/dev.ts`)
 
-**Dialect Integration**:
-```typescript
-// Unified container creation using dialect factory
-export const createContainerManager = (
-  devConfig: NonNullable<DevDatabaseValue>,
-  dialect: DialectEnum,
-  manageType: "dev-start" | "one-off"
-) => {
-  if ("container" in devConfig) {
-    return new ContainerDevDatabaseManager(
-      { dialect, containerName, manageType },
-      () => getDialect(dialect).createDevDatabaseContainer(devConfig.container.image)
-    );
-  }
-  // ... handle connection string case
-};
-```
-
-**Key Features**:
-- **Smart Container Reuse**: Automatically detects and reuses containers started by `dev start` command
-- **Dynamic Detection**: No configuration required - runtime detection based on container labels
-- **Unified Management**: Single `createContainerManager` function handles all container types via dialect factory
-- **Multi-dialect Support**: PostgreSQL and CockroachDB container management through dialect abstraction
-- **Label-based Discovery**: Uses Docker labels (`kyrage.managed`, `kyrage.managed-by`, `kyrage.dialect`) for identification
-
-**Container Reuse Behavior**:
-- `generate --dev` automatically reuses `dev start` containers when available
-- Falls back to one-off containers when no persistent container is running
-- Eliminates configuration complexity while providing optimal performance
-
-### 6. Development Commands (`commands/dev.ts`)
-
-**Purpose**: Provide CLI interface for development database management
+**Purpose**: CLI commands for development database management
 
 **Commands**:
-- `kyrage dev start`: Start persistent development database container with automatic migration baseline
-- `kyrage dev status`: Show running container information
-- `kyrage dev get-url`: Output connection string for running container
-- `kyrage dev clean`: Remove all kyrage-managed containers
+- `kyrage dev start`: Start persistent development database
+- `kyrage dev status`: Show running container status
+- `kyrage dev get-url`: Print connection URL for external tools
+- `kyrage dev clean`: Remove all kyrage containers
 
-**Benefits**:
-- Direct container management without external Docker commands
-- Integrated workflow with kyrage configuration
-- Safe cleanup of only kyrage-managed containers
-- Persistent containers enable smart reuse for `generate --dev`
+**Integration**: Works seamlessly with `generate --dev` for automatic container reuse.
 
-### 7. Console Output (`generate.ts`)
+### 9. Console Output (`generate.ts`)
 
 **Purpose**: Human-readable diff presentation
 
@@ -265,10 +303,14 @@ diff.operations.forEach((operation: Operation) => {
       logger.log(`-- create_table: ${operation.table}`);
       // ... format table columns
       break;
+    case "create_table_with_constraints":
+      logger.log(`-- create_table_with_constraints: ${operation.table}`);
+      // ... format table columns and inline constraints
+      break;
     case "add_column":
       logger.log(`-- add_column: ${operation.table}.${operation.column}`);
       break;
-    // ... format all operation types
+    // ... format all operation types including constraints
   }
 });
 ```
@@ -278,7 +320,7 @@ diff.operations.forEach((operation: Operation) => {
 - Unified processing with migration execution
 - Easy to extend for new operation types
 
-### 8. Command Architecture (`commands/`)
+### 10. Command Architecture (`commands/`)
 
 **Purpose**: Unified command implementation with dependency injection
 
@@ -321,6 +363,14 @@ export function createCommonDependencies(
   - `main.ts`: CLI entry point and command registration. Uses dependency injection to coordinate commands.
   - `operation.ts`: Operation type definitions and schema validation for array-based architecture.
   - `diff.ts`: Calculates Operation arrays representing schema differences.
+  - `operations/`: Modular operation implementations and reconciliation logic.
+    - `executor.ts`: Central operation execution with type-safe dispatch.
+    - `reconciler.ts`: Operation optimization and dependency ordering (`buildReconciledOperations`).
+    - `table/`: Table operations including `createTable`, `createTableWithConstraints`, `dropTable`.
+    - `column/`: Column operations (`addColumn`, `dropColumn`, `alterColumn`).
+    - `index/`: Index operations (`createIndex`, `dropIndex`).
+    - `constraint/`: Constraint operations for primary keys, unique constraints, and foreign keys.
+    - `shared/`: Shared types, utilities, and operation definition helpers.
   - `dialect/`: Centralized database dialect management and abstractions.
     - `types.ts`: Dialect interface definitions and schema representation types (`KyrageDialect`, `ColumnExtraAttribute`, `ConstraintAttributes`).
     - `factory.ts`: Centralized dialect instantiation and management (`getDialect`, `getSupportedDialects`).
@@ -378,6 +428,7 @@ export function createCommonDependencies(
 
 - **Declarative Schema**: Users define the desired schema in TypeScript, enabling type safety and flexibility.
 - **Operation-based Architecture**: Unified Operation arrays enable consistent processing across all modules (console output, SQL generation, testing).
+- **Operation Reconciliation**: Automatic optimization of operation sequences through constraint merging, dependency ordering, and redundancy elimination.
 - **Dialect-based Architecture**: Clean abstraction layer for database-specific functionality with centralized management through factory pattern.
 - **Dependency Injection**: Commands use dependency injection pattern for better testability and maintainability.
 - **Functional Programming**: Uses Ramda utilities like `eqBy` for immutable schema comparison.
