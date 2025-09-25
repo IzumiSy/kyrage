@@ -1,19 +1,35 @@
-import { DEFAULT_MIGRATION_TABLE, Kysely, Migration } from "kysely";
+import { DEFAULT_MIGRATION_TABLE, Migration } from "kysely";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
 import { DBClient } from "./client";
 import z from "zod";
-import {
-  operationSchema,
-  executeOperation,
-  filterOperationsForDroppedTables,
-  filterRedundantDropIndexOperations,
-  sortOperationsByDependency,
-  mergeTableCreationWithConstraints,
-} from "./operations/executor";
-import * as R from "ramda";
+import { operationSchema, executeOperation } from "./operations/executor";
+import { buildReconciledOperations } from "./operations/pipeline";
 
-export const migrationDirName = "migrations";
+export const createMigrationProvider = (
+  props: CreateMigrationProviderProps
+) => {
+  return {
+    getMigrations: async () => {
+      const migrationFiles = await props.migrationsResolver();
+      const migrations: Record<string, Migration> = {};
+      migrationFiles.forEach((migration) => {
+        migrations[migration.id] = {
+          up: async (db) => {
+            for (const operation of buildReconciledOperations(
+              migration.diff.operations
+            )) {
+              await executeOperation(db, operation);
+            }
+          },
+        };
+      });
+
+      return migrations;
+    },
+  };
+};
+
 export const schemaDiffSchema = z.object({
   operations: z.array(operationSchema).readonly(),
 });
@@ -24,6 +40,7 @@ export const migrationSchema = z.object({
   diff: schemaDiffSchema,
 });
 
+export const migrationDirName = "migrations";
 export const getAllMigrations = async () => {
   try {
     const files = await readdir(migrationDirName);
@@ -78,44 +95,3 @@ type CreateMigrationProviderProps = {
     plan: boolean;
   };
 };
-
-export const createMigrationProvider = (
-  props: CreateMigrationProviderProps
-) => {
-  return {
-    getMigrations: async () => {
-      const migrationFiles = await props.migrationsResolver();
-      const migrations: Record<string, Migration> = {};
-      migrationFiles.forEach((migration) => {
-        migrations[migration.id] = {
-          up: async (db) => {
-            await buildMigrationFromDiff(db, migration.diff);
-          },
-        };
-      });
-
-      return migrations;
-    },
-  };
-};
-
-export async function buildMigrationFromDiff(
-  db: Kysely<any>,
-  diff: SchemaDiff
-) {
-  const buildOperations = R.pipe(
-    // Filter out operations for tables that will be dropped
-    filterOperationsForDroppedTables,
-    // Merge table creation with constraints ← 追加
-    mergeTableCreationWithConstraints,
-    // Filter out redundant DROP INDEX operations that would fail due to
-    // automatic index deletion when dropping constraints
-    filterRedundantDropIndexOperations,
-    // Sort operations by dependency to ensure correct execution order
-    sortOperationsByDependency
-  );
-
-  for (const operation of buildOperations(diff.operations)) {
-    await executeOperation(db, operation);
-  }
-}

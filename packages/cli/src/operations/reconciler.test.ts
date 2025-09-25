@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   sortOperationsByDependency,
   mergeTableCreationWithConstraints,
-} from "./executor";
+} from "./reconciler";
 import { Operation } from "./executor";
 
 describe("sortOperationsByDependency", () => {
