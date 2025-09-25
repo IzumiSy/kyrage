@@ -524,29 +524,6 @@ kyrage automatically generates constraint names following these patterns:
 
 You can override these by providing a custom `name` option.
 
-### 💬 Known Limitations
-
-#### Constraint Creation Strategy
-
-Due to kyrage's internal diff detection design, **PRIMARY KEY and UNIQUE constraints are always created as separate `ALTER TABLE` statements**, not inline within `CREATE TABLE` statements.
-
-**Example behavior:**
-```sql
--- kyrage generates this:
-CREATE TABLE "users" (
-  "id" uuid NOT NULL,
-  "email" text NOT NULL
-);
-ALTER TABLE "users" ADD CONSTRAINT "users_id_primary_key" PRIMARY KEY ("id");
-ALTER TABLE "users" ADD CONSTRAINT "users_email_unique" UNIQUE ("email");
-
--- Instead of the more common:
-CREATE TABLE "users" (
-  "id" uuid PRIMARY KEY,
-  "email" text UNIQUE NOT NULL
-);
-```
-
 ## 🏗️ Examples
 
 Check out the [examples/basic](./examples/basic) directory for a complete working example with:
