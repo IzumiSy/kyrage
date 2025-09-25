@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   sortOperationsByDependency,
   mergeTableCreationWithConstraints,
-} from "./operations/executor";
-import { Operation } from "./operations/executor";
+} from "./executor";
+import { Operation } from "./executor";
 
 describe("sortOperationsByDependency", () => {
   it("should sort operations by dependency priority", () => {
