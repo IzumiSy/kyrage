@@ -70,8 +70,27 @@ export type ForeignKeyConstraintSchema = z.infer<
   typeof foreignKeyConstraintSchema
 >;
 
+// create_table_with_constraints用のスキーマ定義
+export const createTableWithConstraintsSchema = z.object({
+  type: z.literal("create_table_with_constraints"),
+  table: z.string(),
+  columns: z.record(z.string(), tableColumnAttributesSchema),
+  constraints: z.object({
+    primaryKey: z.object({
+      name: z.string(),
+      columns: z.array(z.string()).readonly(),
+    }).optional(),
+    unique: z.array(z.object({
+      name: z.string(),
+      columns: z.array(z.string()).readonly(),
+    })).readonly().optional(),
+  }).optional(),
+});
+
 // Operation型定義
 export const operationSchema = z.discriminatedUnion("type", [
+  // Table operations with constraints
+  createTableWithConstraintsSchema,
   // Table operations
   z.object({
     type: z.literal("create_table"),
@@ -238,5 +257,19 @@ export const ops = {
   dropForeignKeyConstraint: (value: TableOpValue) => ({
     ...value,
     type: "drop_foreign_key_constraint" as const,
+  }),
+
+  createTableWithConstraints: (
+    table: string,
+    columns: Record<string, TableColumnAttributes>,
+    constraints?: {
+      primaryKey?: { name: string; columns: ReadonlyArray<string> };
+      unique?: ReadonlyArray<{ name: string; columns: ReadonlyArray<string> }>;
+    }
+  ) => ({
+    type: "create_table_with_constraints" as const,
+    table,
+    columns,
+    constraints,
   }),
 };

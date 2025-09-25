@@ -107,6 +107,8 @@ export async function buildMigrationFromDiff(
   const buildOperations = R.pipe(
     // Filter out operations for tables that will be dropped
     filterOperationsForDroppedTables,
+    // Merge table creation with constraints ← 追加
+    mergeTableCreationWithConstraints,
     // Filter out redundant DROP INDEX operations that would fail due to
     // automatic index deletion when dropping constraints
     filterRedundantDropIndexOperations,
@@ -121,6 +123,8 @@ export async function buildMigrationFromDiff(
 
 async function executeOperation(db: Kysely<any>, operation: Operation) {
   switch (operation.type) {
+    case "create_table_with_constraints":
+      return executeCreateTableWithConstraints(db, operation);
     case "create_table":
       return executeCreateTable(db, operation);
     case "drop_table":
@@ -171,6 +175,54 @@ async function executeCreateTable(
       }
       return c;
     });
+  }
+
+  await builder.execute();
+}
+
+async function executeCreateTableWithConstraints(
+  db: Kysely<any>,
+  operation: Extract<Operation, { type: "create_table_with_constraints" }>
+) {
+  let builder: CreateTableBuilder<string, any> = db.schema.createTable(
+    operation.table
+  );
+
+  // カラム追加
+  for (const [colName, colDef] of Object.entries(operation.columns)) {
+    const dataType = colDef.type;
+    assertDataType(dataType);
+    builder = builder.addColumn(colName, dataType, (col) => {
+      let c = col;
+      if (colDef.notNull) c = c.notNull();
+      if (typeof colDef.defaultSql === "string") {
+        c = c.defaultTo(sql.raw(colDef.defaultSql));
+      }
+      return c;
+    });
+  }
+
+  // Primary KeyとUnique制約のみをInlineで追加
+  if (operation.constraints) {
+    const { primaryKey, unique } = operation.constraints;
+
+    // Primary Key制約
+    if (primaryKey) {
+      builder = builder.addPrimaryKeyConstraint(
+        primaryKey.name,
+        primaryKey.columns as Array<string>
+      );
+    }
+
+    // Unique制約
+    if (unique) {
+      for (const uq of unique) {
+        builder = builder.addUniqueConstraint(
+          uq.name,
+          uq.columns as Array<string>
+        );
+      }
+    }
   }
 
   await builder.execute();
@@ -363,18 +415,19 @@ const OPERATION_PRIORITY = {
   drop_column: 4,
   drop_table: 5,
 
-  // 3. Create tables and columns
-  create_table: 6,
-  add_column: 7,
+  // 3. Create tables and columns (統合版が優先)
+  create_table_with_constraints: 6,
+  create_table: 7,
+  add_column: 8,
 
   // 4. Alter columns
-  alter_column: 8,
+  alter_column: 9,
 
   // 5. Create indexes and constraints last (lowest priority)
-  create_index: 9,
-  create_primary_key_constraint: 10,
-  create_unique_constraint: 11,
-  create_foreign_key_constraint: 12, // Foreign keys must be created last
+  create_index: 10,
+  create_primary_key_constraint: 11,
+  create_unique_constraint: 12,
+  create_foreign_key_constraint: 13, // Foreign keys must be created last
 } as const;
 
 /**
@@ -473,3 +526,85 @@ export const sortOperationsByDependency = (
 
     return a.table.localeCompare(b.table);
   });
+
+/**
+ * create_tableとprimary key/unique制約を統合する
+ * foreign key制約は依存関係が複雑なため除外し、従来通り別オペレーションとして処理
+ */
+export const mergeTableCreationWithConstraints = (
+  operations: ReadonlyArray<Operation>
+): ReadonlyArray<Operation> => {
+  // 第1パス: create_tableオペレーションを特定
+  const createTableTables = new Set<string>();
+  operations.forEach(op => {
+    if (op.type === "create_table") {
+      createTableTables.add(op.table);
+    }
+  });
+
+  // create_tableがない場合は何もしない
+  if (createTableTables.size === 0) {
+    return operations;
+  }
+
+  // 第2パス: オペレーションを分類
+  const createTableOps = new Map<string, Extract<Operation, { type: "create_table" }>>();
+  const constraintOpsForTables = new Map<string, Array<Operation>>();
+  const remainingOps: Array<Operation> = [];
+
+  operations.forEach(op => {
+    if (op.type === "create_table") {
+      createTableOps.set(op.table, op);
+    } else if (
+      // foreign key制約は除外し、primary keyとunique制約のみ統合対象とする
+      (op.type === "create_primary_key_constraint" ||
+       op.type === "create_unique_constraint") &&
+      createTableTables.has(op.table)
+    ) {
+      const existing = constraintOpsForTables.get(op.table) || [];
+      constraintOpsForTables.set(op.table, [...existing, op]);
+    } else {
+      // foreign key制約や他のオペレーションは残りのオペレーションとして処理
+      remainingOps.push(op);
+    }
+  });
+
+  // create_table_with_constraintsを生成
+  const mergedOps: Array<Operation> = [];
+  
+  createTableOps.forEach((createTableOp, tableName) => {
+    const tableConstraints = constraintOpsForTables.get(tableName) || [];
+    
+    if (tableConstraints.length === 0) {
+      // constraintがない場合は通常のcreate_table
+      mergedOps.push(createTableOp);
+    } else {
+      // primary keyとunique制約がある場合はcreate_table_with_constraintsに変換
+      const constraints: any = {};
+
+      tableConstraints.forEach(constraint => {
+        if (constraint.type === "create_primary_key_constraint") {
+          constraints.primaryKey = {
+            name: constraint.name,
+            columns: constraint.columns,
+          };
+        } else if (constraint.type === "create_unique_constraint") {
+          if (!constraints.unique) constraints.unique = [];
+          constraints.unique.push({
+            name: constraint.name,
+            columns: constraint.columns,
+          });
+        }
+      });
+
+      mergedOps.push({
+        type: "create_table_with_constraints" as const,
+        table: createTableOp.table,
+        columns: createTableOp.columns,
+        constraints,
+      });
+    }
+  });
+
+  return [...mergedOps, ...remainingOps];
+};

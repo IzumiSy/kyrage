@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { sortOperationsByDependency } from "./migration";
+import { sortOperationsByDependency, mergeTableCreationWithConstraints } from "./migration";
+import { Operation } from "./operation";
 
 describe("sortOperationsByDependency", () => {
   it("should sort operations by dependency priority", () => {
@@ -133,5 +134,120 @@ describe("sortOperationsByDependency", () => {
     expect(operations).toEqual(original);
     // Sorted should be different
     expect(sorted).not.toEqual(operations);
+  });
+});
+
+describe('mergeTableCreationWithConstraints', () => {
+  it('should merge primary key and unique constraints', () => {
+    const operations: Operation[] = [
+      { type: 'create_primary_key_constraint', table: 'users', name: 'users_pkey', columns: ['id'] },
+      { type: 'create_unique_constraint', table: 'users', name: 'users_email_unique', columns: ['email'] },
+      { type: 'create_foreign_key_constraint', table: 'posts', name: 'posts_user_fkey', 
+        columns: ['user_id'], referencedTable: 'users', referencedColumns: ['id'] },
+      { type: 'create_table', table: 'users', columns: { id: { type: 'integer' }, email: { type: 'varchar' } } },
+      { type: 'create_index', table: 'posts', name: 'posts_title_idx', columns: ['title'], unique: false }
+    ];
+
+    const result = mergeTableCreationWithConstraints(operations);
+    
+    expect(result).toEqual([
+      {
+        type: 'create_table_with_constraints',
+        table: 'users',
+        columns: { id: { type: 'integer' }, email: { type: 'varchar' } },
+        constraints: {
+          primaryKey: { name: 'users_pkey', columns: ['id'] },
+          unique: [{ name: 'users_email_unique', columns: ['email'] }]
+        }
+      },
+      { type: 'create_foreign_key_constraint', table: 'posts', name: 'posts_user_fkey', 
+        columns: ['user_id'], referencedTable: 'users', referencedColumns: ['id'] },
+      { type: 'create_index', table: 'posts', name: 'posts_title_idx', columns: ['title'], unique: false }
+    ]);
+  });
+
+  it('should keep create_table unchanged when no constraints to merge', () => {
+    const operations: Operation[] = [
+      { type: 'create_table', table: 'users', columns: { id: { type: 'integer' } } },
+      { type: 'create_index', table: 'users', name: 'users_id_idx', columns: ['id'], unique: false }
+    ];
+
+    const result = mergeTableCreationWithConstraints(operations);
+    
+    expect(result).toEqual(operations);
+  });
+
+  it('should handle multiple tables with mixed constraints', () => {
+    const operations: Operation[] = [
+      { type: 'create_table', table: 'users', columns: { id: { type: 'integer' }, name: { type: 'varchar' } } },
+      { type: 'create_table', table: 'posts', columns: { id: { type: 'integer' }, title: { type: 'varchar' } } },
+      { type: 'create_primary_key_constraint', table: 'users', name: 'users_pkey', columns: ['id'] },
+      { type: 'create_unique_constraint', table: 'users', name: 'users_name_unique', columns: ['name'] },
+      { type: 'create_primary_key_constraint', table: 'posts', name: 'posts_pkey', columns: ['id'] },
+      { type: 'create_foreign_key_constraint', table: 'posts', name: 'posts_user_fkey', 
+        columns: ['user_id'], referencedTable: 'users', referencedColumns: ['id'] },
+    ];
+
+    const result = mergeTableCreationWithConstraints(operations);
+    
+    expect(result).toEqual([
+      {
+        type: 'create_table_with_constraints',
+        table: 'users',
+        columns: { id: { type: 'integer' }, name: { type: 'varchar' } },
+        constraints: {
+          primaryKey: { name: 'users_pkey', columns: ['id'] },
+          unique: [{ name: 'users_name_unique', columns: ['name'] }]
+        }
+      },
+      {
+        type: 'create_table_with_constraints',
+        table: 'posts',
+        columns: { id: { type: 'integer' }, title: { type: 'varchar' } },
+        constraints: {
+          primaryKey: { name: 'posts_pkey', columns: ['id'] }
+        }
+      },
+      { type: 'create_foreign_key_constraint', table: 'posts', name: 'posts_user_fkey', 
+        columns: ['user_id'], referencedTable: 'users', referencedColumns: ['id'] }
+    ]);
+  });
+
+  it('should preserve operation order for non-merged operations', () => {
+    const operations: Operation[] = [
+      { type: 'drop_table', table: 'old_table' },
+      { type: 'create_table', table: 'users', columns: { id: { type: 'integer' } } },
+      { type: 'create_primary_key_constraint', table: 'users', name: 'users_pkey', columns: ['id'] },
+      { type: 'create_index', table: 'other_table', name: 'other_idx', columns: ['col'], unique: false },
+      { type: 'add_column', table: 'existing_table', column: 'new_col', attributes: { type: 'varchar' } }
+    ];
+
+    const result = mergeTableCreationWithConstraints(operations);
+    
+    expect(result).toEqual([
+      {
+        type: 'create_table_with_constraints',
+        table: 'users',
+        columns: { id: { type: 'integer' } },
+        constraints: {
+          primaryKey: { name: 'users_pkey', columns: ['id'] }
+        }
+      },
+      { type: 'drop_table', table: 'old_table' },
+      { type: 'create_index', table: 'other_table', name: 'other_idx', columns: ['col'], unique: false },
+      { type: 'add_column', table: 'existing_table', column: 'new_col', attributes: { type: 'varchar' } }
+    ]);
+  });
+
+  it('should handle constraints without corresponding create_table', () => {
+    const operations: Operation[] = [
+      { type: 'create_primary_key_constraint', table: 'existing_table', name: 'pk', columns: ['id'] },
+      { type: 'create_unique_constraint', table: 'existing_table', name: 'uq', columns: ['email'] },
+      { type: 'add_column', table: 'other_table', column: 'col', attributes: { type: 'varchar' } }
+    ];
+
+    const result = mergeTableCreationWithConstraints(operations);
+    
+    expect(result).toEqual(operations);
   });
 });
