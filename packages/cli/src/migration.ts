@@ -4,7 +4,7 @@ import { join } from "path";
 import { DBClient } from "./client";
 import z from "zod";
 import { operationSchema, executeOperation } from "./operations/executor";
-import { buildReconciledOperations } from "./operations/pipeline";
+import { buildReconciledOperations } from "./operations/reconciler";
 
 export const createMigrationProvider = (
   props: CreateMigrationProviderProps
