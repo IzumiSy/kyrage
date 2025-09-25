@@ -15,58 +15,40 @@ import { createForeignKeyConstraintOp } from "./constraint/createForeignKeyConst
 import { dropForeignKeyConstraintOp } from "./constraint/dropForeignKeyConstraint";
 import { createTableOp } from "./table/createTable";
 
-export const operationSchema = z.discriminatedUnion("type", [
-  createTableWithConstraintsOp.schema,
-  createTableOp.schema,
-  dropTableOp.schema,
-  addColumnOp.schema,
-  dropColumnOp.schema,
-  alterColumnOp.schema,
-  createIndexOp.schema,
-  dropIndexOp.schema,
-  createPrimaryKeyConstraintOp.schema,
-  dropPrimaryKeyConstraintOp.schema,
-  createUniqueConstraintOp.schema,
-  dropUniqueConstraintOp.schema,
-  createForeignKeyConstraintOp.schema,
-  dropForeignKeyConstraintOp.schema,
-]);
+const operations = [
+  createTableWithConstraintsOp,
+  createTableOp,
+  dropTableOp,
+  addColumnOp,
+  dropColumnOp,
+  alterColumnOp,
+  createIndexOp,
+  dropIndexOp,
+  createPrimaryKeyConstraintOp,
+  dropPrimaryKeyConstraintOp,
+  createUniqueConstraintOp,
+  dropUniqueConstraintOp,
+  createForeignKeyConstraintOp,
+  dropForeignKeyConstraintOp,
+] as const;
 
+export const operationSchema = z.union(operations.map((s) => s.schema));
 export type Operation = z.infer<typeof operationSchema>;
-
 export async function executeOperation(db: Kysely<any>, operation: Operation) {
-  switch (operation.type) {
-    case "create_table_with_constraints":
-      return createTableWithConstraintsOp.execute(db, operation);
-    case "create_table":
-      return createTableOp.execute(db, operation);
-    case "drop_table":
-      return dropTableOp.execute(db, operation);
-    case "add_column":
-      return addColumnOp.execute(db, operation);
-    case "drop_column":
-      return dropColumnOp.execute(db, operation);
-    case "alter_column":
-      return alterColumnOp.execute(db, operation);
-    case "create_index":
-      return createIndexOp.execute(db, operation);
-    case "drop_index":
-      return dropIndexOp.execute(db, operation);
-    case "create_primary_key_constraint":
-      return createPrimaryKeyConstraintOp.execute(db, operation);
-    case "drop_primary_key_constraint":
-      return dropPrimaryKeyConstraintOp.execute(db, operation);
-    case "create_unique_constraint":
-      return createUniqueConstraintOp.execute(db, operation);
-    case "drop_unique_constraint":
-      return dropUniqueConstraintOp.execute(db, operation);
-    case "create_foreign_key_constraint":
-      return createForeignKeyConstraintOp.execute(db, operation);
-    case "drop_foreign_key_constraint":
-      return dropForeignKeyConstraintOp.execute(db, operation);
-    default:
-      throw new Error(`Unknown operation type: ${(operation as any).type}`);
+  const execute = getOperationExecutor(operation.type);
+  return await execute(db, operation);
+}
+
+function getOperationExecutor<T extends Operation["type"]>(operationType: T) {
+  const operation = operations.find((op) => op.typeName === operationType);
+  if (!operation) {
+    throw new Error(`Unknown operation type: ${operationType}`);
   }
+
+  return operation.execute as (
+    db: Kysely<any>,
+    operation: Extract<Operation, { type: T }>
+  ) => Promise<void>;
 }
 
 // Operation priority for dependency sorting
