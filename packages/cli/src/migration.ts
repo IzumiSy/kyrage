@@ -536,7 +536,7 @@ export const mergeTableCreationWithConstraints = (
 ): ReadonlyArray<Operation> => {
   // 第1パス: create_tableオペレーションを特定
   const createTableTables = new Set<string>();
-  operations.forEach(op => {
+  operations.forEach((op) => {
     if (op.type === "create_table") {
       createTableTables.add(op.table);
     }
@@ -548,17 +548,20 @@ export const mergeTableCreationWithConstraints = (
   }
 
   // 第2パス: オペレーションを分類
-  const createTableOps = new Map<string, Extract<Operation, { type: "create_table" }>>();
+  const createTableOps = new Map<
+    string,
+    Extract<Operation, { type: "create_table" }>
+  >();
   const constraintOpsForTables = new Map<string, Array<Operation>>();
   const remainingOps: Array<Operation> = [];
 
-  operations.forEach(op => {
+  operations.forEach((op) => {
     if (op.type === "create_table") {
       createTableOps.set(op.table, op);
     } else if (
       // foreign key制約は除外し、primary keyとunique制約のみ統合対象とする
       (op.type === "create_primary_key_constraint" ||
-       op.type === "create_unique_constraint") &&
+        op.type === "create_unique_constraint") &&
       createTableTables.has(op.table)
     ) {
       const existing = constraintOpsForTables.get(op.table) || [];
@@ -571,10 +574,10 @@ export const mergeTableCreationWithConstraints = (
 
   // create_table_with_constraintsを生成
   const mergedOps: Array<Operation> = [];
-  
+
   createTableOps.forEach((createTableOp, tableName) => {
     const tableConstraints = constraintOpsForTables.get(tableName) || [];
-    
+
     if (tableConstraints.length === 0) {
       // constraintがない場合は通常のcreate_table
       mergedOps.push(createTableOp);
@@ -582,7 +585,7 @@ export const mergeTableCreationWithConstraints = (
       // primary keyとunique制約がある場合はcreate_table_with_constraintsに変換
       const constraints: any = {};
 
-      tableConstraints.forEach(constraint => {
+      tableConstraints.forEach((constraint) => {
         if (constraint.type === "create_primary_key_constraint") {
           constraints.primaryKey = {
             name: constraint.name,

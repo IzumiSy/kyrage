@@ -75,16 +75,25 @@ export const createTableWithConstraintsSchema = z.object({
   type: z.literal("create_table_with_constraints"),
   table: z.string(),
   columns: z.record(z.string(), tableColumnAttributesSchema),
-  constraints: z.object({
-    primaryKey: z.object({
-      name: z.string(),
-      columns: z.array(z.string()).readonly(),
-    }).optional(),
-    unique: z.array(z.object({
-      name: z.string(),
-      columns: z.array(z.string()).readonly(),
-    })).readonly().optional(),
-  }).optional(),
+  constraints: z
+    .object({
+      primaryKey: z
+        .object({
+          name: z.string(),
+          columns: z.array(z.string()).readonly(),
+        })
+        .optional(),
+      unique: z
+        .array(
+          z.object({
+            name: z.string(),
+            columns: z.array(z.string()).readonly(),
+          })
+        )
+        .readonly()
+        .optional(),
+    })
+    .optional(),
 });
 
 // Operation型定義
