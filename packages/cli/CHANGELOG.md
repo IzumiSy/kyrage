@@ -1,5 +1,34 @@
 # @izumisy/kyrage
 
+## 1.4.0
+
+### Minor Changes
+
+- [#128](https://github.com/IzumiSy/kyrage/pull/128) [`81034d5`](https://github.com/IzumiSy/kyrage/commit/81034d5e6fb4ca5f6950bacdd5da184f6faf6f89) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Optimize table creation by merging constraints into `CREATE TABLE` statements
+
+  Kyrage now automatically combines table creation with primary key and unique constraints into a single `CREATE TABLE` statement, reducing the number of SQL operations and improving migration performance.
+
+  **Before:**
+
+  ```sql
+  CREATE TABLE "users" ("id" integer, "email" varchar);
+  ALTER TABLE "users" ADD CONSTRAINT "users_pkey" PRIMARY KEY ("id");
+  ALTER TABLE "users" ADD CONSTRAINT "users_email_unique" UNIQUE ("email");
+  ```
+
+  **After:**
+
+  ```sql
+  CREATE TABLE "users" (
+    "id" integer,
+    "email" varchar,
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "users_email_unique" UNIQUE ("email")
+  );
+  ```
+
+  This optimization happens automatically when generating migrations - no changes to your schema definitions are required.
+
 ## 1.3.1
 
 ### Patch Changes
