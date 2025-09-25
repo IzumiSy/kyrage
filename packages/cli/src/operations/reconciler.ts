@@ -32,6 +32,8 @@ const filterOperationsForDroppedTables = (
 /**
  * Merges `CREATE TABLE` operations with their associated constraints
  * into a single create_table_with_constraints operation.
+ * Now supports Primary Key, Unique, and self-referencing Foreign Key constraints.
+ * Cross-table Foreign Key constraints are kept as separate operations to avoid ordering issues.
  */
 export const mergeTableCreationWithConstraints = (
   operations: ReadonlyArray<Operation>
@@ -54,9 +56,18 @@ export const mergeTableCreationWithConstraints = (
   const constraintOpsForTables = new Map<string, Array<Operation>>();
   const remainingOps: Array<Operation> = [];
 
+  // 1段階目：create table操作の収集
   operations.forEach((op) => {
     if (op.type === "create_table") {
       createTableOps.set(op.table, op);
+    }
+  });
+
+  // 2段階目：制約操作の分類
+  operations.forEach((op) => {
+    if (op.type === "create_table") {
+      // 既に1段階目で処理済み
+      return;
     } else if (
       (op.type === "create_primary_key_constraint" ||
         op.type === "create_unique_constraint") &&
@@ -64,6 +75,22 @@ export const mergeTableCreationWithConstraints = (
     ) {
       const existing = constraintOpsForTables.get(op.table) || [];
       constraintOpsForTables.set(op.table, [...existing, op]);
+    } else if (
+      op.type === "create_foreign_key_constraint" &&
+      createTableTables.has(op.table) &&
+      op.table === op.referencedTable // 自己参照の場合のみマージ
+    ) {
+      // Foreign Key制約は自己参照の場合のみマージ（順序問題回避）
+      const sourceTable = createTableOps.get(op.table);
+      const hasRequiredColumns = sourceTable && 
+        op.columns.every(col => col in sourceTable.columns);
+      
+      if (hasRequiredColumns) {
+        const existing = constraintOpsForTables.get(op.table) || [];
+        constraintOpsForTables.set(op.table, [...existing, op]);
+      } else {
+        remainingOps.push(op);
+      }
     } else {
       remainingOps.push(op);
     }
@@ -90,6 +117,16 @@ export const mergeTableCreationWithConstraints = (
           constraints.unique.push({
             name: constraint.name,
             columns: constraint.columns,
+          });
+        } else if (constraint.type === "create_foreign_key_constraint") {
+          if (!constraints.foreignKeys) constraints.foreignKeys = [];
+          constraints.foreignKeys.push({
+            name: constraint.name,
+            columns: constraint.columns,
+            referencedTable: constraint.referencedTable,
+            referencedColumns: constraint.referencedColumns,
+            onDelete: constraint.onDelete,
+            onUpdate: constraint.onUpdate,
           });
         }
       });

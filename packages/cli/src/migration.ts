@@ -6,6 +6,15 @@ import z from "zod";
 import { operationSchema, executeOperation } from "./operations/executor";
 import { buildReconciledOperations } from "./operations/reconciler";
 
+type CreateMigrationProviderProps = {
+  migrationsResolver: () => Promise<
+    ReadonlyArray<z.infer<typeof migrationSchema>>
+  >;
+  options: {
+    plan: boolean;
+  };
+};
+
 export const createMigrationProvider = (
   props: CreateMigrationProviderProps
 ) => {
@@ -85,13 +94,4 @@ export const getPendingMigrations = async (client: DBClient) => {
   return migrationFiles.filter(
     (file) => !executedMigrations.some((m) => m.name === file.id)
   );
-};
-
-type CreateMigrationProviderProps = {
-  migrationsResolver: () => Promise<
-    ReadonlyArray<z.infer<typeof migrationSchema>>
-  >;
-  options: {
-    plan: boolean;
-  };
 };

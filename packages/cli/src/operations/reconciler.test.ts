@@ -382,4 +382,134 @@ describe("mergeTableCreationWithConstraints", () => {
 
     expect(result).toEqual(operations);
   });
+
+  it("should merge self-referencing foreign key constraints with table creation", () => {
+    const operations: Operation[] = [
+      {
+        type: "create_table",
+        table: "users",
+        columns: { id: { type: "integer" }, parent_id: { type: "integer" } },
+      },
+      {
+        type: "create_primary_key_constraint",
+        table: "users",
+        name: "users_pkey",
+        columns: ["id"],
+      },
+      {
+        type: "create_foreign_key_constraint",
+        table: "users",
+        name: "users_parent_fkey",
+        columns: ["parent_id"],
+        referencedTable: "users",
+        referencedColumns: ["id"],
+      },
+    ];
+
+    const result = mergeTableCreationWithConstraints(operations);
+
+    expect(result).toEqual([
+      {
+        type: "create_table_with_constraints",
+        table: "users",
+        columns: { id: { type: "integer" }, parent_id: { type: "integer" } },
+        constraints: {
+          primaryKey: { name: "users_pkey", columns: ["id"] },
+          foreignKeys: [
+            {
+              name: "users_parent_fkey",
+              columns: ["parent_id"],
+              referencedTable: "users",
+              referencedColumns: ["id"],
+              onDelete: undefined,
+              onUpdate: undefined,
+            },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("should keep cross-table foreign key constraints as separate operations", () => {
+    const operations: Operation[] = [
+      {
+        type: "create_table",
+        table: "users",
+        columns: { id: { type: "integer" }, email: { type: "varchar" } },
+      },
+      {
+        type: "create_table",
+        table: "posts",
+        columns: { id: { type: "integer" }, user_id: { type: "integer" }, title: { type: "varchar" } },
+      },
+      {
+        type: "create_primary_key_constraint",
+        table: "users",
+        name: "users_pkey",
+        columns: ["id"],
+      },
+      {
+        type: "create_unique_constraint",
+        table: "users",
+        name: "users_email_unique",
+        columns: ["email"],
+      },
+      {
+        type: "create_primary_key_constraint",
+        table: "posts",
+        name: "posts_pkey",
+        columns: ["id"],
+      },
+      {
+        type: "create_foreign_key_constraint",
+        table: "posts",
+        name: "posts_user_fkey",
+        columns: ["user_id"],
+        referencedTable: "users",
+        referencedColumns: ["id"],
+        onDelete: "cascade",
+        onUpdate: "restrict",
+      },
+      {
+        type: "create_unique_constraint",
+        table: "posts",
+        name: "posts_title_unique",
+        columns: ["title"],
+      },
+    ];
+
+    const result = mergeTableCreationWithConstraints(operations);
+
+    expect(result).toEqual([
+      {
+        type: "create_table_with_constraints",
+        table: "users",
+        columns: { id: { type: "integer" }, email: { type: "varchar" } },
+        constraints: {
+          primaryKey: { name: "users_pkey", columns: ["id"] },
+          unique: [{ name: "users_email_unique", columns: ["email"] }],
+        },
+      },
+      {
+        type: "create_table_with_constraints",
+        table: "posts",
+        columns: { id: { type: "integer" }, user_id: { type: "integer" }, title: { type: "varchar" } },
+        constraints: {
+          primaryKey: { name: "posts_pkey", columns: ["id"] },
+          unique: [{ name: "posts_title_unique", columns: ["title"] }],
+        },
+      },
+      // Cross-table foreign key constraint remains as separate operation
+      {
+        type: "create_foreign_key_constraint",
+        table: "posts",
+        name: "posts_user_fkey",
+        columns: ["user_id"],
+        referencedTable: "users",
+        referencedColumns: ["id"],
+        onDelete: "cascade",
+        onUpdate: "restrict",
+      },
+    ]);
+  });
 });
