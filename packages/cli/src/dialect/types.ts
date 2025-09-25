@@ -1,6 +1,6 @@
 import { Dialect } from "kysely";
 import { DBClient } from "../client";
-import { ReferentialActions } from "../operation";
+import { ReferentialActions } from "../operations/shared/types";
 import { ConfigValue } from "../config/loader";
 import { DevDatabaseProvider, DevDatabaseConfig } from "../dev/types";
 

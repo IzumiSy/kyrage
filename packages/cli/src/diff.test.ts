@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { diffTables, diffIndexes } from "./diff";
-import { ops } from "./operation";
+import { createTable } from "./operations/table/createTable";
+import { dropTable } from "./operations/table/dropTable";
+import { addColumn } from "./operations/column/addColumn";
+import { dropColumn } from "./operations/column/dropColumn";
+import { alterColumn } from "./operations/column/alterColumn";
+import { createIndex } from "./operations/index/createIndex";
+import { dropIndex } from "./operations/index/dropIndex";
 
 describe("diffTables", () => {
   it("should detect added and removed tables only", () => {
@@ -16,8 +22,8 @@ describe("diffTables", () => {
     const operations = diffTables({ current, ideal });
 
     expect(operations).toEqual([
-      ops.createTable("new_table", { id: { type: "integer" } }),
-      ops.dropTable("old_table"),
+      createTable("new_table", { id: { type: "integer" } }),
+      dropTable("old_table"),
     ]);
   });
 
@@ -47,9 +53,9 @@ describe("diffTables", () => {
     const operations = diffTables({ current, ideal });
 
     expect(operations).toEqual([
-      ops.addColumn({ table: "users", column: "email" }, { type: "varchar" }),
-      ops.dropColumn({ table: "users", column: "age" }, { type: "integer" }),
-      ops.alterColumn(
+      addColumn({ table: "users", column: "email" }, { type: "varchar" }),
+      dropColumn({ table: "users", column: "age" }, { type: "integer" }),
+      alterColumn(
         { table: "users", column: "name" },
         { type: "varchar" },
         { type: "text" }
@@ -78,15 +84,14 @@ describe("diffIndexes", () => {
     ];
 
     const operations = diffIndexes({ current, ideal });
-
     expect(operations).toEqual([
-      ops.createIndex({
+      createIndex({
         table: "users",
         name: "idx_new",
         columns: ["email"],
         unique: false,
       }),
-      ops.dropIndex({ table: "users", name: "idx_old" }),
+      dropIndex({ table: "users", name: "idx_old" }),
     ]);
   });
 
@@ -111,10 +116,8 @@ describe("diffIndexes", () => {
     const operations = diffIndexes({ current, ideal });
 
     expect(operations).toEqual([
-      expect.objectContaining(
-        ops.dropIndex({ table: "users", name: "idx_test" })
-      ),
-      ops.createIndex({
+      expect.objectContaining(dropIndex({ table: "users", name: "idx_test" })),
+      createIndex({
         table: "users",
         name: "idx_test",
         columns: ["id"],
@@ -145,9 +148,9 @@ describe("diffIndexes", () => {
 
     expect(operations).toEqual([
       expect.objectContaining(
-        ops.dropIndex({ table: "users", name: "idx_users_a_b" })
+        dropIndex({ table: "users", name: "idx_users_a_b" })
       ),
-      ops.createIndex({
+      createIndex({
         table: "users",
         name: "idx_users_a_b",
         columns: ["b", "a"],

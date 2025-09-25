@@ -11,7 +11,7 @@ import {
   UniqueConstraintSchema,
   ReferentialActions,
   ForeignKeyConstraintSchema,
-} from "../operation";
+} from "../operations/shared/types";
 
 /**
  * Defines a column in a table.

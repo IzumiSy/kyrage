@@ -5,7 +5,7 @@ import {
   primaryKeyConstraintSchema,
   uniqueConstraintSchema,
   foreignKeyConstraintSchema,
-} from "../operation";
+} from "../operations/shared/types";
 import { buildContainerDevDatabaseConfigSchema } from "../dev/providers/container";
 
 const columnSchema = z.object({

@@ -9,7 +9,8 @@ import {
   SchemaDiff,
 } from "../migration";
 import { diffSchema } from "../diff";
-import { Tables, Operation } from "../operation";
+import { Operation } from "../operations/executor";
+import { Tables } from "../operations/shared/types";
 import { getIntrospector } from "../introspector";
 import { type DBClient } from "../client";
 import { type ConfigValue } from "../config/loader";
