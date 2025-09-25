@@ -1,5 +1,5 @@
 import * as R from "ramda";
-import { Operation } from "../operation";
+import { Operation } from "./executor";
 
 /**
  * Filters out operations that target tables which are dropped earlier in the sequence
