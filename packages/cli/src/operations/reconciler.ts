@@ -162,7 +162,7 @@ export const mergeTableCreationWithConstraints = (
  */
 const filterRedundantDropIndexOperations = (
   operations: ReadonlyArray<Operation>
-): ReadonlyArray<Operation> => {
+) => {
   const droppedConstraintIndexes = new Set<string>();
 
   operations.forEach((operation) => {
@@ -188,9 +188,7 @@ const filterRedundantDropIndexOperations = (
 /**
  * Extract all table names from operations
  */
-const extractAllTables = (
-  operations: ReadonlyArray<Operation>
-): Set<string> => {
+const extractAllTables = (operations: ReadonlyArray<Operation>) => {
   const allTables = new Set<string>();
 
   operations.forEach((op) => {
@@ -229,7 +227,7 @@ const buildDependencyGraph = (operations: ReadonlyArray<Operation>): Graph => {
 const topologicallySortTables = (
   allTables: Set<string>,
   operations: ReadonlyArray<Operation>
-): string[] => {
+) => {
   try {
     const graph = buildDependencyGraph(operations);
     const sortedTables = topologicalSort(graph);
@@ -240,7 +238,7 @@ const topologicallySortTables = (
       .filter((table) => !tablesInSort.has(table))
       .sort(); // Sort alphabetically
 
-    return [...independentTables, ...sortedTables];
+    return [...independentTables, ...sortedTables] as const;
   } catch (error) {
     if (error instanceof CycleError) {
       throw new Error(
@@ -255,7 +253,7 @@ const topologicallySortTables = (
 /**
  * Create table order mapping for sorting operations
  */
-const createTableOrderMap = (sortedTables: string[]): Map<string, number> => {
+const createTableOrderMap = (sortedTables: ReadonlyArray<string>) => {
   return new Map(sortedTables.map((table, index) => [table, index]));
 };
 
@@ -263,8 +261,7 @@ const createTableOrderMap = (sortedTables: string[]): Map<string, number> => {
  * Creates a comparator function for sorting operations
  */
 const createOperationComparator =
-  (tableOrderMap: Map<string, number>) =>
-  (a: Operation, b: Operation): number => {
+  (tableOrderMap: Map<string, number>) => (a: Operation, b: Operation) => {
     // 1. Sort by operation priority
     const priorityA = OPERATION_PRIORITY[a.type];
     const priorityB = OPERATION_PRIORITY[b.type];
@@ -312,14 +309,17 @@ const OPERATION_PRIORITY = {
  */
 export const sortOperationsByDependency = (
   operations: ReadonlyArray<Operation>
-): ReadonlyArray<Operation> => {
-  const allTables = extractAllTables(operations);
-  const sortedTables = topologicallySortTables(allTables, operations);
-  const tableOrderMap = createTableOrderMap(sortedTables);
-  const comparator = createOperationComparator(tableOrderMap);
-
-  return operations.slice().sort(comparator);
-};
+): ReadonlyArray<Operation> =>
+  R.sort(
+    createOperationComparator(
+      R.pipe(
+        extractAllTables,
+        (tables) => topologicallySortTables(tables, operations),
+        createTableOrderMap
+      )(operations)
+    ),
+    operations
+  );
 
 /**
  * Extracts foreign key relationships from an operation
