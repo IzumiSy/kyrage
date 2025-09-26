@@ -82,9 +82,9 @@ export const mergeTableCreationWithConstraints = (
     ) {
       // Foreign Key制約は自己参照の場合のみマージ（順序問題回避）
       const sourceTable = createTableOps.get(op.table);
-      const hasRequiredColumns = sourceTable && 
-        op.columns.every(col => col in sourceTable.columns);
-      
+      const hasRequiredColumns =
+        sourceTable && op.columns.every((col) => col in sourceTable.columns);
+
       if (hasRequiredColumns) {
         const existing = constraintOpsForTables.get(op.table) || [];
         constraintOpsForTables.set(op.table, [...existing, op]);

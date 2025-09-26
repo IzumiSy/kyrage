@@ -89,7 +89,7 @@ export const createTableWithConstraintsOp = defineOperation({
               let c = constraint;
               if (fk.onDelete) c = c.onDelete(fk.onDelete);
               if (fk.onUpdate) c = c.onUpdate(fk.onUpdate);
-              
+
               // Deferrable制約を追加（MySQLでは無視され、PostgreSQLでは順序問題を解決）
               return c.deferrable().initiallyDeferred();
             }

@@ -440,7 +440,11 @@ describe("mergeTableCreationWithConstraints", () => {
       {
         type: "create_table",
         table: "posts",
-        columns: { id: { type: "integer" }, user_id: { type: "integer" }, title: { type: "varchar" } },
+        columns: {
+          id: { type: "integer" },
+          user_id: { type: "integer" },
+          title: { type: "varchar" },
+        },
       },
       {
         type: "create_primary_key_constraint",
@@ -493,7 +497,11 @@ describe("mergeTableCreationWithConstraints", () => {
       {
         type: "create_table_with_constraints",
         table: "posts",
-        columns: { id: { type: "integer" }, user_id: { type: "integer" }, title: { type: "varchar" } },
+        columns: {
+          id: { type: "integer" },
+          user_id: { type: "integer" },
+          title: { type: "varchar" },
+        },
         constraints: {
           primaryKey: { name: "posts_pkey", columns: ["id"] },
           unique: [{ name: "posts_title_unique", columns: ["title"] }],
