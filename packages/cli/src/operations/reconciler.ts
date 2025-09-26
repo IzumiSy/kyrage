@@ -1,9 +1,76 @@
 import * as R from "ramda";
+import toposort from "toposort";
 import { Operation } from "./executor";
 import { createTableWithConstraints } from "./table/createTableWithConstraints";
 import { CreateForeignKeyConstraintOp } from "./constraint/createForeignKeyConstraint";
 import { CreateUniqueConstraintOp } from "./constraint/createUniqueConstraint";
 import { CreatePrimaryKeyConstraintOp } from "./constraint/createPrimaryKeyConstraint";
+
+/**
+ * Extracts foreign key relationships from an operation
+ */
+const extractForeignKeys = (
+  op: Operation
+): Array<{ table: string; referencedTable: string }> => {
+  switch (op.type) {
+    case "create_foreign_key_constraint":
+      return [{ table: op.table, referencedTable: op.referencedTable }];
+    case "create_table_with_constraints":
+      return (op.constraints?.foreignKeys || []).map((fk) => ({
+        table: op.table,
+        referencedTable: fk.referencedTable,
+      }));
+    default:
+      return [];
+  }
+};
+
+/**
+ * Gets the table name from an operation if it has one
+ */
+const getOperationTable = (operation: Operation): string | null => {
+  return "table" in operation ? operation.table : null;
+};
+
+/**
+ * Resolves cyclic foreign key dependencies by setting inline: false
+ * for foreign key constraints involved in cycles
+ */
+const resolveCyclicForeignKeys = (
+  operations: ReadonlyArray<Operation>,
+  edges: Array<[string, string]>
+): ReadonlyArray<Operation> => {
+  // Detect bidirectional edges which indicate cycles
+  const edgeSet = new Set(edges.map(([a, b]) => `${a}->${b}`));
+  const cyclicPairs = new Set<string>();
+
+  edges.forEach(([a, b]) => {
+    if (edgeSet.has(`${b}->${a}`)) {
+      cyclicPairs.add(`${a}-${b}`);
+      cyclicPairs.add(`${b}-${a}`);
+    }
+  });
+
+  if (cyclicPairs.size === 0) return operations;
+
+  const cyclicTables = new Set<string>();
+  cyclicPairs.forEach((pair) => {
+    const [a, b] = pair.split("-");
+    cyclicTables.add(a);
+    cyclicTables.add(b);
+  });
+
+  return operations.map((op) => {
+    if (
+      op.type === "create_foreign_key_constraint" &&
+      cyclicTables.has(op.table) &&
+      cyclicTables.has(op.referencedTable)
+    ) {
+      return { ...op, inline: false };
+    }
+    return op;
+  });
+};
 
 /**
  * Filters out operations that target tables which are dropped earlier in the sequence
@@ -186,11 +253,94 @@ const filterRedundantDropIndexOperations = (
 
 /**
  * Sorts operations to ensure that dependencies are respected during execution.
+ * Uses topological sorting to handle foreign key dependencies between tables.
  */
 export const sortOperationsByDependency = (
   operations: ReadonlyArray<Operation>
-) =>
-  operations.slice().sort((a, b) => {
+): ReadonlyArray<Operation> => {
+  // Build foreign key dependency edges [referencedTable, table]
+  const edges: Array<[string, string]> = [];
+  const allTables = new Set<string>();
+
+  // Collect all table names
+  operations.forEach((op) => {
+    const tableName = getOperationTable(op);
+    if (tableName) {
+      allTables.add(tableName);
+    }
+  });
+
+  // Extract foreign key dependencies
+  let resolvedOperations = operations;
+  operations.forEach((op) => {
+    const foreignKeys = extractForeignKeys(op);
+    foreignKeys.forEach((fk) => {
+      if (fk.table !== fk.referencedTable) {
+        // referencedTable should be created before table
+        edges.push([fk.referencedTable, fk.table]);
+        allTables.add(fk.table);
+        allTables.add(fk.referencedTable);
+      }
+    });
+  });
+
+  let sortedTables: string[];
+
+  try {
+    // Attempt topological sort
+    sortedTables = toposort(edges);
+
+    // Add tables that have no dependencies
+    const tablesInSort = new Set(sortedTables);
+    for (const table of allTables) {
+      if (!tablesInSort.has(table)) {
+        sortedTables.unshift(table); // Add at the beginning as they have no dependencies
+      }
+    }
+  } catch (error) {
+    // Circular dependency detected, resolve by setting inline: false
+    console.warn(
+      "Circular dependency detected in foreign keys, resolving by separating constraints"
+    );
+    resolvedOperations = resolveCyclicForeignKeys(operations, edges);
+
+    // Try topological sort again after resolving cycles
+    const resolvedEdges: Array<[string, string]> = [];
+    resolvedOperations.forEach((op) => {
+      const foreignKeys = extractForeignKeys(op);
+      foreignKeys.forEach((fk) => {
+        // Only add edges for inline foreign keys
+        const isInline =
+          op.type === "create_foreign_key_constraint"
+            ? op.inline !== false
+            : true;
+        if (fk.table !== fk.referencedTable && isInline) {
+          resolvedEdges.push([fk.referencedTable, fk.table]);
+        }
+      });
+    });
+
+    try {
+      sortedTables = toposort(resolvedEdges);
+      const tablesInSort = new Set(sortedTables);
+      for (const table of allTables) {
+        if (!tablesInSort.has(table)) {
+          sortedTables.unshift(table);
+        }
+      }
+    } catch {
+      // Fallback to alphabetical sorting
+      sortedTables = Array.from(allTables).sort();
+    }
+  }
+
+  // Create table order map for sorting
+  const tableOrderMap = new Map(
+    sortedTables.map((table, index) => [table, index])
+  );
+
+  return resolvedOperations.slice().sort((a, b) => {
+    // 1. Sort by operation priority
     const priorityA = OPERATION_PRIORITY[a.type];
     const priorityB = OPERATION_PRIORITY[b.type];
 
@@ -198,8 +348,23 @@ export const sortOperationsByDependency = (
       return priorityA - priorityB;
     }
 
-    return a.table.localeCompare(b.table);
+    // 2. Sort by table dependency order for same priority
+    const tableA = getOperationTable(a);
+    const tableB = getOperationTable(b);
+
+    if (tableA && tableB) {
+      const orderA = tableOrderMap.get(tableA) ?? Number.MAX_SAFE_INTEGER;
+      const orderB = tableOrderMap.get(tableB) ?? Number.MAX_SAFE_INTEGER;
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+    }
+
+    // 3. Finally, sort alphabetically by table name
+    return (tableA || "").localeCompare(tableB || "");
   });
+};
 
 // Operation priority for dependency sorting
 const OPERATION_PRIORITY = {
