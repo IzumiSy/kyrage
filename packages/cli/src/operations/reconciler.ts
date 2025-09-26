@@ -186,6 +186,13 @@ const filterRedundantDropIndexOperations = (
 };
 
 /**
+ * Gets the table name from an operation if it has one
+ */
+const getOperationTable = (operation: Operation): string | null => {
+  return "table" in operation ? operation.table : null;
+};
+
+/**
  * Extract all table names from operations
  */
 const extractAllTables = (operations: ReadonlyArray<Operation>) => {
@@ -199,6 +206,25 @@ const extractAllTables = (operations: ReadonlyArray<Operation>) => {
   });
 
   return allTables;
+};
+
+/**
+ * Extracts foreign key relationships from an operation
+ */
+const extractForeignKeys = (
+  op: Operation
+): Array<{ table: string; referencedTable: string }> => {
+  switch (op.type) {
+    case "create_foreign_key_constraint":
+      return [{ table: op.table, referencedTable: op.referencedTable }];
+    case "create_table_with_constraints":
+      return (op.constraints?.foreignKeys || []).map((fk) => ({
+        table: op.table,
+        referencedTable: fk.referencedTable,
+      }));
+    default:
+      return [];
+  }
 };
 
 /**
@@ -320,32 +346,6 @@ export const sortOperationsByDependency = (
     ),
     operations
   );
-
-/**
- * Extracts foreign key relationships from an operation
- */
-const extractForeignKeys = (
-  op: Operation
-): Array<{ table: string; referencedTable: string }> => {
-  switch (op.type) {
-    case "create_foreign_key_constraint":
-      return [{ table: op.table, referencedTable: op.referencedTable }];
-    case "create_table_with_constraints":
-      return (op.constraints?.foreignKeys || []).map((fk) => ({
-        table: op.table,
-        referencedTable: fk.referencedTable,
-      }));
-    default:
-      return [];
-  }
-};
-
-/**
- * Gets the table name from an operation if it has one
- */
-const getOperationTable = (operation: Operation): string | null => {
-  return "table" in operation ? operation.table : null;
-};
 
 export const buildReconciledOperations = R.pipe(
   filterOperationsForDroppedTables,
