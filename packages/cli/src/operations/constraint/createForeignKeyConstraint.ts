@@ -4,7 +4,7 @@ import {
   TableOpValue,
   ReferentialActions,
 } from "../shared/types";
-import { defineOperation } from "../shared/operation";
+import { defineOperation, InferOpSchema } from "../shared/operation";
 
 export const createForeignKeyConstraintOp = defineOperation({
   typeName: "create_foreign_key_constraint",
@@ -33,6 +33,10 @@ export const createForeignKeyConstraintOp = defineOperation({
   },
 });
 
+export type CreateForeignKeyConstraintOp = InferOpSchema<
+  typeof createForeignKeyConstraintOp
+>;
+
 export const createForeignKeyConstraint = (
   tableOpValue: TableOpValue,
   options: {
@@ -41,6 +45,7 @@ export const createForeignKeyConstraint = (
     referencedColumns: ReadonlyArray<string>;
     onDelete?: ReferentialActions;
     onUpdate?: ReferentialActions;
+    inline?: boolean;
   }
 ) => ({
   ...tableOpValue,

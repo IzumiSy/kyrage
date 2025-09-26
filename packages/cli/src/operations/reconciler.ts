@@ -1,5 +1,10 @@
 import * as R from "ramda";
+import { Graph, topologicalSort, CycleError } from "graph-data-structure";
 import { Operation } from "./executor";
+import { createTableWithConstraints } from "./table/createTableWithConstraints";
+import { CreateForeignKeyConstraintOp } from "./constraint/createForeignKeyConstraint";
+import { CreateUniqueConstraintOp } from "./constraint/createUniqueConstraint";
+import { CreatePrimaryKeyConstraintOp } from "./constraint/createPrimaryKeyConstraint";
 
 /**
  * Filters out operations that target tables which are dropped earlier in the sequence
@@ -32,6 +37,14 @@ const filterOperationsForDroppedTables = (
 /**
  * Merges `CREATE TABLE` operations with their associated constraints
  * into a single create_table_with_constraints operation.
+ * Now supports Primary Key, Unique, and Foreign Key constraints.
+ *
+ * Foreign Key constraints are merged if:
+ * - The table is being created in the same migration
+ * - The inline option is not explicitly set to false
+ * - The required columns exist in the source table
+ *
+ * Use inline: false for cross-table foreign keys that need specific ordering.
  */
 export const mergeTableCreationWithConstraints = (
   operations: ReadonlyArray<Operation>
@@ -54,18 +67,48 @@ export const mergeTableCreationWithConstraints = (
   const constraintOpsForTables = new Map<string, Array<Operation>>();
   const remainingOps: Array<Operation> = [];
 
+  // 1段階目：create table操作の収集
   operations.forEach((op) => {
     if (op.type === "create_table") {
       createTableOps.set(op.table, op);
-    } else if (
-      (op.type === "create_primary_key_constraint" ||
-        op.type === "create_unique_constraint") &&
-      createTableTables.has(op.table)
-    ) {
-      const existing = constraintOpsForTables.get(op.table) || [];
-      constraintOpsForTables.set(op.table, [...existing, op]);
-    } else {
-      remainingOps.push(op);
+    }
+  });
+
+  // 2段階目：制約操作の分類
+  operations.forEach((op) => {
+    switch (op.type) {
+      case "create_table":
+        return;
+      case "create_primary_key_constraint":
+      case "create_unique_constraint":
+        if (createTableTables.has(op.table)) {
+          const existing = constraintOpsForTables.get(op.table) || [];
+          constraintOpsForTables.set(op.table, [...existing, op]);
+        } else {
+          remainingOps.push(op);
+        }
+        break;
+      case "create_foreign_key_constraint":
+        if (createTableTables.has(op.table) && op.inline !== false) {
+          const sourceTable = createTableOps.get(op.table)!;
+          const missingColumns = op.columns.filter(
+            (col) => !(col in sourceTable.columns)
+          );
+          if (missingColumns.length > 0) {
+            throw new Error(
+              `Foreign key constraint "${op.name}" references non-existent columns: ${missingColumns.join(", ")}`
+            );
+          }
+
+          const existing = constraintOpsForTables.get(op.table) || [];
+          constraintOpsForTables.set(op.table, [...existing, op]);
+        } else {
+          remainingOps.push(op);
+        }
+        break;
+      default:
+        remainingOps.push(op);
+        break;
     }
   });
 
@@ -73,34 +116,41 @@ export const mergeTableCreationWithConstraints = (
 
   createTableOps.forEach((createTableOp, tableName) => {
     const tableConstraints = constraintOpsForTables.get(tableName) || [];
-
     if (tableConstraints.length === 0) {
       mergedOps.push(createTableOp);
-    } else {
-      const constraints: any = {};
-
-      tableConstraints.forEach((constraint) => {
-        if (constraint.type === "create_primary_key_constraint") {
-          constraints.primaryKey = {
-            name: constraint.name,
-            columns: constraint.columns,
-          };
-        } else if (constraint.type === "create_unique_constraint") {
-          if (!constraints.unique) constraints.unique = [];
-          constraints.unique.push({
-            name: constraint.name,
-            columns: constraint.columns,
-          });
-        }
-      });
-
-      mergedOps.push({
-        type: "create_table_with_constraints" as const,
-        table: createTableOp.table,
-        columns: createTableOp.columns,
-        constraints,
-      });
+      return;
     }
+
+    const constraints: {
+      primaryKey?: CreatePrimaryKeyConstraintOp;
+      unique: Array<CreateUniqueConstraintOp>;
+      foreignKeys: Array<CreateForeignKeyConstraintOp>;
+    } = {
+      unique: [],
+      foreignKeys: [],
+    };
+
+    tableConstraints.forEach((constraint) => {
+      switch (constraint.type) {
+        case "create_primary_key_constraint":
+          constraints.primaryKey = constraint;
+          break;
+        case "create_unique_constraint":
+          constraints.unique.push(constraint);
+          break;
+        case "create_foreign_key_constraint":
+          constraints.foreignKeys.push(constraint);
+          break;
+      }
+    });
+
+    mergedOps.push(
+      createTableWithConstraints(
+        createTableOp.table,
+        createTableOp.columns,
+        constraints
+      )
+    );
   });
 
   return [...mergedOps, ...remainingOps];
@@ -112,7 +162,7 @@ export const mergeTableCreationWithConstraints = (
  */
 const filterRedundantDropIndexOperations = (
   operations: ReadonlyArray<Operation>
-): ReadonlyArray<Operation> => {
+) => {
   const droppedConstraintIndexes = new Set<string>();
 
   operations.forEach((operation) => {
@@ -136,12 +186,109 @@ const filterRedundantDropIndexOperations = (
 };
 
 /**
- * Sorts operations to ensure that dependencies are respected during execution.
+ * Gets the table name from an operation if it has one
  */
-export const sortOperationsByDependency = (
+const getOperationTable = (operation: Operation): string | null => {
+  return "table" in operation ? operation.table : null;
+};
+
+/**
+ * Extract all table names from operations
+ */
+const extractAllTables = (operations: ReadonlyArray<Operation>) => {
+  const allTables = new Set<string>();
+
+  operations.forEach((op) => {
+    const tableName = getOperationTable(op);
+    if (tableName) {
+      allTables.add(tableName);
+    }
+  });
+
+  return allTables;
+};
+
+/**
+ * Extracts foreign key relationships from an operation
+ */
+const extractForeignKeys = (
+  op: Operation
+): Array<{ table: string; referencedTable: string }> => {
+  switch (op.type) {
+    case "create_foreign_key_constraint":
+      return [{ table: op.table, referencedTable: op.referencedTable }];
+    case "create_table_with_constraints":
+      return (op.constraints?.foreignKeys || []).map((fk) => ({
+        table: op.table,
+        referencedTable: fk.referencedTable,
+      }));
+    default:
+      return [];
+  }
+};
+
+/**
+ * Build dependency graph from foreign key relationships
+ */
+const buildDependencyGraph = (operations: ReadonlyArray<Operation>): Graph => {
+  const graph = new Graph();
+
+  operations.forEach((op) =>
+    extractForeignKeys(op).forEach((fk) => {
+      if (
+        fk.table !== fk.referencedTable &&
+        (op.type !== "create_foreign_key_constraint" || op.inline !== false)
+      ) {
+        graph.addEdge(fk.referencedTable, fk.table);
+      }
+    })
+  );
+
+  return graph;
+};
+
+/**
+ * Sort tables considering dependencies and return sorted table list
+ */
+const topologicallySortTables = (
+  allTables: Set<string>,
   operations: ReadonlyArray<Operation>
-) =>
-  operations.slice().sort((a, b) => {
+) => {
+  try {
+    const graph = buildDependencyGraph(operations);
+    const sortedTables = topologicalSort(graph);
+
+    // Add tables that have no dependencies
+    const tablesInSort = new Set(sortedTables);
+    const independentTables = Array.from(allTables)
+      .filter((table) => !tablesInSort.has(table))
+      .sort(); // Sort alphabetically
+
+    return [...independentTables, ...sortedTables] as const;
+  } catch (error) {
+    if (error instanceof CycleError) {
+      throw new Error(
+        `Circular dependency detected in foreign key constraints. ` +
+          `Please resolve this by setting 'inline: false' for one of the foreign key constraints in each circular relationship.`
+      );
+    }
+    throw error;
+  }
+};
+
+/**
+ * Create table order mapping for sorting operations
+ */
+const createTableOrderMap = (sortedTables: ReadonlyArray<string>) => {
+  return new Map(sortedTables.map((table, index) => [table, index]));
+};
+
+/**
+ * Creates a comparator function for sorting operations
+ */
+const createOperationComparator =
+  (tableOrderMap: Map<string, number>) => (a: Operation, b: Operation) => {
+    // 1. Sort by operation priority
     const priorityA = OPERATION_PRIORITY[a.type];
     const priorityB = OPERATION_PRIORITY[b.type];
 
@@ -149,10 +296,22 @@ export const sortOperationsByDependency = (
       return priorityA - priorityB;
     }
 
-    return a.table.localeCompare(b.table);
-  });
+    // 2. Sort by table dependency order for same priority
+    const tableA = getOperationTable(a);
+    const tableB = getOperationTable(b);
 
-// Operation priority for dependency sorting
+    if (tableA && tableB) {
+      const orderA = tableOrderMap.get(tableA) ?? Number.MAX_SAFE_INTEGER;
+      const orderB = tableOrderMap.get(tableB) ?? Number.MAX_SAFE_INTEGER;
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+    }
+
+    // 3. Finally, sort alphabetically by table name
+    return (tableA || "").localeCompare(tableB || "");
+  };
 const OPERATION_PRIORITY = {
   drop_foreign_key_constraint: 0,
   drop_unique_constraint: 1,
@@ -169,6 +328,24 @@ const OPERATION_PRIORITY = {
   create_unique_constraint: 12,
   create_foreign_key_constraint: 13,
 } as const;
+
+/**
+ * Sorts operations to ensure that dependencies are respected during execution.
+ * Uses topological sorting to handle foreign key dependencies between tables.
+ */
+export const sortOperationsByDependency = (
+  operations: ReadonlyArray<Operation>
+): ReadonlyArray<Operation> =>
+  R.sort(
+    createOperationComparator(
+      R.pipe(
+        extractAllTables,
+        (tables) => topologicallySortTables(tables, operations),
+        createTableOrderMap
+      )(operations)
+    ),
+    operations
+  );
 
 export const buildReconciledOperations = R.pipe(
   filterOperationsForDroppedTables,

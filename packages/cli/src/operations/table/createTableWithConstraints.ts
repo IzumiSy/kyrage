@@ -3,9 +3,10 @@ import { CreateTableBuilder } from "kysely";
 import {
   tableColumnAttributesSchema,
   TableColumnAttributes,
+  referentialActionsSchema,
 } from "../shared/types";
 import { addColumnsToTableBuilder } from "./createTable";
-import { defineOperation } from "../shared/operation";
+import { defineOperation, InferOpSchema } from "../shared/operation";
 
 export const createTableWithConstraintsOp = defineOperation({
   typeName: "create_table_with_constraints",
@@ -30,6 +31,20 @@ export const createTableWithConstraintsOp = defineOperation({
           )
           .readonly()
           .optional(),
+        foreignKeys: z
+          .array(
+            z.object({
+              name: z.string(),
+              columns: z.array(z.string()).readonly(),
+              referencedTable: z.string(),
+              referencedColumns: z.array(z.string()).readonly(),
+              onDelete: referentialActionsSchema.optional(),
+              onUpdate: referentialActionsSchema.optional(),
+              inline: z.boolean().optional(),
+            })
+          )
+          .readonly()
+          .optional(),
       })
       .optional(),
   }),
@@ -41,9 +56,9 @@ export const createTableWithConstraintsOp = defineOperation({
     // カラム追加（共通関数を使用）
     builder = addColumnsToTableBuilder(builder, operation.columns);
 
-    // Primary KeyとUnique制約のみをInlineで追加
+    // Primary KeyとUnique制約、Foreign Key制約をInlineで追加
     if (operation.constraints) {
-      const { primaryKey, unique } = operation.constraints;
+      const { primaryKey, unique, foreignKeys } = operation.constraints;
 
       // Primary Key制約
       if (primaryKey) {
@@ -62,22 +77,45 @@ export const createTableWithConstraintsOp = defineOperation({
           );
         }
       }
+
+      // Foreign Key制約
+      if (foreignKeys) {
+        for (const fk of foreignKeys) {
+          builder = builder.addForeignKeyConstraint(
+            fk.name,
+            fk.columns as Array<string>,
+            fk.referencedTable,
+            fk.referencedColumns as Array<string>,
+            (constraint) => {
+              let c = constraint;
+              if (fk.onDelete) c = c.onDelete(fk.onDelete);
+              if (fk.onUpdate) c = c.onUpdate(fk.onUpdate);
+              return c;
+            }
+          );
+        }
+      }
     }
 
     await builder.execute();
   },
 });
 
+export type CreateTableWithConstraintsOp = InferOpSchema<
+  typeof createTableWithConstraintsOp
+>;
+
 export const createTableWithConstraints = (
   table: string,
   columns: Record<string, TableColumnAttributes>,
-  constraints?: {
-    primaryKey?: { name: string; columns: ReadonlyArray<string> };
-    unique?: ReadonlyArray<{ name: string; columns: ReadonlyArray<string> }>;
-  }
+  constraints: CreateTableWithConstraintsOp["constraints"]
 ) => ({
   type: "create_table_with_constraints" as const,
   table,
   columns,
-  constraints,
+  constraints: {
+    primaryKey: constraints?.primaryKey,
+    unique: constraints?.unique ?? [],
+    foreignKeys: constraints?.foreignKeys ?? [],
+  },
 });

@@ -3,7 +3,7 @@ import {
   primaryKeyConstraintSchema,
   PrimaryKeyConstraintSchema,
 } from "../shared/types";
-import { defineOperation } from "../shared/operation";
+import { defineOperation, InferOpSchema } from "../shared/operation";
 
 export const createPrimaryKeyConstraintOp = defineOperation({
   typeName: "create_primary_key_constraint",
@@ -21,6 +21,10 @@ export const createPrimaryKeyConstraintOp = defineOperation({
       .execute();
   },
 });
+
+export type CreatePrimaryKeyConstraintOp = InferOpSchema<
+  typeof createPrimaryKeyConstraintOp
+>;
 
 export const createPrimaryKeyConstraint = (
   value: PrimaryKeyConstraintSchema
