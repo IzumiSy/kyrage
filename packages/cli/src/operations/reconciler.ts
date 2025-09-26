@@ -186,16 +186,13 @@ const filterRedundantDropIndexOperations = (
 };
 
 /**
- * Sorts operations to ensure that dependencies are respected during execution.
- * Uses topological sorting to handle foreign key dependencies between tables.
+ * Extract all table names from operations
  */
-export const sortOperationsByDependency = (
+const extractAllTables = (
   operations: ReadonlyArray<Operation>
-): ReadonlyArray<Operation> => {
-  // Build foreign key dependency edges [referencedTable, table]
+): Set<string> => {
   const allTables = new Set<string>();
 
-  // Collect all table names
   operations.forEach((op) => {
     const tableName = getOperationTable(op);
     if (tableName) {
@@ -203,51 +200,71 @@ export const sortOperationsByDependency = (
     }
   });
 
-  let sortedTables: string[] = [];
+  return allTables;
+};
 
+/**
+ * Build dependency graph from foreign key relationships
+ */
+const buildDependencyGraph = (operations: ReadonlyArray<Operation>): Graph => {
+  const graph = new Graph();
+
+  operations.forEach((op) =>
+    extractForeignKeys(op).forEach((fk) => {
+      if (
+        fk.table !== fk.referencedTable &&
+        (op.type !== "create_foreign_key_constraint" || op.inline !== false)
+      ) {
+        graph.addEdge(fk.referencedTable, fk.table);
+      }
+    })
+  );
+
+  return graph;
+};
+
+/**
+ * Sort tables considering dependencies and return sorted table list
+ */
+const topologicallySortTables = (
+  allTables: Set<string>,
+  operations: ReadonlyArray<Operation>
+): string[] => {
   try {
-    const graph = new Graph();
-
-    // Extract foreign key dependencies (only for different tables with inline foreign keys)
-    operations.forEach((op) =>
-      extractForeignKeys(op).forEach((fk) => {
-        if (
-          fk.table !== fk.referencedTable &&
-          (op.type !== "create_foreign_key_constraint" || op.inline !== false)
-        ) {
-          graph.addEdge(fk.referencedTable, fk.table);
-        }
-      })
-    );
-
-    // Attempt topological sort
-    sortedTables = topologicalSort(graph);
+    const graph = buildDependencyGraph(operations);
+    const sortedTables = topologicalSort(graph);
 
     // Add tables that have no dependencies
     const tablesInSort = new Set(sortedTables);
-    for (const table of allTables) {
-      if (!tablesInSort.has(table)) {
-        sortedTables.unshift(table); // Add at the beginning as they have no dependencies
-      }
-    }
+    const independentTables = Array.from(allTables)
+      .filter((table) => !tablesInSort.has(table))
+      .sort(); // Sort alphabetically
+
+    return [...independentTables, ...sortedTables];
   } catch (error) {
-    // graph-data-structure throws CycleError for circular dependencies
     if (error instanceof CycleError) {
       throw new Error(
         `Circular dependency detected in foreign key constraints. ` +
           `Please resolve this by setting 'inline: false' for one of the foreign key constraints in each circular relationship.`
       );
     }
-    // Re-throw other errors
     throw error;
   }
+};
 
-  // Create table order map for sorting
-  const tableOrderMap = new Map(
-    sortedTables.map((table, index) => [table, index])
-  );
+/**
+ * Create table order mapping for sorting operations
+ */
+const createTableOrderMap = (sortedTables: string[]): Map<string, number> => {
+  return new Map(sortedTables.map((table, index) => [table, index]));
+};
 
-  return operations.slice().sort((a, b) => {
+/**
+ * Creates a comparator function for sorting operations
+ */
+const createOperationComparator =
+  (tableOrderMap: Map<string, number>) =>
+  (a: Operation, b: Operation): number => {
     // 1. Sort by operation priority
     const priorityA = OPERATION_PRIORITY[a.type];
     const priorityB = OPERATION_PRIORITY[b.type];
@@ -271,10 +288,7 @@ export const sortOperationsByDependency = (
 
     // 3. Finally, sort alphabetically by table name
     return (tableA || "").localeCompare(tableB || "");
-  });
-};
-
-// Operation priority for dependency sorting
+  };
 const OPERATION_PRIORITY = {
   drop_foreign_key_constraint: 0,
   drop_unique_constraint: 1,
@@ -291,6 +305,21 @@ const OPERATION_PRIORITY = {
   create_unique_constraint: 12,
   create_foreign_key_constraint: 13,
 } as const;
+
+/**
+ * Sorts operations to ensure that dependencies are respected during execution.
+ * Uses topological sorting to handle foreign key dependencies between tables.
+ */
+export const sortOperationsByDependency = (
+  operations: ReadonlyArray<Operation>
+): ReadonlyArray<Operation> => {
+  const allTables = extractAllTables(operations);
+  const sortedTables = topologicallySortTables(allTables, operations);
+  const tableOrderMap = createTableOrderMap(sortedTables);
+  const comparator = createOperationComparator(tableOrderMap);
+
+  return operations.slice().sort(comparator);
+};
 
 /**
  * Extracts foreign key relationships from an operation
