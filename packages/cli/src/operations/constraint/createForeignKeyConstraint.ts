@@ -41,6 +41,7 @@ export const createForeignKeyConstraint = (
     referencedColumns: ReadonlyArray<string>;
     onDelete?: ReferentialActions;
     onUpdate?: ReferentialActions;
+    inline?: boolean;
   }
 ) => ({
   ...tableOpValue,

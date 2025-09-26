@@ -64,6 +64,7 @@ export const foreignKeyConstraintSchema = z.object({
   referencedColumns: z.array(z.string()).readonly(),
   onDelete: referentialActionsSchema.optional(),
   onUpdate: referentialActionsSchema.optional(),
+  inline: z.boolean().optional(),
 });
 export type ForeignKeyConstraintSchema = z.infer<
   typeof foreignKeyConstraintSchema

@@ -238,7 +238,11 @@ describe("mergeTableCreationWithConstraints", () => {
       {
         type: "create_table",
         table: "posts",
-        columns: { id: { type: "integer" }, title: { type: "varchar" } },
+        columns: {
+          id: { type: "integer" },
+          title: { type: "varchar" },
+          user_id: { type: "integer" }, // user_idカラムを追加
+        },
       },
       {
         type: "create_primary_key_constraint",
@@ -283,18 +287,25 @@ describe("mergeTableCreationWithConstraints", () => {
       {
         type: "create_table_with_constraints",
         table: "posts",
-        columns: { id: { type: "integer" }, title: { type: "varchar" } },
+        columns: {
+          id: { type: "integer" },
+          title: { type: "varchar" },
+          user_id: { type: "integer" },
+        },
         constraints: {
           primaryKey: { name: "posts_pkey", columns: ["id"] },
+          foreignKeys: [
+            {
+              name: "posts_user_fkey",
+              columns: ["user_id"],
+              referencedTable: "users",
+              referencedColumns: ["id"],
+              onDelete: undefined,
+              onUpdate: undefined,
+              inline: undefined,
+            },
+          ],
         },
-      },
-      {
-        type: "create_foreign_key_constraint",
-        table: "posts",
-        name: "posts_user_fkey",
-        columns: ["user_id"],
-        referencedTable: "users",
-        referencedColumns: ["id"],
       },
     ]);
   });
@@ -423,6 +434,7 @@ describe("mergeTableCreationWithConstraints", () => {
               referencedColumns: ["id"],
               onDelete: undefined,
               onUpdate: undefined,
+              inline: undefined,
             },
           ],
         },
@@ -430,7 +442,7 @@ describe("mergeTableCreationWithConstraints", () => {
     ]);
   });
 
-  it("should keep cross-table foreign key constraints as separate operations", () => {
+  it("should merge cross-table foreign key constraints with table creation (default inline: true)", () => {
     const operations: Operation[] = [
       {
         type: "create_table",
@@ -505,19 +517,120 @@ describe("mergeTableCreationWithConstraints", () => {
         constraints: {
           primaryKey: { name: "posts_pkey", columns: ["id"] },
           unique: [{ name: "posts_title_unique", columns: ["title"] }],
+          foreignKeys: [
+            {
+              name: "posts_user_fkey",
+              columns: ["user_id"],
+              referencedTable: "users",
+              referencedColumns: ["id"],
+              onDelete: "cascade",
+              onUpdate: "restrict",
+              inline: undefined,
+            },
+          ],
         },
       },
-      // Cross-table foreign key constraint remains as separate operation
+    ]);
+  });
+
+  it("should respect inline: false option for foreign key constraints", () => {
+    const operations: Operation[] = [
+      {
+        type: "create_table",
+        table: "users",
+        columns: { id: { type: "integer" }, parent_id: { type: "integer" } },
+      },
+      {
+        type: "create_primary_key_constraint",
+        table: "users",
+        name: "users_pkey",
+        columns: ["id"],
+      },
+      {
+        type: "create_foreign_key_constraint",
+        table: "users",
+        name: "users_parent_fkey",
+        columns: ["parent_id"],
+        referencedTable: "users",
+        referencedColumns: ["id"],
+        inline: false, // 明示的にinline: falseを指定
+      },
+    ];
+
+    const result = mergeTableCreationWithConstraints(operations);
+
+    expect(result).toEqual([
+      {
+        type: "create_table_with_constraints",
+        table: "users",
+        columns: { id: { type: "integer" }, parent_id: { type: "integer" } },
+        constraints: {
+          primaryKey: { name: "users_pkey", columns: ["id"] },
+          // Foreign Key制約はinline: falseのため含まれない
+        },
+      },
+      // inline: falseのForeign Key制約は個別操作として残る
+      {
+        type: "create_foreign_key_constraint",
+        table: "users",
+        name: "users_parent_fkey",
+        columns: ["parent_id"],
+        referencedTable: "users",
+        referencedColumns: ["id"],
+        inline: false,
+      },
+    ]);
+  });
+
+  it("should throw error when foreign key references non-existent column", () => {
+    const operations: Operation[] = [
+      {
+        type: "create_table",
+        table: "posts",
+        columns: {
+          id: { type: "integer" },
+          title: { type: "varchar" },
+          // user_id カラムが存在しない
+        },
+      },
       {
         type: "create_foreign_key_constraint",
         table: "posts",
         name: "posts_user_fkey",
-        columns: ["user_id"],
+        columns: ["user_id"], // 存在しないカラムを参照
         referencedTable: "users",
         referencedColumns: ["id"],
-        onDelete: "cascade",
-        onUpdate: "restrict",
       },
-    ]);
+    ];
+
+    expect(() => mergeTableCreationWithConstraints(operations)).toThrow(
+      'Foreign key constraint "posts_user_fkey" references non-existent columns: user_id'
+    );
+  });
+
+  it("should throw error when foreign key references multiple non-existent columns", () => {
+    const operations: Operation[] = [
+      {
+        type: "create_table",
+        table: "orders",
+        columns: {
+          id: { type: "integer" },
+          total: { type: "decimal" },
+          // user_id, product_id カラムが存在しない
+        },
+      },
+      {
+        type: "create_foreign_key_constraint",
+        table: "orders",
+        name: "orders_composite_fkey",
+        columns: ["user_id", "product_id"], // 存在しないカラムを参照
+        referencedTable: "user_products",
+        referencedColumns: ["user_id", "product_id"],
+      },
+    ];
+
+    expect(() => mergeTableCreationWithConstraints(operations)).toThrow(
+      'Foreign key constraint "orders_composite_fkey" references non-existent columns: user_id, product_id'
+    );
   });
 });

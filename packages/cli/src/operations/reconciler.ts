@@ -32,8 +32,14 @@ const filterOperationsForDroppedTables = (
 /**
  * Merges `CREATE TABLE` operations with their associated constraints
  * into a single create_table_with_constraints operation.
- * Now supports Primary Key, Unique, and self-referencing Foreign Key constraints.
- * Cross-table Foreign Key constraints are kept as separate operations to avoid ordering issues.
+ * Now supports Primary Key, Unique, and Foreign Key constraints.
+ *
+ * Foreign Key constraints are merged if:
+ * - The table is being created in the same migration
+ * - The inline option is not explicitly set to false
+ * - The required columns exist in the source table
+ *
+ * Use inline: false for cross-table foreign keys that need specific ordering.
  */
 export const mergeTableCreationWithConstraints = (
   operations: ReadonlyArray<Operation>
@@ -66,7 +72,6 @@ export const mergeTableCreationWithConstraints = (
   // 2段階目：制約操作の分類
   operations.forEach((op) => {
     if (op.type === "create_table") {
-      // 既に1段階目で処理済み
       return;
     } else if (
       (op.type === "create_primary_key_constraint" ||
@@ -78,19 +83,20 @@ export const mergeTableCreationWithConstraints = (
     } else if (
       op.type === "create_foreign_key_constraint" &&
       createTableTables.has(op.table) &&
-      op.table === op.referencedTable // 自己参照の場合のみマージ
+      op.inline !== false
     ) {
-      // Foreign Key制約は自己参照の場合のみマージ（順序問題回避）
-      const sourceTable = createTableOps.get(op.table);
-      const hasRequiredColumns =
-        sourceTable && op.columns.every((col) => col in sourceTable.columns);
-
-      if (hasRequiredColumns) {
-        const existing = constraintOpsForTables.get(op.table) || [];
-        constraintOpsForTables.set(op.table, [...existing, op]);
-      } else {
-        remainingOps.push(op);
+      const sourceTable = createTableOps.get(op.table)!;
+      const missingColumns = op.columns.filter(
+        (col) => !(col in sourceTable.columns)
+      );
+      if (missingColumns.length > 0) {
+        throw new Error(
+          `Foreign key constraint "${op.name}" references non-existent columns: ${missingColumns.join(", ")}`
+        );
       }
+
+      const existing = constraintOpsForTables.get(op.table) || [];
+      constraintOpsForTables.set(op.table, [...existing, op]);
     } else {
       remainingOps.push(op);
     }
@@ -127,6 +133,7 @@ export const mergeTableCreationWithConstraints = (
             referencedColumns: constraint.referencedColumns,
             onDelete: constraint.onDelete,
             onUpdate: constraint.onUpdate,
+            inline: constraint.inline,
           });
         }
       });

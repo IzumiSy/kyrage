@@ -46,6 +46,7 @@ type DefinedForeignKeyConstraint = {
   referencedColumns: ReadonlyArray<string>;
   onDelete?: ReferentialActions;
   onUpdate?: ReferentialActions;
+  inline?: boolean;
 };
 
 type ExpressionBuilders<T extends Record<string, DefinedColumn>> = {
@@ -99,6 +100,7 @@ type ExpressionBuilders<T extends Record<string, DefinedColumn>> = {
       name?: string;
       onDelete?: ReferentialActions;
       onUpdate?: ReferentialActions;
+      inline?: boolean;
     }
   ) => DefinedForeignKeyConstraint;
 };
@@ -189,6 +191,7 @@ export const defineTable = <T extends Record<string, DefinedColumn>>(
             referencedColumns: normalizedReferencedColumns,
             onDelete: options?.onDelete,
             onUpdate: options?.onUpdate,
+            inline: options?.inline ?? true, // デフォルトはtrue（既存の動作を維持）
           };
         },
       })
@@ -265,6 +268,7 @@ export const defineConfig = (config: DefineConfigProp) => {
         referencedColumns: fk.referencedColumns,
         onDelete: fk.onDelete,
         onUpdate: fk.onUpdate,
+        inline: fk.inline,
       });
     }
 

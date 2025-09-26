@@ -40,6 +40,7 @@ export const createTableWithConstraintsOp = defineOperation({
               referencedColumns: z.array(z.string()).readonly(),
               onDelete: referentialActionsSchema.optional(),
               onUpdate: referentialActionsSchema.optional(),
+              inline: z.boolean().optional(),
             })
           )
           .readonly()
@@ -113,6 +114,7 @@ export const createTableWithConstraints = (
       referencedColumns: ReadonlyArray<string>;
       onDelete?: string;
       onUpdate?: string;
+      inline?: boolean;
     }>;
   }
 ) => ({
