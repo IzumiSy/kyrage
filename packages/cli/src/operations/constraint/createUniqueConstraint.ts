@@ -3,7 +3,7 @@ import {
   uniqueConstraintSchema,
   UniqueConstraintSchema,
 } from "../shared/types";
-import { defineOperation } from "../shared/operation";
+import { defineOperation, InferOpSchema } from "../shared/operation";
 
 export const createUniqueConstraintOp = defineOperation({
   typeName: "create_unique_constraint",
@@ -18,6 +18,10 @@ export const createUniqueConstraintOp = defineOperation({
       .execute();
   },
 });
+
+export type CreateUniqueConstraintOp = InferOpSchema<
+  typeof createUniqueConstraintOp
+>;
 
 export const createUniqueConstraint = (value: UniqueConstraintSchema) => ({
   ...value,

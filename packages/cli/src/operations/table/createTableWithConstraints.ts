@@ -6,7 +6,7 @@ import {
   referentialActionsSchema,
 } from "../shared/types";
 import { addColumnsToTableBuilder } from "./createTable";
-import { defineOperation } from "../shared/operation";
+import { defineOperation, InferOpSchema } from "../shared/operation";
 
 export const createTableWithConstraintsOp = defineOperation({
   typeName: "create_table_with_constraints",
@@ -101,22 +101,14 @@ export const createTableWithConstraintsOp = defineOperation({
   },
 });
 
+export type CreateTableWithConstraintsOp = InferOpSchema<
+  typeof createTableWithConstraintsOp
+>;
+
 export const createTableWithConstraints = (
   table: string,
   columns: Record<string, TableColumnAttributes>,
-  constraints?: {
-    primaryKey?: { name: string; columns: ReadonlyArray<string> };
-    unique?: ReadonlyArray<{ name: string; columns: ReadonlyArray<string> }>;
-    foreignKeys?: ReadonlyArray<{
-      name: string;
-      columns: ReadonlyArray<string>;
-      referencedTable: string;
-      referencedColumns: ReadonlyArray<string>;
-      onDelete?: string;
-      onUpdate?: string;
-      inline?: boolean;
-    }>;
-  }
+  constraints: CreateTableWithConstraintsOp["constraints"]
 ) => ({
   type: "create_table_with_constraints" as const,
   table,

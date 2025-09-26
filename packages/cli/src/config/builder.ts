@@ -191,7 +191,7 @@ export const defineTable = <T extends Record<string, DefinedColumn>>(
             referencedColumns: normalizedReferencedColumns,
             onDelete: options?.onDelete,
             onUpdate: options?.onUpdate,
-            inline: options?.inline ?? true, // デフォルトはtrue（既存の動作を維持）
+            inline: options?.inline ?? true,
           };
         },
       })
