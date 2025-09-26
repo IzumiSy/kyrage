@@ -1,5 +1,104 @@
 # @izumisy/kyrage
 
+## 1.5.0
+
+### Minor Changes
+
+- [#131](https://github.com/IzumiSy/kyrage/pull/131) [`23e21eb`](https://github.com/IzumiSy/kyrage/commit/23e21ebb259d895b7546383ba9e2c2a6e480e23c) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Add foreign key constraint merging to table creation operations with inline control option
+
+  Kyrage now automatically merges foreign key constraints into `CREATE TABLE` statements alongside existing primary key and unique constraints. This reduces SQL operations and improves migration performance. Added `inline` option to schema builder's `reference()` method for fine-grained control over constraint merging.
+
+  **Example schema with inline foreign key:**
+
+  ```typescript
+  import { column as c, defineTable as t } from "@izumisy/kyrage";
+
+  const users = t("users", {
+    id: c("uuid", { primaryKey: true }),
+  });
+
+  const posts = t(
+    "posts",
+    {
+      id: c("uuid", { primaryKey: true }),
+      userId: c("uuid"),
+    },
+    (t) => [
+      // Merged into CREATE TABLE (default: inline: true)
+      t.reference("userId", users, "id"),
+    ]
+  );
+  ```
+
+  **Example with separate constraint:**
+
+  ```typescript
+  const posts = t(
+    "posts",
+    {
+      id: c("uuid", { primaryKey: true }),
+      userId: c("uuid"),
+    },
+    (t) => [
+      // Separate ALTER TABLE statement
+      t.reference("userId", users, "id", { inline: false }),
+    ]
+  );
+  ```
+
+### Patch Changes
+
+- [#131](https://github.com/IzumiSy/kyrage/pull/131) [`23e21eb`](https://github.com/IzumiSy/kyrage/commit/23e21ebb259d895b7546383ba9e2c2a6e480e23c) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Table operations are now sorted to always respect foreign key and other dependency relationships. Independent tables are ordered alphabetically, ensuring stable and predictable output for migrations and SQL generation.
+
+  **Example:**
+
+  ```typescript
+  import { column as c, defineTable as t } from "@izumisy/kyrage";
+
+  const users = t("users", {
+    id: c("uuid", { primaryKey: true }),
+    name: c("varchar"),
+  });
+
+  const posts = t(
+    "posts",
+    {
+      id: c("uuid", { primaryKey: true }),
+      userId: c("uuid"),
+      content: c("text"),
+    },
+    (t) => [
+      t.reference("userId", users, "id"), // posts depends on users
+    ]
+  );
+
+  const categories = t("categories", {
+    id: c("uuid", { primaryKey: true }),
+    label: c("varchar"),
+  });
+  ```
+
+  The generated SQL will always be:
+
+  ```sql
+  CREATE TABLE categories (
+    id uuid PRIMARY KEY,
+    label varchar
+  );
+
+  CREATE TABLE users (
+    id uuid PRIMARY KEY,
+    name varchar
+  );
+
+  CREATE TABLE posts (
+    id uuid PRIMARY KEY,
+    userId uuid,
+    content text,
+    CONSTRAINT posts_userId_fkey FOREIGN KEY (userId) REFERENCES users(id)
+  );
+  ```
+
 ## 1.4.0
 
 ### Minor Changes
