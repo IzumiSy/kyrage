@@ -113,5 +113,9 @@ export const createTableWithConstraints = (
   type: "create_table_with_constraints" as const,
   table,
   columns,
-  constraints,
+  constraints: {
+    primaryKey: constraints?.primaryKey,
+    unique: constraints?.unique ?? [],
+    foreignKeys: constraints?.foreignKeys ?? [],
+  },
 });

@@ -1,5 +1,9 @@
 import * as R from "ramda";
 import { Operation } from "./executor";
+import { createTableWithConstraints } from "./table/createTableWithConstraints";
+import { CreateForeignKeyConstraintOp } from "./constraint/createForeignKeyConstraint";
+import { CreateUniqueConstraintOp } from "./constraint/createUniqueConstraint";
+import { CreatePrimaryKeyConstraintOp } from "./constraint/createPrimaryKeyConstraint";
 
 /**
  * Filters out operations that target tables which are dropped earlier in the sequence
@@ -71,34 +75,39 @@ export const mergeTableCreationWithConstraints = (
 
   // 2段階目：制約操作の分類
   operations.forEach((op) => {
-    if (op.type === "create_table") {
-      return;
-    } else if (
-      (op.type === "create_primary_key_constraint" ||
-        op.type === "create_unique_constraint") &&
-      createTableTables.has(op.table)
-    ) {
-      const existing = constraintOpsForTables.get(op.table) || [];
-      constraintOpsForTables.set(op.table, [...existing, op]);
-    } else if (
-      op.type === "create_foreign_key_constraint" &&
-      createTableTables.has(op.table) &&
-      op.inline !== false
-    ) {
-      const sourceTable = createTableOps.get(op.table)!;
-      const missingColumns = op.columns.filter(
-        (col) => !(col in sourceTable.columns)
-      );
-      if (missingColumns.length > 0) {
-        throw new Error(
-          `Foreign key constraint "${op.name}" references non-existent columns: ${missingColumns.join(", ")}`
-        );
-      }
+    switch (op.type) {
+      case "create_table":
+        return;
+      case "create_primary_key_constraint":
+      case "create_unique_constraint":
+        if (createTableTables.has(op.table)) {
+          const existing = constraintOpsForTables.get(op.table) || [];
+          constraintOpsForTables.set(op.table, [...existing, op]);
+        } else {
+          remainingOps.push(op);
+        }
+        break;
+      case "create_foreign_key_constraint":
+        if (createTableTables.has(op.table) && op.inline !== false) {
+          const sourceTable = createTableOps.get(op.table)!;
+          const missingColumns = op.columns.filter(
+            (col) => !(col in sourceTable.columns)
+          );
+          if (missingColumns.length > 0) {
+            throw new Error(
+              `Foreign key constraint "${op.name}" references non-existent columns: ${missingColumns.join(", ")}`
+            );
+          }
 
-      const existing = constraintOpsForTables.get(op.table) || [];
-      constraintOpsForTables.set(op.table, [...existing, op]);
-    } else {
-      remainingOps.push(op);
+          const existing = constraintOpsForTables.get(op.table) || [];
+          constraintOpsForTables.set(op.table, [...existing, op]);
+        } else {
+          remainingOps.push(op);
+        }
+        break;
+      default:
+        remainingOps.push(op);
+        break;
     }
   });
 
@@ -106,45 +115,41 @@ export const mergeTableCreationWithConstraints = (
 
   createTableOps.forEach((createTableOp, tableName) => {
     const tableConstraints = constraintOpsForTables.get(tableName) || [];
-
     if (tableConstraints.length === 0) {
       mergedOps.push(createTableOp);
-    } else {
-      const constraints: any = {};
-
-      tableConstraints.forEach((constraint) => {
-        if (constraint.type === "create_primary_key_constraint") {
-          constraints.primaryKey = {
-            name: constraint.name,
-            columns: constraint.columns,
-          };
-        } else if (constraint.type === "create_unique_constraint") {
-          if (!constraints.unique) constraints.unique = [];
-          constraints.unique.push({
-            name: constraint.name,
-            columns: constraint.columns,
-          });
-        } else if (constraint.type === "create_foreign_key_constraint") {
-          if (!constraints.foreignKeys) constraints.foreignKeys = [];
-          constraints.foreignKeys.push({
-            name: constraint.name,
-            columns: constraint.columns,
-            referencedTable: constraint.referencedTable,
-            referencedColumns: constraint.referencedColumns,
-            onDelete: constraint.onDelete,
-            onUpdate: constraint.onUpdate,
-            inline: constraint.inline,
-          });
-        }
-      });
-
-      mergedOps.push({
-        type: "create_table_with_constraints" as const,
-        table: createTableOp.table,
-        columns: createTableOp.columns,
-        constraints,
-      });
+      return;
     }
+
+    const constraints: {
+      primaryKey?: CreatePrimaryKeyConstraintOp;
+      unique: Array<CreateUniqueConstraintOp>;
+      foreignKeys: Array<CreateForeignKeyConstraintOp>;
+    } = {
+      unique: [],
+      foreignKeys: [],
+    };
+
+    tableConstraints.forEach((constraint) => {
+      switch (constraint.type) {
+        case "create_primary_key_constraint":
+          constraints.primaryKey = constraint;
+          break;
+        case "create_unique_constraint":
+          constraints.unique.push(constraint);
+          break;
+        case "create_foreign_key_constraint":
+          constraints.foreignKeys.push(constraint);
+          break;
+      }
+    });
+
+    mergedOps.push(
+      createTableWithConstraints(
+        createTableOp.table,
+        createTableOp.columns,
+        constraints
+      )
+    );
   });
 
   return [...mergedOps, ...remainingOps];
