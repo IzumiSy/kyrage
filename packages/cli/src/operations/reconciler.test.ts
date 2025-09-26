@@ -117,6 +117,85 @@ describe("sortOperationsByDependency", () => {
     // Sorted should be different
     expect(sorted).not.toEqual(operations);
   });
+
+  it("should throw error when circular dependency is detected in foreign keys", () => {
+    const operations: Operation[] = [
+      createTable("users", {
+        id: { type: "integer" },
+        dept_id: { type: "integer" },
+      }),
+      createTable("departments", {
+        id: { type: "integer" },
+        manager_id: { type: "integer" },
+      }),
+      createForeignKeyConstraint(
+        { table: "users", name: "users_dept_fk" },
+        {
+          columns: ["dept_id"],
+          referencedTable: "departments",
+          referencedColumns: ["id"],
+        }
+      ),
+      createForeignKeyConstraint(
+        { table: "departments", name: "dept_manager_fk" },
+        {
+          columns: ["manager_id"],
+          referencedTable: "users",
+          referencedColumns: ["id"],
+        }
+      ),
+    ];
+
+    expect(() => sortOperationsByDependency(operations)).toThrow(
+      /Circular dependency detected in foreign key constraints\. Please resolve this by setting 'inline: false'/
+    );
+  });
+
+  it("should handle foreign keys with inline: false without circular dependency error", () => {
+    const operations: Operation[] = [
+      createTable("users", {
+        id: { type: "integer" },
+        dept_id: { type: "integer" },
+      }),
+      createTable("departments", {
+        id: { type: "integer" },
+        manager_id: { type: "integer" },
+      }),
+      createForeignKeyConstraint(
+        { table: "users", name: "users_dept_fk" },
+        {
+          columns: ["dept_id"],
+          referencedTable: "departments",
+          referencedColumns: ["id"],
+        }
+      ),
+      createForeignKeyConstraint(
+        { table: "departments", name: "dept_manager_fk" },
+        {
+          columns: ["manager_id"],
+          referencedTable: "users",
+          referencedColumns: ["id"],
+          inline: false, // This breaks the cycle
+        }
+      ),
+    ];
+
+    // Should not throw because one FK is marked as inline: false
+    expect(() => sortOperationsByDependency(operations)).not.toThrow();
+
+    const result = sortOperationsByDependency(operations);
+    expect(result).toHaveLength(4);
+
+    // departments should come before users due to FK dependency
+    const deptTableIndex = result.findIndex(
+      (op) => op.type === "create_table" && op.table === "departments"
+    );
+    const usersTableIndex = result.findIndex(
+      (op) => op.type === "create_table" && op.table === "users"
+    );
+
+    expect(deptTableIndex).toBeLessThan(usersTableIndex);
+  });
 });
 
 describe("mergeTableCreationWithConstraints", () => {

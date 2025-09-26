@@ -1,76 +1,10 @@
 import * as R from "ramda";
-import toposort from "toposort";
+import { Graph, topologicalSort, CycleError } from "graph-data-structure";
 import { Operation } from "./executor";
 import { createTableWithConstraints } from "./table/createTableWithConstraints";
 import { CreateForeignKeyConstraintOp } from "./constraint/createForeignKeyConstraint";
 import { CreateUniqueConstraintOp } from "./constraint/createUniqueConstraint";
 import { CreatePrimaryKeyConstraintOp } from "./constraint/createPrimaryKeyConstraint";
-
-/**
- * Extracts foreign key relationships from an operation
- */
-const extractForeignKeys = (
-  op: Operation
-): Array<{ table: string; referencedTable: string }> => {
-  switch (op.type) {
-    case "create_foreign_key_constraint":
-      return [{ table: op.table, referencedTable: op.referencedTable }];
-    case "create_table_with_constraints":
-      return (op.constraints?.foreignKeys || []).map((fk) => ({
-        table: op.table,
-        referencedTable: fk.referencedTable,
-      }));
-    default:
-      return [];
-  }
-};
-
-/**
- * Gets the table name from an operation if it has one
- */
-const getOperationTable = (operation: Operation): string | null => {
-  return "table" in operation ? operation.table : null;
-};
-
-/**
- * Resolves cyclic foreign key dependencies by setting inline: false
- * for foreign key constraints involved in cycles
- */
-const resolveCyclicForeignKeys = (
-  operations: ReadonlyArray<Operation>,
-  edges: Array<[string, string]>
-): ReadonlyArray<Operation> => {
-  // Detect bidirectional edges which indicate cycles
-  const edgeSet = new Set(edges.map(([a, b]) => `${a}->${b}`));
-  const cyclicPairs = new Set<string>();
-
-  edges.forEach(([a, b]) => {
-    if (edgeSet.has(`${b}->${a}`)) {
-      cyclicPairs.add(`${a}-${b}`);
-      cyclicPairs.add(`${b}-${a}`);
-    }
-  });
-
-  if (cyclicPairs.size === 0) return operations;
-
-  const cyclicTables = new Set<string>();
-  cyclicPairs.forEach((pair) => {
-    const [a, b] = pair.split("-");
-    cyclicTables.add(a);
-    cyclicTables.add(b);
-  });
-
-  return operations.map((op) => {
-    if (
-      op.type === "create_foreign_key_constraint" &&
-      cyclicTables.has(op.table) &&
-      cyclicTables.has(op.referencedTable)
-    ) {
-      return { ...op, inline: false };
-    }
-    return op;
-  });
-};
 
 /**
  * Filters out operations that target tables which are dropped earlier in the sequence
@@ -259,7 +193,6 @@ export const sortOperationsByDependency = (
   operations: ReadonlyArray<Operation>
 ): ReadonlyArray<Operation> => {
   // Build foreign key dependency edges [referencedTable, table]
-  const edges: Array<[string, string]> = [];
   const allTables = new Set<string>();
 
   // Collect all table names
@@ -270,25 +203,25 @@ export const sortOperationsByDependency = (
     }
   });
 
-  // Extract foreign key dependencies
-  let resolvedOperations = operations;
-  operations.forEach((op) => {
-    const foreignKeys = extractForeignKeys(op);
-    foreignKeys.forEach((fk) => {
-      if (fk.table !== fk.referencedTable) {
-        // referencedTable should be created before table
-        edges.push([fk.referencedTable, fk.table]);
-        allTables.add(fk.table);
-        allTables.add(fk.referencedTable);
-      }
-    });
-  });
-
-  let sortedTables: string[];
+  let sortedTables: string[] = [];
 
   try {
+    const graph = new Graph();
+
+    // Extract foreign key dependencies (only for different tables with inline foreign keys)
+    operations.forEach((op) =>
+      extractForeignKeys(op).forEach((fk) => {
+        if (
+          fk.table !== fk.referencedTable &&
+          (op.type !== "create_foreign_key_constraint" || op.inline !== false)
+        ) {
+          graph.addEdge(fk.referencedTable, fk.table);
+        }
+      })
+    );
+
     // Attempt topological sort
-    sortedTables = toposort(edges);
+    sortedTables = topologicalSort(graph);
 
     // Add tables that have no dependencies
     const tablesInSort = new Set(sortedTables);
@@ -298,40 +231,15 @@ export const sortOperationsByDependency = (
       }
     }
   } catch (error) {
-    // Circular dependency detected, resolve by setting inline: false
-    console.warn(
-      "Circular dependency detected in foreign keys, resolving by separating constraints"
-    );
-    resolvedOperations = resolveCyclicForeignKeys(operations, edges);
-
-    // Try topological sort again after resolving cycles
-    const resolvedEdges: Array<[string, string]> = [];
-    resolvedOperations.forEach((op) => {
-      const foreignKeys = extractForeignKeys(op);
-      foreignKeys.forEach((fk) => {
-        // Only add edges for inline foreign keys
-        const isInline =
-          op.type === "create_foreign_key_constraint"
-            ? op.inline !== false
-            : true;
-        if (fk.table !== fk.referencedTable && isInline) {
-          resolvedEdges.push([fk.referencedTable, fk.table]);
-        }
-      });
-    });
-
-    try {
-      sortedTables = toposort(resolvedEdges);
-      const tablesInSort = new Set(sortedTables);
-      for (const table of allTables) {
-        if (!tablesInSort.has(table)) {
-          sortedTables.unshift(table);
-        }
-      }
-    } catch {
-      // Fallback to alphabetical sorting
-      sortedTables = Array.from(allTables).sort();
+    // graph-data-structure throws CycleError for circular dependencies
+    if (error instanceof CycleError) {
+      throw new Error(
+        `Circular dependency detected in foreign key constraints. ` +
+          `Please resolve this by setting 'inline: false' for one of the foreign key constraints in each circular relationship.`
+      );
     }
+    // Re-throw other errors
+    throw error;
   }
 
   // Create table order map for sorting
@@ -339,7 +247,7 @@ export const sortOperationsByDependency = (
     sortedTables.map((table, index) => [table, index])
   );
 
-  return resolvedOperations.slice().sort((a, b) => {
+  return operations.slice().sort((a, b) => {
     // 1. Sort by operation priority
     const priorityA = OPERATION_PRIORITY[a.type];
     const priorityB = OPERATION_PRIORITY[b.type];
@@ -383,6 +291,32 @@ const OPERATION_PRIORITY = {
   create_unique_constraint: 12,
   create_foreign_key_constraint: 13,
 } as const;
+
+/**
+ * Extracts foreign key relationships from an operation
+ */
+const extractForeignKeys = (
+  op: Operation
+): Array<{ table: string; referencedTable: string }> => {
+  switch (op.type) {
+    case "create_foreign_key_constraint":
+      return [{ table: op.table, referencedTable: op.referencedTable }];
+    case "create_table_with_constraints":
+      return (op.constraints?.foreignKeys || []).map((fk) => ({
+        table: op.table,
+        referencedTable: fk.referencedTable,
+      }));
+    default:
+      return [];
+  }
+};
+
+/**
+ * Gets the table name from an operation if it has one
+ */
+const getOperationTable = (operation: Operation): string | null => {
+  return "table" in operation ? operation.table : null;
+};
 
 export const buildReconciledOperations = R.pipe(
   filterOperationsForDroppedTables,
