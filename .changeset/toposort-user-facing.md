@@ -1,5 +1,5 @@
 ---
-'@kyrage/cli': patch
+"@izumisy/kyrage": patch
 ---
 
 Table operations are now sorted to always respect foreign key and other dependency relationships. Independent tables are ordered alphabetically, ensuring stable and predictable output for migrations and SQL generation.
