@@ -44,7 +44,7 @@
     "consola": "^3.4.2",
     "graph-data-structure": "^4.5.0",
     "kysely": "^0.28.7",
-    "mysql2": "^3.15.0",
+    "mysql2": "^3.15.1",
     "pg": "^8.16.3",
     "ramda": "^0.31.3",
     "sql-formatter": "^15.6.9",
