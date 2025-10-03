@@ -1,5 +1,11 @@
 # @izumisy/kyrage
 
+## 1.5.1
+
+### Patch Changes
+
+- [#137](https://github.com/IzumiSy/kyrage/pull/137) [`2922cb8`](https://github.com/IzumiSy/kyrage/commit/2922cb847e5e53cb6e90f4a0c03cc7abea1b1556) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Update dependencies
+
 ## 1.5.0
 
 ### Minor Changes
