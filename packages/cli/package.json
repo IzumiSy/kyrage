@@ -57,7 +57,7 @@
     "@types/node": "^24",
     "@types/pg": "^8.15.5",
     "@types/ramda": "^0.31.1",
-    "memfs": "^4.39.0",
+    "memfs": "^4.48.1",
     "prettier": "^3",
     "tsup": "^8.5.0",
     "typescript": "^5",
