@@ -72,8 +72,8 @@ importers:
         specifier: ^15.6.9
         version: 15.6.9
       testcontainers:
-        specifier: ^11.6.0
-        version: 11.6.0
+        specifier: ^11.7.0
+        version: 11.7.0
       zod:
         specifier: ^4.1.11
         version: 4.1.11
@@ -1035,10 +1035,6 @@ packages:
     resolution: {integrity: sha512-ens7BiayssQz/uAxGzH8zGXCtiV24rRWXdjNha5V4zSOcxmAZsfGVm/PPFbwQdqEkDnhG+SyR9E3zSHUbOKXBQ==}
     engines: {node: '>= 8.0'}
 
-  dockerode@4.0.8:
-    resolution: {integrity: sha512-HdPBprWmwfHMHi12AVIFDhXIqIS+EpiOVkZaAZxgML4xf5McqEZjJZtahTPkLDxWOt84ApfWPAH9EoQwOiaAIQ==}
-    engines: {node: '>= 8.0'}
-
   dockerode@4.0.9:
     resolution: {integrity: sha512-iND4mcOWhPaCNh54WmK/KoSb35AFqPAUWFMffTQcp52uQt36b5uNwEJTSXntJZBbeGad72Crbi/hvDIv6us/6Q==}
     engines: {node: '>= 8.0'}
@@ -1872,9 +1868,6 @@ packages:
     resolution: {integrity: sha512-wK0Ri4fOGjv/XPy8SBHZChl8CM7uMc5VML7SqiQ0zG7+J5Vr+RMQDoHa2CNT6KHUnTGIXH34UDMkPzAUyapBZg==}
     engines: {node: '>=8'}
 
-  testcontainers@11.6.0:
-    resolution: {integrity: sha512-2kXdhZ4mvvPP4xEY1yxhLSrFt/TXokClOtppA4bt/5FJJwZrnUkyCo3TVfhHx3Ynlq1N00qjoQuxpnwFqU9a7g==}
-
   testcontainers@11.7.0:
     resolution: {integrity: sha512-uImnn8TqYfjv/e+McPBpBqKWvWKPIPzKtL+jxHHxy4CsaXWaZr9Z01viVfml1xCblUnr76GsMjlEsi/Q7SFupw==}
 
@@ -2674,7 +2667,7 @@ snapshots:
 
   '@testcontainers/cockroachdb@11.5.1':
     dependencies:
-      testcontainers: 11.6.0
+      testcontainers: 11.7.0
     transitivePeerDependencies:
       - bare-buffer
       - react-native-b4a
@@ -3078,18 +3071,6 @@ snapshots:
       readable-stream: 3.6.2
       split-ca: 1.0.1
       ssh2: 1.17.0
-    transitivePeerDependencies:
-      - supports-color
-
-  dockerode@4.0.8:
-    dependencies:
-      '@balena/dockerignore': 1.0.2
-      '@grpc/grpc-js': 1.14.0
-      '@grpc/proto-loader': 0.7.15
-      docker-modem: 5.0.6
-      protobufjs: 7.5.4
-      tar-fs: 2.1.4
-      uuid: 10.0.0
     transitivePeerDependencies:
       - supports-color
 
@@ -3940,28 +3921,6 @@ snapshots:
       - react-native-b4a
 
   term-size@2.2.1: {}
-
-  testcontainers@11.6.0:
-    dependencies:
-      '@balena/dockerignore': 1.0.2
-      '@types/dockerode': 3.3.44
-      archiver: 7.0.1
-      async-lock: 1.4.1
-      byline: 5.0.0
-      debug: 4.4.3
-      docker-compose: 1.3.0
-      dockerode: 4.0.8
-      get-port: 7.1.0
-      proper-lockfile: 4.1.2
-      properties-reader: 2.3.0
-      ssh-remote-port-forward: 1.0.4
-      tar-fs: 3.1.1
-      tmp: 0.2.5
-      undici: 7.16.0
-    transitivePeerDependencies:
-      - bare-buffer
-      - react-native-b4a
-      - supports-color
 
   testcontainers@11.7.0:
     dependencies:
