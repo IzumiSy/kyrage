@@ -5,3 +5,10 @@ updates:
     schedule:
       interval: weekly
       timezone: Asia/Tokyo
+    groups:
+      testcontainers:
+        applies-to: version-updates
+        patterns:
+          - "testcontainers"
+          - "@testcontainers/*"
+
