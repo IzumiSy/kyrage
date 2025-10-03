@@ -1,0 +1,60 @@
+name: Add Changeset to Dependabot PRs
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  add-changeset:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          cache-dependency-path: ./pnpm-lock.yaml
+          node-version-file: './package.json'
+      - run: pnpm install
+      - name: Get first commit message and create changeset
+        id: commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const changesetWrite = require('@changesets/write');
+            const { data: commits } = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+
+            // Get a commit message from the first commit in the PR that dependabot created
+            const firstCommit = commits[0];
+            const commitMessage = firstCommit.commit.message;
+
+            console.log('Commit message:', commitMessage);
+
+            const id = await changesetWrite(
+              {
+                summary: commitMessage,
+                releases: [
+                  { name: "@izumisy/kyrage", type: "patch" }
+                ]
+              },
+              process.cwd(),
+            );
+
+            console.log(`Created changeset with ID: ${id}`);
+      - name: Commit changeset
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore: add changeset for dependabot update'
+          file_pattern: '.changeset/*.md'
