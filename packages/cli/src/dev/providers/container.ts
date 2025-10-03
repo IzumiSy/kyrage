@@ -5,8 +5,11 @@ import {
   DevDatabaseStatus,
 } from "../types";
 import { DialectEnum } from "../../config/loader";
-import { StartedTestContainer } from "testcontainers/build/test-container";
-import { GenericContainer, getContainerRuntimeClient } from "testcontainers";
+import {
+  GenericContainer,
+  getContainerRuntimeClient,
+  StartedTestContainer,
+} from "testcontainers";
 import z from "zod";
 
 export const buildContainerDevDatabaseConfigSchema = (options: {
