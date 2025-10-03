@@ -4,14 +4,14 @@ on:
   pull_request:
     types: [opened]
 
-permissions:
-  contents: write
-  pull-requests: write
+concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
   add-changeset:
     if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
