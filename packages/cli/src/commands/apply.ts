@@ -15,10 +15,10 @@ export interface ApplyOptions {
 }
 
 export async function executeApply(
-  dependencies: CommonDependencies,
+  deps: CommonDependencies,
   options: ApplyOptions
 ) {
-  const { client, logger } = dependencies;
+  const { client, logger } = deps;
   const { reporter } = logger;
 
   await using db = client.getDB({
@@ -28,9 +28,9 @@ export async function executeApply(
   const provider = createMigrationProvider({
     migrationsResolver: async () => {
       if (options.plan) {
-        return await getPendingMigrations(client);
+        return await getPendingMigrations(deps);
       } else {
-        return await getAllMigrations();
+        return await getAllMigrations(deps);
       }
     },
     options: {

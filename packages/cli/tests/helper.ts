@@ -1,23 +1,19 @@
 import { afterAll } from "vitest";
-import { DBClient, getClient } from "../src/client";
+import { getClient } from "../src/client";
 import {
   defineConfig,
   DefineConfigProp,
   DefinedTables,
 } from "../src/config/builder";
-import {
-  ConfigValue,
-  DatabaseValue,
-  DialectEnum,
-  configSchema,
-} from "../src/config/loader";
+import { DatabaseValue, DialectEnum, configSchema } from "../src/config/loader";
 import { getContainerRuntimeClient } from "testcontainers";
 import { getDialect } from "../src/dialect/factory";
 import { executeApply } from "../src/commands/apply";
 import { executeGenerate } from "../src/commands/generate";
-import { defaultConsolaLogger, Logger } from "../src/logger";
+import { defaultConsolaLogger } from "../src/logger";
 import { KyrageDialect } from "../src/dialect/types";
 import { ManagedKey } from "../src/dev/providers/container";
+import { CommonDependencies } from "../src/commands/common";
 
 const getConfigForTest = (kyrageDialect: KyrageDialect) => {
   switch (kyrageDialect.getName()) {
@@ -79,29 +75,23 @@ export const setupTestDB = async () => {
 export const defineConfigForTest = (config: DefineConfigProp) =>
   configSchema.parse(defineConfig(config));
 
-type SetupDeps = {
-  client: DBClient;
-  logger: Logger;
-  config: ConfigValue;
-};
-
 /**
  * テスト用にマイグレーションを生成と適用しテーブルをセットアップする
  */
 export const applyTable = async (
-  baseDeps: { client: DBClient; database: DatabaseValue },
-  tables: DefinedTables,
+  baseDeps: Pick<CommonDependencies, "client" | "fs">,
+  config: {
+    database: DatabaseValue;
+    tables: DefinedTables;
+  },
   hooks?: {
-    beforeApply?: (deps: SetupDeps) => Promise<void> | void;
+    beforeApply?: (deps: CommonDependencies) => Promise<void> | void;
   }
 ) => {
   const deps = {
-    client: baseDeps.client,
+    ...baseDeps,
     logger: defaultConsolaLogger,
-    config: defineConfigForTest({
-      database: baseDeps.database,
-      tables,
-    }),
+    config: defineConfigForTest(config),
   };
 
   await executeGenerate(deps, {

@@ -1,10 +1,9 @@
 import { DEFAULT_MIGRATION_TABLE, Migration } from "kysely";
-import { readdir, readFile } from "fs/promises";
 import { join } from "path";
-import { DBClient } from "./client";
 import z from "zod";
 import { operationSchema, executeOperation } from "./operations/executor";
 import { buildReconciledOperations } from "./operations/reconciler";
+import { CommonDependencies, FSPromiseAPIs } from "./commands/common";
 
 type CreateMigrationProviderProps = {
   migrationsResolver: () => Promise<
@@ -50,14 +49,16 @@ export const migrationSchema = z.object({
 });
 
 export const migrationDirName = "migrations";
-export const getAllMigrations = async () => {
+export const getAllMigrations = async (deps: { fs: FSPromiseAPIs }) => {
+  const { fs } = deps;
+
   try {
-    const files = await readdir(migrationDirName);
+    const files = await fs.readdir(migrationDirName);
     const migrationJSONFiles = files
       .filter((file) => file.endsWith(".json"))
       .map(async (file) =>
         migrationSchema.parse(
-          JSON.parse(await readFile(join(migrationDirName, file), "utf-8"))
+          JSON.parse(await fs.readFile(join(migrationDirName, file), "utf-8"))
         )
       );
     return await Promise.all(migrationJSONFiles);
@@ -70,9 +71,10 @@ export const getAllMigrations = async () => {
   }
 };
 
-export const getPendingMigrations = async (client: DBClient) => {
+export const getPendingMigrations = async (deps: CommonDependencies) => {
+  const { client, fs } = deps;
   await using db = client.getDB();
-  const migrationFiles = await getAllMigrations();
+  const migrationFiles = await getAllMigrations({ fs });
 
   // If no migration table exists, it should be the initial time to apply migrations
   // All migrations are marked as pending

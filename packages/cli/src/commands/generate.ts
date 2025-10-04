@@ -1,6 +1,5 @@
 import { defineCommand } from "citty";
 import { createCommonDependencies, type CommonDependencies } from "./common";
-import { mkdir, writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { defaultConsolaLogger, type Logger } from "../logger";
 import {
@@ -24,33 +23,33 @@ export interface GenerateOptions {
 }
 
 export async function executeGenerate(
-  dependencies: CommonDependencies,
+  deps: CommonDependencies,
   options: GenerateOptions
 ) {
-  const { logger, config } = dependencies;
+  const { logger, config, fs } = deps;
   const { reporter } = logger;
 
   // Handle squash mode - do squash-specific work then continue with normal flow
   // Squashing is just removing all pending migrations and creating a new one that combines their changes.
   if (options.squash) {
-    await removePendingMigrations(dependencies);
+    await removePendingMigrations(deps);
   }
 
   // Create the appropriate client (dev or production)
   const { client: targetClient, cleanup } = options.dev
-    ? await startDevDatabase(dependencies, {
+    ? await startDevDatabase(deps, {
         mode: "generate-dev",
         logger,
       })
     : {
-        client: dependencies.client,
+        client: deps.client,
         cleanup: async () => void 0,
       };
 
   try {
     // Check for pending migrations against the target database
     if (!options.ignorePending) {
-      const pm = await getPendingMigrations(targetClient);
+      const pm = await getPendingMigrations(deps);
       if (pm.length > 0) {
         if (options.dev) {
           // In dev mode, show info but continue processing since migrations will be auto-applied
@@ -83,8 +82,11 @@ export async function executeGenerate(
     printPrettyDiff(logger, newMigration.diff);
 
     const migrationFilePath = `${migrationDirName}/${newMigration.id}.json`;
-    await mkdir(migrationDirName, { recursive: true });
-    await writeFile(migrationFilePath, JSON.stringify(newMigration, null, 2));
+    await fs.mkdir(migrationDirName, { recursive: true });
+    await fs.writeFile(
+      migrationFilePath,
+      JSON.stringify(newMigration, null, 2)
+    );
 
     const successMessage = options.squash
       ? `Generated squashed migration: ${migrationFilePath}`
@@ -95,7 +97,7 @@ export async function executeGenerate(
     if (options.dev) {
       await executeApply(
         {
-          ...dependencies,
+          ...deps,
           client: targetClient,
         },
         {
@@ -112,12 +114,12 @@ export async function executeGenerate(
 /**
  * Remove all pending migrations from the migration directory.
  */
-const removePendingMigrations = async (dependencies: CommonDependencies) => {
-  const { client, logger } = dependencies;
+const removePendingMigrations = async (deps: CommonDependencies) => {
+  const { logger, fs } = deps;
   const { reporter } = logger;
 
   // Get pending migrations
-  const pendingMigrations = await getPendingMigrations(client);
+  const pendingMigrations = await getPendingMigrations(deps);
   if (pendingMigrations.length === 0) {
     reporter.info("No pending migrations found, nothing to squash.");
     return;
@@ -136,7 +138,7 @@ const removePendingMigrations = async (dependencies: CommonDependencies) => {
   );
 
   try {
-    await Promise.all(filesToRemove.map((filePath) => unlink(filePath)));
+    await Promise.all(filesToRemove.map((filePath) => fs.unlink(filePath)));
     reporter.success(
       `🗑️  Removed ${filesToRemove.length} pending migration files`
     );

@@ -1,28 +1,29 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { sql } from "kysely";
 import { applyTable, setupTestDB } from "./helper";
 import { column, defineTable } from "../src";
 import { getIntrospector } from "../src/introspector";
-
-vi.mock("fs/promises", async () => {
-  const memfs = await import("memfs");
-  return memfs.fs.promises;
-});
+import { fs } from "memfs";
+import { FSPromiseAPIs } from "../src/commands/common";
 
 const { client, dialect, database } = await setupTestDB();
+const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
 const introspector = getIntrospector(client);
 const dialectName = dialect.getName();
 
 describe(`${dialectName} introspector driver`, async () => {
   it("should introspect table columns correctly", async () => {
-    const deps = await applyTable({ client, database }, [
-      defineTable("test_table", {
-        id: column("uuid", { primaryKey: true }),
-        name: column("varchar(255)", { notNull: true }),
-        age: column("int8", { defaultSql: "0" }),
-        is_active: column("boolean", { defaultSql: "true" }),
-      }),
-    ]);
+    const deps = await applyTable(baseDeps, {
+      database,
+      tables: [
+        defineTable("test_table", {
+          id: column("uuid", { primaryKey: true }),
+          name: column("varchar(255)", { notNull: true }),
+          age: column("int8", { defaultSql: "0" }),
+          is_active: column("boolean", { defaultSql: "true" }),
+        }),
+      ],
+    });
 
     const { tables } = await introspector.introspect(deps.config);
     expect(tables).toEqual([
@@ -63,19 +64,25 @@ describe(`${dialectName} introspector driver`, async () => {
   });
 
   it("should introspect indexes correctly", async () => {
-    const deps = await applyTable({ client, database }, [
-      defineTable(
-        "test_table_with_indexes",
-        {
-          id: column("uuid", { primaryKey: true }),
-          email: column("text"),
-          alias: column("text", { unique: true }),
-          name: column("text"),
-          age: column("integer"),
-        },
-        (t) => [t.index(["email"]), t.index(["name", "age"], { unique: true })]
-      ),
-    ]);
+    const deps = await applyTable(baseDeps, {
+      database,
+      tables: [
+        defineTable(
+          "test_table_with_indexes",
+          {
+            id: column("uuid", { primaryKey: true }),
+            email: column("text"),
+            alias: column("text", { unique: true }),
+            name: column("text"),
+            age: column("integer"),
+          },
+          (t) => [
+            t.index(["email"]),
+            t.index(["name", "age"], { unique: true }),
+          ]
+        ),
+      ],
+    });
 
     const { indexes } = await introspector.introspect(deps.config);
     expect(indexes).toEqual([
@@ -103,25 +110,28 @@ describe(`${dialectName} introspector driver`, async () => {
       email: column("text", { unique: true }),
       username: column("text"),
     });
-    const deps = await applyTable({ client, database }, [
-      usersTable,
-      defineTable(
-        "posts",
-        {
-          id: column("uuid", { primaryKey: true }),
-          user_id: column("uuid"),
-          title: column("text"),
-        },
-        (t) => [
-          t.reference("user_id", usersTable, "id", {
-            onDelete: "cascade",
-            onUpdate: "cascade",
-            name: "fk_user",
-          }),
-          t.unique(["user_id", "title"], { name: "unique_title_per_user" }),
-        ]
-      ),
-    ]);
+    const deps = await applyTable(baseDeps, {
+      database,
+      tables: [
+        usersTable,
+        defineTable(
+          "posts",
+          {
+            id: column("uuid", { primaryKey: true }),
+            user_id: column("uuid"),
+            title: column("text"),
+          },
+          (t) => [
+            t.reference("user_id", usersTable, "id", {
+              onDelete: "cascade",
+              onUpdate: "cascade",
+              name: "fk_user",
+            }),
+            t.unique(["user_id", "title"], { name: "unique_title_per_user" }),
+          ]
+        ),
+      ],
+    });
 
     const { constraints } = await introspector.introspect(deps.config);
     expect(constraints).toEqual({
