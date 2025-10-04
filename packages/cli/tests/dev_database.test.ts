@@ -37,13 +37,13 @@ describe.skip("generate with dev database", () => {
     },
   };
 
-  it("should create and cleanup one-off container when dev start not running", async () => {
-    const baseDeps = {
-      client: nullClient,
-      logger: defaultConsolaLogger,
-      fs: fs.promises as unknown as FSPromiseAPIs,
-    };
+  const baseDeps = {
+    client: nullClient,
+    logger: defaultConsolaLogger,
+    fs: fs.promises as unknown as FSPromiseAPIs,
+  };
 
+  it("should create and cleanup one-off container when dev start not running", async () => {
     await executeGenerate(
       {
         ...baseDeps,
@@ -81,14 +81,8 @@ describe.skip("generate with dev database", () => {
   });
 
   it.skip("should reuse dev start container when available", async () => {
-    const depBase = {
-      client: nullClient,
-      logger: defaultConsolaLogger,
-      fs: fs.promises as unknown as FSPromiseAPIs,
-    };
-
     const deps = {
-      ...depBase,
+      ...baseDeps,
       config: defineConfigForTest({
         ...configBase,
         tables: [
@@ -110,7 +104,7 @@ describe.skip("generate with dev database", () => {
     // Generate another migration, and verify it does not stop the container
     await executeGenerate(
       {
-        ...depBase,
+        ...baseDeps,
         config: defineConfigForTest({
           ...configBase,
           tables: [
@@ -125,7 +119,7 @@ describe.skip("generate with dev database", () => {
       },
       defaultOptions
     );
-    expect(await depBase.fs.readdir("migrations")).toHaveLength(2);
+    expect(await baseDeps.fs.readdir("migrations")).toHaveLength(2);
     const lastContainerIDs = await findAllKyrageManagedContainerIDs();
     expect(lastContainerIDs).toHaveLength(1);
 

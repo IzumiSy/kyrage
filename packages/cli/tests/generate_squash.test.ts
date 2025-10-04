@@ -33,7 +33,7 @@ describe("generate --squash", () => {
 
   it("should squash multiple pending migrations into one", async () => {
     // First, create some pending migrations by running generate multiple times
-    await fs.mkdir("migrations", { recursive: true }, () => void 0);
+    await baseDeps.fs.mkdir("migrations", { recursive: true });
 
     // Generate first migration - users table with just id
     const configStep1 = defineConfigForTest({
