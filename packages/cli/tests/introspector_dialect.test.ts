@@ -6,9 +6,8 @@ import { getIntrospector } from "../src/introspector";
 import { fs } from "memfs";
 import { FSPromiseAPIs } from "../src/commands/common";
 
-const mockedFS = fs.promises as unknown as FSPromiseAPIs;
 const { client, dialect, database } = await setupTestDB();
-const baseDeps = { client, fs: mockedFS };
+const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
 const introspector = getIntrospector(client);
 const dialectName = dialect.getName();
 

@@ -4,9 +4,8 @@ import { setupTestDB, applyTable } from "./helper";
 import { fs } from "memfs";
 import { FSPromiseAPIs } from "../src/commands/common";
 
-const mockedFS = fs.promises as unknown as FSPromiseAPIs;
 const { database, client } = await setupTestDB();
-const baseDeps = { client, fs: mockedFS };
+const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
 
 describe("apply migrations in multiple times", () => {
   it("should update DB in multiple times by the schema in config", async () => {

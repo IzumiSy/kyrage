@@ -8,8 +8,7 @@ import { fs } from "memfs";
 import { FSPromiseAPIs } from "../src/commands/common";
 
 const { database, client } = await setupTestDB();
-const mockedFS = fs.promises as unknown as FSPromiseAPIs;
-const baseDeps = { client, fs: mockedFS };
+const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
 
 it("generate with planned apply", async () => {
   const loggerStdout = vi
