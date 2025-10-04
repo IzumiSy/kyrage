@@ -71,10 +71,8 @@ export const getAllMigrations = async (deps: { fs: FSPromiseAPIs }) => {
   }
 };
 
-export const getPendingMigrations = async (
-  dependencies: CommonDependencies
-) => {
-  const { client, fs } = dependencies;
+export const getPendingMigrations = async (deps: CommonDependencies) => {
+  const { client, fs } = deps;
   await using db = client.getDB();
   const migrationFiles = await getAllMigrations({ fs });
 

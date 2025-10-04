@@ -1,24 +1,19 @@
 import { afterAll } from "vitest";
-import { DBClient, getClient } from "../src/client";
+import { getClient } from "../src/client";
 import {
   defineConfig,
   DefineConfigProp,
   DefinedTables,
 } from "../src/config/builder";
-import {
-  ConfigValue,
-  DatabaseValue,
-  DialectEnum,
-  configSchema,
-} from "../src/config/loader";
+import { DatabaseValue, DialectEnum, configSchema } from "../src/config/loader";
 import { getContainerRuntimeClient } from "testcontainers";
 import { getDialect } from "../src/dialect/factory";
 import { executeApply } from "../src/commands/apply";
 import { executeGenerate } from "../src/commands/generate";
-import { defaultConsolaLogger, Logger } from "../src/logger";
+import { defaultConsolaLogger } from "../src/logger";
 import { KyrageDialect } from "../src/dialect/types";
 import { ManagedKey } from "../src/dev/providers/container";
-import { CommonDependencies, FSPromiseAPIs } from "../src/commands/common";
+import { CommonDependencies } from "../src/commands/common";
 
 const getConfigForTest = (kyrageDialect: KyrageDialect) => {
   switch (kyrageDialect.getName()) {

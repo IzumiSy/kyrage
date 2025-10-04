@@ -9,6 +9,7 @@ import { FSPromiseAPIs } from "../src/commands/common";
 
 const { database, client } = await setupTestDB();
 const mockedFS = fs.promises as unknown as FSPromiseAPIs;
+const baseDeps = { client, fs: mockedFS };
 
 it("generate with planned apply", async () => {
   const loggerStdout = vi
@@ -27,7 +28,7 @@ it("generate with planned apply", async () => {
       (t) => [t.index(["name", "email"]), t.unique(["name", "email"])]
     );
     await applyTable(
-      { client, fs: mockedFS },
+      baseDeps,
       {
         database,
         tables: [
@@ -50,9 +51,9 @@ it("generate with planned apply", async () => {
         ],
       },
       {
-        beforeApply: async (deps_) => {
+        beforeApply: async (deps) => {
           // Plan changes
-          await executeApply(deps_, {
+          await executeApply(deps, {
             plan: true,
             pretty: false,
           });
@@ -73,8 +74,7 @@ it("generate with planned apply", async () => {
       (t) => [t.index(["id", "email"], { unique: true })]
     );
     const deps = {
-      client,
-      fs: mockedFS,
+      ...baseDeps,
       logger: defaultConsolaLogger,
       config: defineConfigForTest({
         database,

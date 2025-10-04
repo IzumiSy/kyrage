@@ -97,10 +97,10 @@ type DatabaseStartupResult = {
  * Start development database with migrations applied
  */
 export async function startDevDatabase(
-  dependencies: CommonDependencies,
+  deps: CommonDependencies,
   options: StartDevDatabaseOptions
 ): Promise<DatabaseStartupResult> {
-  const { config } = dependencies;
+  const { config } = deps;
   const logger = options.logger || nullLogger;
   const { reporter } = logger;
 
@@ -113,7 +113,7 @@ export async function startDevDatabase(
     manageType,
     manager: devManager,
     result: devManagerResult,
-  } = await prepareDevManager(dependencies, options);
+  } = await prepareDevManager(deps, options);
   if (devManagerResult.reused) {
     reporter.info("🔄 Reusing existing dev database...");
   } else {
@@ -132,7 +132,7 @@ export async function startDevDatabase(
   });
 
   // Apply baseline migrations to dev database
-  const pendingMigrations = await getPendingMigrations(devClient);
+  const pendingMigrations = await getPendingMigrations(deps);
   if (pendingMigrations.length > 0) {
     reporter.info(
       `🔄 Applying ${pendingMigrations.length} pending migrations...`
@@ -142,6 +142,7 @@ export async function startDevDatabase(
       {
         client: devClient,
         logger: nullLogger,
+        fs: deps.fs,
         config,
       },
       {
