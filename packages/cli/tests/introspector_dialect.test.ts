@@ -1,13 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { sql } from "kysely";
 import { applyTable, setupTestDB } from "./helper";
 import { column, defineTable } from "../src";
 import { getIntrospector } from "../src/introspector";
-
-vi.mock("fs/promises", async () => {
-  const memfs = await import("memfs");
-  return memfs.fs.promises;
-});
 
 const { client, dialect, database } = await setupTestDB();
 const introspector = getIntrospector(client);

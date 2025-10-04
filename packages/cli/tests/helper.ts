@@ -18,6 +18,7 @@ import { executeGenerate } from "../src/commands/generate";
 import { defaultConsolaLogger, Logger } from "../src/logger";
 import { KyrageDialect } from "../src/dialect/types";
 import { ManagedKey } from "../src/dev/providers/container";
+import { CommonDependencies, FSPromiseAPIs } from "../src/commands/common";
 
 const getConfigForTest = (kyrageDialect: KyrageDialect) => {
   switch (kyrageDialect.getName()) {
@@ -79,29 +80,23 @@ export const setupTestDB = async () => {
 export const defineConfigForTest = (config: DefineConfigProp) =>
   configSchema.parse(defineConfig(config));
 
-type SetupDeps = {
-  client: DBClient;
-  logger: Logger;
-  config: ConfigValue;
-};
-
 /**
  * テスト用にマイグレーションを生成と適用しテーブルをセットアップする
  */
 export const applyTable = async (
-  baseDeps: { client: DBClient; database: DatabaseValue },
-  tables: DefinedTables,
+  baseDeps: Pick<CommonDependencies, "client" | "fs">,
+  config: {
+    database: DatabaseValue;
+    tables: DefinedTables;
+  },
   hooks?: {
-    beforeApply?: (deps: SetupDeps) => Promise<void> | void;
+    beforeApply?: (deps: CommonDependencies) => Promise<void> | void;
   }
 ) => {
   const deps = {
-    client: baseDeps.client,
+    ...baseDeps,
     logger: defaultConsolaLogger,
-    config: defineConfigForTest({
-      database: baseDeps.database,
-      tables,
-    }),
+    config: defineConfigForTest(config),
   };
 
   await executeGenerate(deps, {

@@ -4,12 +4,8 @@ import { defineTable, column } from "../src/config/builder";
 import { defineConfigForTest, setupTestDB } from "./helper";
 import { defaultConsolaLogger } from "../src/logger";
 import { getAllMigrations } from "../src/migration";
-import { mkdir } from "fs/promises";
-
-vi.mock("fs/promises", async () => {
-  const memfs = await import("memfs");
-  return memfs.fs.promises;
-});
+import { fs, vol } from "memfs";
+import { FSPromiseAPIs } from "../src/commands/common";
 
 const { database, client } = await setupTestDB();
 const config = defineConfigForTest({
@@ -26,13 +22,18 @@ const config = defineConfigForTest({
 describe("generate --squash", () => {
   beforeEach(async () => {
     // Clear any existing migrations directory
-    const memfs = await import("memfs");
-    memfs.vol.reset();
+    vol.reset();
   });
+
+  const baseDeps = {
+    client,
+    logger: defaultConsolaLogger,
+    fs: fs.promises as unknown as FSPromiseAPIs,
+  };
 
   it("should squash multiple pending migrations into one", async () => {
     // First, create some pending migrations by running generate multiple times
-    await mkdir("migrations", { recursive: true });
+    await fs.mkdir("migrations", { recursive: true }, () => void 0);
 
     // Generate first migration - users table with just id
     const configStep1 = defineConfigForTest({
@@ -45,7 +46,10 @@ describe("generate --squash", () => {
     });
 
     await executeGenerate(
-      { client, logger: defaultConsolaLogger, config: configStep1 },
+      {
+        ...baseDeps,
+        config: configStep1,
+      },
       {
         ignorePending: false,
         dev: false,
@@ -65,7 +69,10 @@ describe("generate --squash", () => {
     });
 
     await executeGenerate(
-      { client, logger: defaultConsolaLogger, config: configStep2 },
+      {
+        ...baseDeps,
+        config: configStep2,
+      },
       {
         ignorePending: true,
         dev: false,
@@ -75,7 +82,10 @@ describe("generate --squash", () => {
 
     // Generate third migration - make email unique
     await executeGenerate(
-      { client, logger: defaultConsolaLogger, config },
+      {
+        ...baseDeps,
+        config,
+      },
       {
         ignorePending: true,
         dev: false,
@@ -84,12 +94,12 @@ describe("generate --squash", () => {
     );
 
     // At this point we should have 3 pending migrations
-    const migrationsBeforeSquash = await getAllMigrations();
+    const migrationsBeforeSquash = await getAllMigrations(baseDeps);
     expect(migrationsBeforeSquash.length).toBe(3);
 
     // Now squash them
     await executeGenerate(
-      { client, logger: defaultConsolaLogger, config },
+      { ...baseDeps, config },
       {
         ignorePending: false,
         dev: false,
@@ -98,7 +108,7 @@ describe("generate --squash", () => {
     );
 
     // After squash, we should have 1 migration
-    const migrationsAfterSquash = await getAllMigrations();
+    const migrationsAfterSquash = await getAllMigrations(baseDeps);
     expect(migrationsAfterSquash.length).toBe(1);
 
     // The squashed migration should contain the final state
@@ -123,13 +133,13 @@ describe("generate --squash", () => {
   });
 
   it("should handle no pending migrations gracefully", async () => {
-    await mkdir("migrations", { recursive: true });
+    await fs.mkdir("migrations", { recursive: true }, () => void 0);
 
     // Try to squash when there are no migrations
     const consoleSpy = vi.spyOn(defaultConsolaLogger.reporter, "info");
 
     await executeGenerate(
-      { client, logger: defaultConsolaLogger, config },
+      { ...baseDeps, config },
       {
         ignorePending: false,
         dev: false,

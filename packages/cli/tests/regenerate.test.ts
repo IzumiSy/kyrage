@@ -1,15 +1,11 @@
-import { describe, beforeAll, expect, it, vi } from "vitest";
+import { describe, beforeAll, expect, it } from "vitest";
 import { defineTable, column } from "../src/config/builder";
 import { defineConfigForTest, setupTestDB } from "./helper";
 import { sql } from "kysely";
 import { executeGenerate } from "../src/commands/generate";
-import { vol } from "memfs";
+import { vol, fs } from "memfs";
 import { defaultConsolaLogger } from "../src/logger";
-
-vi.mock("fs/promises", async () => {
-  const memfs = await import("memfs");
-  return memfs.fs.promises;
-});
+import { FSPromiseAPIs } from "../src/commands/common";
 
 const { database, client } = await setupTestDB();
 
@@ -50,6 +46,7 @@ describe("generate", () => {
     );
     const deps = {
       client,
+      fs: fs.promises as unknown as FSPromiseAPIs,
       logger: defaultConsolaLogger,
       config: defineConfigForTest({
         database,

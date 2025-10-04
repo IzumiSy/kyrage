@@ -4,13 +4,11 @@ import { setupTestDB, defineConfigForTest, applyTable } from "./helper";
 import { executeGenerate } from "../src/commands/generate";
 import { defaultConsolaLogger } from "../src/logger";
 import { executeApply } from "../src/commands/apply";
-
-vi.mock("fs/promises", async () => {
-  const memfs = await import("memfs");
-  return memfs.fs.promises;
-});
+import { fs } from "memfs";
+import { FSPromiseAPIs } from "../src/commands/common";
 
 const { database, client } = await setupTestDB();
+const mockedFS = fs.promises as unknown as FSPromiseAPIs;
 
 it("generate with planned apply", async () => {
   const loggerStdout = vi
@@ -29,25 +27,28 @@ it("generate with planned apply", async () => {
       (t) => [t.index(["name", "email"]), t.unique(["name", "email"])]
     );
     await applyTable(
-      { client, database },
-      [
-        membersTable,
-        defineTable(
-          "category",
-          {
-            id: column("uuid"),
-            member_id: column("uuid"),
-            name: column("text", { unique: true }),
-          },
-          (t) => [
-            t.primaryKey(["id", "member_id"]),
-            t.reference("member_id", membersTable, "id", {
-              onDelete: "cascade",
-              name: "category_member_fk",
-            }),
-          ]
-        ),
-      ],
+      { client, fs: mockedFS },
+      {
+        database,
+        tables: [
+          membersTable,
+          defineTable(
+            "category",
+            {
+              id: column("uuid"),
+              member_id: column("uuid"),
+              name: column("text", { unique: true }),
+            },
+            (t) => [
+              t.primaryKey(["id", "member_id"]),
+              t.reference("member_id", membersTable, "id", {
+                onDelete: "cascade",
+                name: "category_member_fk",
+              }),
+            ]
+          ),
+        ],
+      },
       {
         beforeApply: async (deps_) => {
           // Plan changes
@@ -73,6 +74,7 @@ it("generate with planned apply", async () => {
     );
     const deps = {
       client,
+      fs: mockedFS,
       logger: defaultConsolaLogger,
       config: defineConfigForTest({
         database,
