@@ -13,11 +13,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
         with:
-          ref: ${{ github.head_ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          run_install: false
       - uses: actions/setup-node@v4
         with:
           cache: pnpm
