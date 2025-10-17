@@ -1,5 +1,19 @@
 # @izumisy/kyrage
 
+## 1.5.2
+
+### Patch Changes
+
+- [#147](https://github.com/IzumiSy/kyrage/pull/147) [`1d8161f`](https://github.com/IzumiSy/kyrage/commit/1d8161f2d24d84f939ec77183953f6727811eedb) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump zod from 4.1.11 to 4.1.12
+
+- [#150](https://github.com/IzumiSy/kyrage/pull/150) [`e8b416f`](https://github.com/IzumiSy/kyrage/commit/e8b416f9b462fa51cda523ef408e64cf99346fa2) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump memfs from 4.48.1 to 4.49.0
+
+- [#151](https://github.com/IzumiSy/kyrage/pull/151) [`d995dc0`](https://github.com/IzumiSy/kyrage/commit/d995dc0575a8ba13819de8b96c074bc7cf805eb6) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump mysql2 from 3.15.1 to 3.15.2
+
+- [#148](https://github.com/IzumiSy/kyrage/pull/148) [`233c6e7`](https://github.com/IzumiSy/kyrage/commit/233c6e7151410b42f38e468d090295b2c4223d8b) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump kysely from 0.28.7 to 0.28.8
+
+- [#149](https://github.com/IzumiSy/kyrage/pull/149) [`e9b5a3e`](https://github.com/IzumiSy/kyrage/commit/e9b5a3ee1feac8ce58aa6e9acb55836473e2af47) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump @types/node from 24.6.2 to 24.7.2
+
 ## 1.5.1
 
 ### Patch Changes
