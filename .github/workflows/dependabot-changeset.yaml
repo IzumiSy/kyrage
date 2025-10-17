@@ -48,7 +48,7 @@ jobs:
 
             const id = await writeChangeset(
               {
-                summary: `[add changeset] ${commitMessage}`,
+                summary: commitMessage,
                 releases: [
                   { name: "@izumisy/kyrage", type: "patch" }
                 ]
@@ -60,5 +60,5 @@ jobs:
       - name: Commit changeset
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: 'chore: add changeset for dependabot update'
+          commit_message: '[add changeset] dependabot update'
           file_pattern: '.changeset/*.md'
