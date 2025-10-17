@@ -2,7 +2,7 @@ name: Add Changeset to Dependabot PRs
 
 on:
   pull_request:
-    types: [opened]
+    types: [opened, synchronize]
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -34,6 +34,13 @@ jobs:
               pull_number: context.payload.pull_request.number,
             });
 
+            // Check if any commit message starts with '[add changeset]'
+            const hasChangesetCommit = commits.some(c => c.commit.message.startsWith('[add changeset]'));
+            if (hasChangesetCommit) {
+              console.log('PR already contains a changeset commit. Skipping changeset creation.');
+              return;
+            }
+
             // Get a commit message from the first line of the commit in the PR that dependabot created
             const firstCommit = commits[0];
             const commitMessage = firstCommit.commit.message.split('\n')[0];
@@ -41,7 +48,7 @@ jobs:
 
             const id = await writeChangeset(
               {
-                summary: commitMessage,
+                summary: `[add changeset] ${commitMessage}`,
                 releases: [
                   { name: "@izumisy/kyrage", type: "patch" }
                 ]
