@@ -2,7 +2,7 @@ name: Add Changeset to Dependabot PRs
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened]
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -27,20 +27,19 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const changesetWrite = require('@changesets/write');
+            const { default: writeChangeset }= require('@changesets/write');
             const { data: commits } = await github.rest.pulls.listCommits({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.payload.pull_request.number,
             });
 
-            // Get a commit message from the first commit in the PR that dependabot created
+            // Get a commit message from the first line of the commit in the PR that dependabot created
             const firstCommit = commits[0];
-            const commitMessage = firstCommit.commit.message;
-
+            const commitMessage = firstCommit.commit.message.split('\n')[0];
             console.log('Commit message:', commitMessage);
 
-            const id = await changesetWrite(
+            const id = await writeChangeset(
               {
                 summary: commitMessage,
                 releases: [
