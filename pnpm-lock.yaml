@@ -66,8 +66,8 @@ importers:
         specifier: ^8.16.3
         version: 8.16.3
       ramda:
-        specifier: ^0.31.3
-        version: 0.31.3
+        specifier: ^0.32.0
+        version: 0.32.0
       sql-formatter:
         specifier: ^15.6.10
         version: 15.6.10
@@ -1653,8 +1653,8 @@ packages:
   railroad-diagrams@1.0.0:
     resolution: {integrity: sha512-cz93DjNeLY0idrCNOH6PviZGRN9GJhsdm9hpn1YCS879fj4W+x5IFJhhkRZcwVgMmFF7R82UA/7Oh+R8lLZg6A==}
 
-  ramda@0.31.3:
-    resolution: {integrity: sha512-xKADKRNnqmDdX59PPKLm3gGmk1ZgNnj3k7DryqWwkamp4TJ6B36DdpyKEQ0EoEYmH2R62bV4Q+S0ym2z8N2f3Q==}
+  ramda@0.32.0:
+    resolution: {integrity: sha512-GQWAHhxhxWBWA8oIBr1XahFVjQ9Fic6MK9ikijfd4TZHfE2+urfk+irVlR5VOn48uwMgM+loRRBJd6Yjsbc0zQ==}
 
   randexp@0.4.6:
     resolution: {integrity: sha512-80WNmd9DA0tmZrw9qQa62GPPWfuXJknrmVmLcxvq4uZBdYqb1wYoKTmnlGUchvVWe0XiLupYkBoXVOxz3C8DYQ==}
@@ -3655,7 +3655,7 @@ snapshots:
 
   railroad-diagrams@1.0.0: {}
 
-  ramda@0.31.3: {}
+  ramda@0.32.0: {}
 
   randexp@0.4.6:
     dependencies:
