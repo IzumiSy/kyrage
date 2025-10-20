@@ -1,5 +1,13 @@
 # @izumisy/kyrage
 
+## 1.5.3
+
+### Patch Changes
+
+- [#159](https://github.com/IzumiSy/kyrage/pull/159) [`7026f08`](https://github.com/IzumiSy/kyrage/commit/7026f08976801f90263febd28e61b4134b19c49a) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump c12 from 3.3.0 to 3.3.1
+
+- [#160](https://github.com/IzumiSy/kyrage/pull/160) [`5779a2d`](https://github.com/IzumiSy/kyrage/commit/5779a2d4aef619ef18b9d96b230ec32ce3c59800) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump ramda from 0.31.3 to 0.32.0
+
 ## 1.5.2
 
 ### Patch Changes
