@@ -7,7 +7,7 @@
   },
   "devDependencies": {
     "@izumisy/kyrage": "workspace:^",
-    "@types/node": "^24.8.1",
+    "@types/node": "^24.9.2",
     "kysely": "^0.28.8",
     "typescript": "^5.9.3"
   }
