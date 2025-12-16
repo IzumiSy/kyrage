@@ -1,5 +1,21 @@
 # @izumisy/kyrage
 
+## 1.5.4
+
+### Patch Changes
+
+- [#171](https://github.com/IzumiSy/kyrage/pull/171) [`92c3871`](https://github.com/IzumiSy/kyrage/commit/92c38712792ab0faccacfde004586bc29398190b) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump turbo from 2.6.0 to 2.6.1
+
+- [#162](https://github.com/IzumiSy/kyrage/pull/162) [`970b5c3`](https://github.com/IzumiSy/kyrage/commit/970b5c3d0e040967d8cbc1d4ac22168714c09691) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump mysql2 from 3.15.2 to 3.15.3
+
+- [#163](https://github.com/IzumiSy/kyrage/pull/163) [`4331715`](https://github.com/IzumiSy/kyrage/commit/4331715e3c00f8090a29cacc879a4040f5f38a10) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump @types/node from 24.8.1 to 24.9.1
+
+- [#172](https://github.com/IzumiSy/kyrage/pull/172) [`7dea0a0`](https://github.com/IzumiSy/kyrage/commit/7dea0a001d5f41fd99ee5773800493c83fad6d4f) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump @types/node from 24.9.1 to 24.10.1
+
+- [#169](https://github.com/IzumiSy/kyrage/pull/169) [`52f0bda`](https://github.com/IzumiSy/kyrage/commit/52f0bdadc09a8f4e446ecba766f80e5a68a6ec0b) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump tsup from 8.5.0 to 8.5.1
+
+- [#165](https://github.com/IzumiSy/kyrage/pull/165) [`89cedce`](https://github.com/IzumiSy/kyrage/commit/89cedce0a318fb68066a37ab983ebc100fb44b9d) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump turbo from 2.5.8 to 2.6.0
+
 ## 1.5.3
 
 ### Patch Changes
