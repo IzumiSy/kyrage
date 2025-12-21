@@ -54,7 +54,7 @@
   "devDependencies": {
     "@swc/core": "^1.13.5",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^24",
+    "@types/node": "^25",
     "@types/pg": "^8.15.5",
     "@types/ramda": "^0.31.1",
     "memfs": "^4.49.0",
