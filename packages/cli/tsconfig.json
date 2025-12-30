@@ -4,12 +4,12 @@
     "module": "preserve",
     "moduleResolution": "bundler",
     "noEmit": true,
-    "incremental": true,
     "strict": true,
     "resolveJsonModule": true,
     "noImplicitAny": true,
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true
-  }
+  },
+  "include": ["src", "tests"],
 }
