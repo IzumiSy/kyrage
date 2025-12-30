@@ -30,8 +30,8 @@
     "kyrage": "./dist/main.js"
   },
   "scripts": {
-    "dev": "NODE_ENV=development tsup --watch",
-    "build": "tsup",
+    "dev": "NODE_ENV=development tsdown --watch",
+    "build": "tsdown",
     "type-check": "tsc --noEmit --incremental --pretty",
     "test": "vitest run"
   },
@@ -59,7 +59,7 @@
     "@types/ramda": "^0.31.1",
     "memfs": "^4.49.0",
     "prettier": "^3",
-    "tsup": "^8.5.1",
+    "tsdown": "^0.18.4",
     "typescript": "^5",
     "vitest": "^3.2.4"
   }

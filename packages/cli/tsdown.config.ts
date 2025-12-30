@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { defineConfig } from "tsup";
+import { defineConfig } from "tsdown";
 
 const devOpts =
   process.env.NODE_ENV === "development"
