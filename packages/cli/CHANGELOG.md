@@ -1,5 +1,25 @@
 # @izumisy/kyrage
 
+## 1.5.4
+
+### Patch Changes
+
+- [#178](https://github.com/IzumiSy/kyrage/pull/178) [`55438af`](https://github.com/IzumiSy/kyrage/commit/55438affe3950b20bbe76dac68b45e16e51e3ae9) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Use tsdown
+
+- [#171](https://github.com/IzumiSy/kyrage/pull/171) [`92c3871`](https://github.com/IzumiSy/kyrage/commit/92c38712792ab0faccacfde004586bc29398190b) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump turbo from 2.6.0 to 2.6.1
+
+- [#162](https://github.com/IzumiSy/kyrage/pull/162) [`970b5c3`](https://github.com/IzumiSy/kyrage/commit/970b5c3d0e040967d8cbc1d4ac22168714c09691) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump mysql2 from 3.15.2 to 3.15.3
+
+- [#161](https://github.com/IzumiSy/kyrage/pull/161) [`1a53c06`](https://github.com/IzumiSy/kyrage/commit/1a53c065fde7fbcfae8297252720a2a04a69aef1) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump the testcontainers group with 3 updates
+
+- [#176](https://github.com/IzumiSy/kyrage/pull/176) [`fd92f23`](https://github.com/IzumiSy/kyrage/commit/fd92f239dfe4f210e9bc55bee6168c948fe5ca38) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump @types/node from 24.10.1 to 25.0.3
+
+- [#174](https://github.com/IzumiSy/kyrage/pull/174) [`8afd921`](https://github.com/IzumiSy/kyrage/commit/8afd921763e164cc84d6d500a5d22d699892bd35) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump c12 from 3.3.1 to 3.3.3
+
+- [#165](https://github.com/IzumiSy/kyrage/pull/165) [`89cedce`](https://github.com/IzumiSy/kyrage/commit/89cedce0a318fb68066a37ab983ebc100fb44b9d) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump turbo from 2.5.8 to 2.6.0
+
+- [#173](https://github.com/IzumiSy/kyrage/pull/173) [`42feb7f`](https://github.com/IzumiSy/kyrage/commit/42feb7f3368e3c177b835f2b9c6b877e362c0c26) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump mysql2 from 3.15.3 to 3.16.0
+
 ## 1.5.3
 
 ### Patch Changes
