@@ -1,5 +1,11 @@
 # @izumisy/kyrage
 
+## 1.5.5
+
+### Patch Changes
+
+- [#179](https://github.com/IzumiSy/kyrage/pull/179) [`4ea9edf`](https://github.com/IzumiSy/kyrage/commit/4ea9edf2ae86b8cb3ac4188ad8358e2d1e975d9e) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Use Node.js v24
+
 ## 1.5.4
 
 ### Patch Changes
