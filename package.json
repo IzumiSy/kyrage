@@ -2,7 +2,7 @@
   "name": "kyrage",
   "private": true,
   "engines": {
-    "node": "22.x"
+    "node": "24.x"
   },
   "scripts": {
     "build": "turbo build",
