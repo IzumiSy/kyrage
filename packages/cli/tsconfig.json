@@ -3,6 +3,8 @@
     "target": "ES2020",
     "module": "preserve",
     "moduleResolution": "bundler",
+    "noEmit": true,
+    "incremental": true,
     "strict": true,
     "resolveJsonModule": true,
     "noImplicitAny": true,

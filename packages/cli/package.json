@@ -32,7 +32,7 @@
   "scripts": {
     "dev": "NODE_ENV=development tsdown --watch",
     "build": "tsdown",
-    "type-check": "tsc --noEmit --incremental --pretty",
+    "type-check": "tsc",
     "test": "vitest run"
   },
   "dependencies": {
