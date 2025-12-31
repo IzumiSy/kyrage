@@ -2,7 +2,7 @@
   "name": "@izumisy/kyrage",
   "private": false,
   "type": "module",
-  "version": "1.5.5",
+  "version": "1.5.6",
   "description": "A minimal, schema-based declarative migration tool for Node.js ecosystem",
   "author": "Seiya Izumi (https://github.com/IzumiSy)",
   "license": "MIT",
