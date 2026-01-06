@@ -1,5 +1,13 @@
 # @izumisy/kyrage
 
+## 1.5.6
+
+### Patch Changes
+
+- [#183](https://github.com/IzumiSy/kyrage/pull/183) [`752db7c`](https://github.com/IzumiSy/kyrage/commit/752db7c32b283c7ac1645b780da3eb4aa24bae24) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [zod](https://www.npmjs.com/package/zod) (^4.1.12 -> ^4.3.5)
+
+- [#175](https://github.com/IzumiSy/kyrage/pull/175) [`2a3a379`](https://github.com/IzumiSy/kyrage/commit/2a3a3795f937e73c9877c800708d8b2075595aa1) Thanks [@dependabot](https://github.com/apps/dependabot)! - Bump vitest from 3.2.4 to 4.0.16
+
 ## 1.5.5
 
 ### Patch Changes
