@@ -1,0 +1,19 @@
+name: Add Changeset to Dependabot PRs
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  add-changeset:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: IzumiSy/deps2changesets@main

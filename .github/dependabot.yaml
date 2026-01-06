@@ -5,6 +5,7 @@ updates:
     schedule:
       interval: weekly
       timezone: Asia/Tokyo
+    versioning-strategy: increase
     groups:
       testcontainers:
         applies-to: version-updates
