@@ -16,10 +16,14 @@ export const buildContainerDevDatabaseConfigSchema = (options: {
   defaultImage: string;
 }) =>
   z.object({
-    container: z.object({
-      image: z.string().default(options.defaultImage),
-      name: z.string().optional(),
-    }),
+    container: z
+      .object({
+        image: z.string().default(options.defaultImage),
+        name: z.string().optional(),
+      })
+      .default({
+        image: options.defaultImage,
+      }),
   });
 export type ContainerDevDatabaseConfig = z.infer<
   ReturnType<typeof buildContainerDevDatabaseConfigSchema>
@@ -150,13 +154,13 @@ class ContainerDevDatabaseInstance implements DevDatabaseInstance {
     if (runningContainer) {
       const r = await runningContainer.inspect();
       return {
-        type: "container",
+        type: "container" as const,
         imageName: r.Config.Image,
         containerID: r.Id,
       };
     }
 
-    return { type: "unavailable" };
+    return { type: "unavailable" as const };
   }
 
   async isAvailable(): Promise<boolean> {
