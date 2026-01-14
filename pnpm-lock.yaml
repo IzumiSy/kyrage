@@ -27,8 +27,8 @@ importers:
         specifier: ^25.0.3
         version: 25.0.3
       kysely:
-        specifier: ^0.28.8
-        version: 0.28.8
+        specifier: ^0.28.9
+        version: 0.28.9
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -57,8 +57,8 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       kysely:
-        specifier: ^0.28.8
-        version: 0.28.8
+        specifier: ^0.28.9
+        version: 0.28.9
       mysql2:
         specifier: ^3.16.0
         version: 3.16.0
@@ -1421,8 +1421,8 @@ packages:
   jsonfile@4.0.0:
     resolution: {integrity: sha512-m6F1R3z8jjlf2imQHS2Qez5sjKWQzbuuhuJ/FKYFRZvPE3PuHcSMVZzfsLhGVOkfd20obL5SWEBew5ShlquNxg==}
 
-  kysely@0.28.8:
-    resolution: {integrity: sha512-QUOgl5ZrS9IRuhq5FvOKFSsD/3+IA6MLE81/bOOTRA/YQpKDza2sFdN5g6JCB9BOpqMJDGefLCQ9F12hRS13TA==}
+  kysely@0.28.9:
+    resolution: {integrity: sha512-3BeXMoiOhpOwu62CiVpO6lxfq4eS6KMYfQdMsN/2kUCRNuF2YiEr7u0HLHaQU+O4Xu8YXE3bHVkwaQ85i72EuA==}
     engines: {node: '>=20.0.0'}
 
   lazystream@1.0.1:
@@ -3504,7 +3504,7 @@ snapshots:
     optionalDependencies:
       graceful-fs: 4.2.11
 
-  kysely@0.28.8: {}
+  kysely@0.28.9: {}
 
   lazystream@1.0.1:
     dependencies:

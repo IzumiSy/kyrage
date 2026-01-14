@@ -43,7 +43,7 @@
     "citty": "^0.1.6",
     "consola": "^3.4.2",
     "graph-data-structure": "^4.5.0",
-    "kysely": "^0.28.8",
+    "kysely": "^0.28.9",
     "mysql2": "^3.16.0",
     "pg": "^8.16.3",
     "ramda": "^0.32.0",
