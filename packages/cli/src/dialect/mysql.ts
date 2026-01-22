@@ -159,7 +159,8 @@ export const introspectMysqlConstraints = async (db: PlannableKysely) => {
       -- Foreign Key specific information
       kcu.REFERENCED_TABLE_NAME as referenced_table,
       rc.UPDATE_RULE as on_update,
-      rc.DELETE_RULE as on_delete
+      rc.DELETE_RULE as on_delete,
+      GROUP_CONCAT(kcu.REFERENCED_COLUMN_NAME ORDER BY kcu.ORDINAL_POSITION) as referenced_columns
     FROM information_schema.TABLE_CONSTRAINTS tc
     JOIN information_schema.KEY_COLUMN_USAGE kcu
       ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
@@ -174,34 +175,8 @@ export const introspectMysqlConstraints = async (db: PlannableKysely) => {
              kcu.REFERENCED_TABLE_NAME, rc.UPDATE_RULE, rc.DELETE_RULE
     ORDER BY tc.TABLE_NAME, tc.CONSTRAINT_NAME;
   `
-    .$castTo<MysqlConstraint>()
+    .$castTo<MysqlConstraint & { referenced_columns: string | null }>()
     .execute(db);
-
-  // Need to fetch referenced columns separately for foreign keys
-  const foreignKeyRows = rows.filter((row) => row.constraint_type === "FOREIGN KEY");
-  
-  const foreignKeysWithReferencedColumns = await Promise.all(
-    foreignKeyRows.map(async (fkRow) => {
-      const { rows: refColRows } = await sql`
-        SELECT
-          GROUP_CONCAT(kcu.REFERENCED_COLUMN_NAME ORDER BY kcu.ORDINAL_POSITION) as referenced_columns
-        FROM information_schema.KEY_COLUMN_USAGE kcu
-        WHERE kcu.TABLE_SCHEMA = DATABASE()
-          AND kcu.CONSTRAINT_NAME = ${fkRow.constraint_name}
-          AND kcu.TABLE_NAME = ${fkRow.table_name}
-          AND kcu.REFERENCED_COLUMN_NAME IS NOT NULL
-      `
-        .$castTo<{ referenced_columns: string }>()
-        .execute(db);
-      
-      return {
-        ...fkRow,
-        referenced_columns: refColRows[0] 
-          ? refColRows[0].referenced_columns.split(',')
-          : [],
-      };
-    })
-  );
 
   return {
     primaryKey: rows
@@ -222,17 +197,21 @@ export const introspectMysqlConstraints = async (db: PlannableKysely) => {
         type: "UNIQUE" as const,
         columns: (row.columns as unknown as string).split(','),
       })),
-    foreignKey: foreignKeysWithReferencedColumns.map((row) => ({
-      schema: row.schema_name,
-      table: row.table_name,
-      name: row.constraint_name,
-      type: "FOREIGN KEY" as const,
-      columns: (row.columns as unknown as string).split(','),
-      referencedTable: row.referenced_table!,
-      referencedColumns: row.referenced_columns,
-      onDelete: convertMysqlReferentialAction(row.on_delete),
-      onUpdate: convertMysqlReferentialAction(row.on_update),
-    })),
+    foreignKey: rows
+      .filter((row) => row.constraint_type === "FOREIGN KEY")
+      .map((row) => ({
+        schema: row.schema_name,
+        table: row.table_name,
+        name: row.constraint_name,
+        type: "FOREIGN KEY" as const,
+        columns: (row.columns as unknown as string).split(','),
+        referencedTable: row.referenced_table!,
+        referencedColumns: row.referenced_columns 
+          ? row.referenced_columns.split(',')
+          : [],
+        onDelete: convertMysqlReferentialAction(row.on_delete),
+        onUpdate: convertMysqlReferentialAction(row.on_update),
+      })),
   };
 };
 
@@ -247,7 +226,7 @@ type MysqlConstraint = {
   on_update: string | null;
 };
 
-const convertMysqlReferentialAction = (
+export const convertMysqlReferentialAction = (
   action: string | null
 ): ReferentialActions | undefined => {
   if (!action) return undefined;
