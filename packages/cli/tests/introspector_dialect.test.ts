@@ -32,13 +32,13 @@ describe(`${dialectName} introspector driver`, async () => {
         schema: "public",
         columns: {
           id: expect.objectContaining({
-            dataType: "char",
+            dataType: "char(36)",
             notNull: true,
             default: null,
             characterMaximumLength: 36,
           }),
           name: expect.objectContaining({
-            dataType: "varchar",
+            dataType: "varchar(255)",
             notNull: true,
             default: null,
             characterMaximumLength: 255,

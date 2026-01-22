@@ -119,7 +119,7 @@ describe("generate --squash", () => {
           type: "create_table",
           table: "users",
           columns: expect.objectContaining({
-            id: expect.objectContaining({ type: "char", primaryKey: true }),
+            id: expect.objectContaining({ type: "char(36)", primaryKey: true }),
             email: expect.objectContaining({
               type: "text",
               notNull: true,
