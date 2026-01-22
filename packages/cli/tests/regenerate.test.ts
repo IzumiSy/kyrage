@@ -18,8 +18,11 @@ beforeAll(async () => {
       name TEXT NOT NULL,
       email TEXT NOT NULL CONSTRAINT members_email_unique UNIQUE
     );
+  `.execute(db);
+  await sql`
     CREATE UNIQUE INDEX "idx_members_name_email" ON "members" ("name", "email");
-
+  `.execute(db);
+  await sql`
     CREATE TABLE orders (
       customer_id UUID NOT NULL,
       product_id UUID NOT NULL,
