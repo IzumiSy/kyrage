@@ -1,5 +1,13 @@
 # @izumisy/kyrage
 
+## 1.5.7
+
+### Patch Changes
+
+- [#190](https://github.com/IzumiSy/kyrage/pull/190) [`af17197`](https://github.com/IzumiSy/kyrage/commit/af171976b0ccfd9c2ff1d0e7243156bb336fe97c) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [kysely](https://www.npmjs.com/package/kysely) (^0.28.8 -> ^0.28.9)
+
+- [#193](https://github.com/IzumiSy/kyrage/pull/193) [`d5dfe5e`](https://github.com/IzumiSy/kyrage/commit/d5dfe5e0777d88a087705d1423a4237d9c0d1f2f) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [sql-formatter](https://www.npmjs.com/package/sql-formatter) (^15.6.10 -> ^15.6.12)
+
 ## 1.5.6
 
 ### Patch Changes
