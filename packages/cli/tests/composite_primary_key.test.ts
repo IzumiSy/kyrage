@@ -17,8 +17,8 @@ describe("Composite Primary Key", () => {
           defineTable(
             "posts",
             {
-              id: column("uuid"), // nullable in schema definition
-              author_id: column("uuid"), // nullable in schema definition
+              id: column("char(36)"), // nullable in schema definition
+              author_id: column("char(36)"), // nullable in schema definition
               slug: column("text", { notNull: true }),
               title: column("text"),
               content: column("text", { notNull: true }),

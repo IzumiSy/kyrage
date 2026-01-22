@@ -17,9 +17,9 @@ describe(`${dialectName} introspector driver`, async () => {
       database,
       tables: [
         defineTable("test_table", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
           name: column("varchar(255)", { notNull: true }),
-          age: column("int8", { defaultSql: "0" }),
+          age: column("bigint", { defaultSql: "0" }),
           is_active: column("boolean", { defaultSql: "true" }),
         }),
       ],
@@ -32,10 +32,10 @@ describe(`${dialectName} introspector driver`, async () => {
         schema: "public",
         columns: {
           id: expect.objectContaining({
-            dataType: "uuid",
+            dataType: "char",
             notNull: true,
             default: null,
-            characterMaximumLength: null,
+            characterMaximumLength: 36,
           }),
           name: expect.objectContaining({
             dataType: "varchar",
@@ -70,7 +70,7 @@ describe(`${dialectName} introspector driver`, async () => {
         defineTable(
           "test_table_with_indexes",
           {
-            id: column("uuid", { primaryKey: true }),
+            id: column("char(36)", { primaryKey: true }),
             email: column("text"),
             alias: column("text", { unique: true }),
             name: column("text"),
@@ -106,7 +106,7 @@ describe(`${dialectName} introspector driver`, async () => {
 
   it("should introspect constraints correctly", async () => {
     const usersTable = defineTable("users", {
-      id: column("uuid", { primaryKey: true }),
+      id: column("char(36)", { primaryKey: true }),
       email: column("text", { unique: true }),
       username: column("text"),
     });
@@ -117,8 +117,8 @@ describe(`${dialectName} introspector driver`, async () => {
         defineTable(
           "posts",
           {
-            id: column("uuid", { primaryKey: true }),
-            user_id: column("uuid"),
+            id: column("char(36)", { primaryKey: true }),
+            user_id: column("char(36)"),
             title: column("text"),
           },
           (t) => [

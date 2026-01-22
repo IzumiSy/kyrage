@@ -13,7 +13,7 @@ describe("apply migrations in multiple times", () => {
       database,
       tables: [
         defineTable("members", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
           name: column("text"),
         }),
       ],
@@ -24,7 +24,7 @@ describe("apply migrations in multiple times", () => {
       expect.objectContaining({
         name: "members",
         columns: expect.arrayContaining([
-          expect.objectContaining({ name: "id", dataType: "uuid" }),
+          expect.objectContaining({ name: "id", dataType: "char" }),
           expect.objectContaining({ name: "name", dataType: "text" }),
         ]),
       }),
@@ -34,11 +34,11 @@ describe("apply migrations in multiple times", () => {
       database,
       tables: [
         defineTable("members", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
           email: column("text"),
         }),
         defineTable("posts", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
           title: column("text"),
         }),
       ],
@@ -48,14 +48,14 @@ describe("apply migrations in multiple times", () => {
       expect.objectContaining({
         name: "members",
         columns: expect.arrayContaining([
-          expect.objectContaining({ name: "id", dataType: "uuid" }),
+          expect.objectContaining({ name: "id", dataType: "char" }),
           expect.objectContaining({ name: "email", dataType: "text" }),
         ]),
       }),
       expect.objectContaining({
         name: "posts",
         columns: expect.arrayContaining([
-          expect.objectContaining({ name: "id", dataType: "uuid" }),
+          expect.objectContaining({ name: "id", dataType: "char" }),
           expect.objectContaining({ name: "title", dataType: "text" }),
         ]),
       }),
