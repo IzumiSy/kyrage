@@ -8,7 +8,6 @@ import { fs, vol } from "memfs";
 import { FSPromiseAPIs } from "../src/commands/common";
 
 const { database, client } = await setupTestDB();
-
 const config = defineConfigForTest({
   database,
   tables: [
@@ -64,90 +63,6 @@ describe("generate --squash", () => {
       tables: [
         defineTable("users", {
           id: column("char(36)", { primaryKey: true }),
-          email: column("text", { notNull: true, unique: true }),
-        }),
-      ],
-    });
-
-    await executeGenerate(
-      {
-        ...baseDeps,
-        config: configStep2,
-      },
-      {
-        ignorePending: false,
-        dev: false,
-        squash: false,
-      }
-    );
-
-    // Generate third migration - add name
-    await executeGenerate(
-      {
-        ...baseDeps,
-        config,
-      },
-      {
-        ignorePending: false,
-        dev: false,
-        squash: false,
-      }
-    );
-
-    // Now we should have 3 pending migrations
-    const migrationsBeforeSquash = await getAllMigrations(baseDeps);
-    expect(migrationsBeforeSquash.pending).toHaveLength(3);
-
-    // Now squash them
-    await executeGenerate(
-      {
-        ...baseDeps,
-        config,
-      },
-      {
-        ignorePending: false,
-        dev: false,
-        squash: true,
-      }
-    );
-
-    // After squashing, we should have only 1 pending migration
-    const migrationsAfterSquash = await getAllMigrations(baseDeps);
-    expect(migrationsAfterSquash.pending).toHaveLength(1);
-  });
-
-  it("should handle no pending migrations gracefully", async () => {
-    // Create migrations directory
-    await baseDeps.fs.mkdir("migrations", { recursive: true });
-
-    // Try to squash when there are no migrations
-    const loggerInfo = vi.spyOn(defaultConsolaLogger, "info");
-
-    await executeGenerate(
-      {
-        ...baseDeps,
-        config,
-      },
-      {
-        ignorePending: false,
-        dev: false,
-        squash: true,
-      }
-    );
-
-    expect(loggerInfo).toHaveBeenCalledWith(
-      expect.stringContaining("No pending migrations to squash")
-    );
-
-    loggerInfo.mockRestore();
-  });
-});
-
-    const configStep2 = defineConfigForTest({
-      database,
-      tables: [
-        defineTable("users", {
-          id: column("uuid", { primaryKey: true }),
           email: column("text", { notNull: true }),
         }),
       ],
@@ -204,7 +119,7 @@ describe("generate --squash", () => {
           type: "create_table",
           table: "users",
           columns: expect.objectContaining({
-            id: expect.objectContaining({ type: "uuid", primaryKey: true }),
+            id: expect.objectContaining({ type: "char", primaryKey: true }),
             email: expect.objectContaining({
               type: "text",
               notNull: true,

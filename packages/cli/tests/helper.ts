@@ -35,6 +35,12 @@ const getConfigForTest = (kyrageDialect: KyrageDialect) => {
           image: "mysql:8",
         },
       };
+    case "mariadb":
+      return {
+        container: {
+          image: "mariadb:11",
+        },
+      };
     default:
       throw new Error("unsupported dialect specified");
   }
