@@ -14,7 +14,10 @@ const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
 const dialectName = dialect.getName();
 const quote = dialectName === "mysql" || dialectName === "mariadb" ? "`" : '"';
 const uuidSql = "char(36)";
-const textSql = "text";
+// MySQL/MariaDB require VARCHAR for UNIQUE/INDEX constraints, not TEXT
+const isMysqlLike = dialectName === "mysql" || dialectName === "mariadb";
+const textTypeUnique = isMysqlLike ? "varchar(255)" : "text";
+const textSql = isMysqlLike ? "varchar(255)" : "text";
 
 it("generate with planned apply", async () => {
   const loggerStdout = vi
@@ -27,8 +30,8 @@ it("generate with planned apply", async () => {
       "members",
       {
         id: column("char(36)", { primaryKey: true }),
-        name: column("text", { unique: true }),
-        email: column("text"),
+        name: column(textTypeUnique, { unique: true }),
+        email: column(textTypeUnique),
       },
       (t) => [t.index(["name", "email"]), t.unique(["name", "email"])]
     );
@@ -43,7 +46,7 @@ it("generate with planned apply", async () => {
             {
               id: column("char(36)"),
               member_id: column("char(36)"),
-              name: column("text", { unique: true }),
+              name: column(textTypeUnique, { unique: true }),
             },
             (t) => [
               t.primaryKey(["id", "member_id"]),
@@ -74,7 +77,7 @@ it("generate with planned apply", async () => {
       {
         id: column("char(36)", { primaryKey: true }),
         name: column("text"),
-        email: column("text", { unique: true }),
+        email: column(textTypeUnique, { unique: true }),
       },
       (t) => [t.index(["id", "email"], { unique: true })]
     );

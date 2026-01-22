@@ -100,10 +100,9 @@ describe.skipIf(dialectName === "postgres" || dialectName === "cockroachdb")(
 
       await sql`
         CREATE TABLE members (
-          id CHAR(36) NOT NULL,
+          id CHAR(36) NOT NULL PRIMARY KEY,
           name TEXT NOT NULL,
           email VARCHAR(255) NOT NULL,
-          CONSTRAINT members_id_primary_key PRIMARY KEY (id),
           CONSTRAINT members_email_unique UNIQUE (email)
         )
       `.execute(db);
@@ -113,7 +112,7 @@ describe.skipIf(dialectName === "postgres" || dialectName === "cockroachdb")(
           customer_id CHAR(36) NOT NULL,
           product_id CHAR(36) NOT NULL,
           order_date DATE NOT NULL,
-          CONSTRAINT pk_orders_customer_id_product_id_order_date PRIMARY KEY (customer_id, product_id, order_date),
+          PRIMARY KEY (customer_id, product_id, order_date),
           CONSTRAINT uq_customer_product UNIQUE (customer_id, product_id),
           CONSTRAINT fk_orders_customer_id FOREIGN KEY (customer_id) REFERENCES members (id) ON DELETE CASCADE ON UPDATE CASCADE
         )
@@ -148,9 +147,7 @@ describe.skipIf(dialectName === "postgres" || dialectName === "cockroachdb")(
                 order_date: column("date", { notNull: true }),
               },
               (t) => [
-                t.primaryKey(["customer_id", "product_id", "order_date"], {
-                  name: "pk_orders_customer_id_product_id_order_date",
-                }),
+                t.primaryKey(["customer_id", "product_id", "order_date"]),
                 t.unique(["customer_id", "product_id"], {
                   name: "uq_customer_product",
                 }),

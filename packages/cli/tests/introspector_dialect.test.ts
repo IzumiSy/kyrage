@@ -10,6 +10,11 @@ const { client, dialect, database } = await setupTestDB();
 const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
 const introspector = getIntrospector(client);
 const dialectName = dialect.getName();
+const isMysqlLike = dialectName === "mysql" || dialectName === "mariadb";
+// MySQL/MariaDB require VARCHAR for UNIQUE/INDEX constraints, not TEXT
+const textTypeUnique = isMysqlLike ? "varchar(255)" : "text";
+const schemaName = isMysqlLike ? "test" : "public";
+const booleanDefault = isMysqlLike ? "1" : "true";
 
 describe(`${dialectName} introspector driver`, async () => {
   it("should introspect table columns correctly", async () => {
@@ -29,7 +34,7 @@ describe(`${dialectName} introspector driver`, async () => {
     expect(tables).toEqual([
       {
         name: "test_table",
-        schema: "public",
+        schema: schemaName,
         columns: {
           id: expect.objectContaining({
             dataType: "char(36)",
@@ -52,7 +57,7 @@ describe(`${dialectName} introspector driver`, async () => {
           is_active: expect.objectContaining({
             dataType: "boolean",
             notNull: false,
-            default: "true",
+            default: booleanDefault,
             characterMaximumLength: null,
           }),
         },
@@ -60,7 +65,10 @@ describe(`${dialectName} introspector driver`, async () => {
     ]);
 
     await using db = client.getDB();
-    await sql`DROP TABLE public.test_table`.execute(db);
+    const dropSql = isMysqlLike
+      ? sql`DROP TABLE test_table`
+      : sql`DROP TABLE public.test_table`;
+    await dropSql.execute(db);
   });
 
   it("should introspect indexes correctly", async () => {
@@ -71,9 +79,9 @@ describe(`${dialectName} introspector driver`, async () => {
           "test_table_with_indexes",
           {
             id: column("char(36)", { primaryKey: true }),
-            email: column("text"),
-            alias: column("text", { unique: true }),
-            name: column("text"),
+            email: column(textTypeUnique),
+            alias: column(textTypeUnique, { unique: true }),
+            name: column(textTypeUnique),
             age: column("integer"),
           },
           (t) => [
@@ -101,13 +109,16 @@ describe(`${dialectName} introspector driver`, async () => {
     ]);
 
     await using db = client.getDB();
-    await sql`DROP TABLE public.test_table_with_indexes`.execute(db);
+    const dropSql = isMysqlLike
+      ? sql`DROP TABLE test_table_with_indexes`
+      : sql`DROP TABLE public.test_table_with_indexes`;
+    await dropSql.execute(db);
   });
 
   it("should introspect constraints correctly", async () => {
     const usersTable = defineTable("users", {
       id: column("char(36)", { primaryKey: true }),
-      email: column("text", { unique: true }),
+      email: column(textTypeUnique, { unique: true }),
       username: column("text"),
     });
     const deps = await applyTable(baseDeps, {
@@ -119,7 +130,7 @@ describe(`${dialectName} introspector driver`, async () => {
           {
             id: column("char(36)", { primaryKey: true }),
             user_id: column("char(36)"),
-            title: column("text"),
+            title: column(textTypeUnique),
           },
           (t) => [
             t.reference("user_id", usersTable, "id", {
@@ -134,26 +145,77 @@ describe(`${dialectName} introspector driver`, async () => {
     });
 
     const { constraints } = await introspector.introspect(deps.config);
-    expect(constraints).toEqual({
+    
+    // MySQL uses "PRIMARY" as the constraint name and omits null fields
+    const primaryKeyName = isMysqlLike ? "PRIMARY" : "posts_id_primary_key";
+    const usersKeyName = isMysqlLike ? "PRIMARY" : "users_id_primary_key";
+    
+    const expectedConstraints = isMysqlLike ? {
       primaryKey: [
         {
-          name: "posts_id_primary_key",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: "public",
+          name: primaryKeyName,
+          schema: schemaName,
           table: "posts",
           type: "PRIMARY KEY",
           columns: ["id"],
         },
         {
-          name: "users_id_primary_key",
+          name: usersKeyName,
+          schema: schemaName,
+          table: "users",
+          type: "PRIMARY KEY",
+          columns: ["id"],
+        },
+      ],
+      unique: [
+        {
+          name: "unique_title_per_user",
+          schema: schemaName,
+          table: "posts",
+          type: "UNIQUE",
+          columns: ["user_id", "title"],
+        },
+        {
+          name: "users_email_unique",
+          schema: schemaName,
+          table: "users",
+          type: "UNIQUE",
+          columns: ["email"],
+        },
+      ],
+      foreignKey: [
+        {
+          schema: schemaName,
+          table: "posts",
+          name: "fk_user",
+          type: "FOREIGN KEY",
+          columns: ["user_id"],
+          referencedTable: "users",
+          referencedColumns: ["id"],
+          onDelete: "cascade",
+          onUpdate: "cascade",
+        },
+      ],
+    } : {
+      primaryKey: [
+        {
+          name: primaryKeyName,
           on_delete: null,
           on_update: null,
           referenced_columns: null,
           referenced_table: null,
-          schema: "public",
+          schema: schemaName,
+          table: "posts",
+          type: "PRIMARY KEY",
+          columns: ["id"],
+        },
+        {
+          name: usersKeyName,
+          on_delete: null,
+          on_update: null,
+          referenced_columns: null,
+          referenced_table: null,
+          schema: schemaName,
           table: "users",
           type: "PRIMARY KEY",
           columns: ["id"],
@@ -166,7 +228,7 @@ describe(`${dialectName} introspector driver`, async () => {
           on_update: null,
           referenced_columns: null,
           referenced_table: null,
-          schema: "public",
+          schema: schemaName,
           table: "posts",
           type: "UNIQUE",
           columns: ["user_id", "title"],
@@ -177,7 +239,7 @@ describe(`${dialectName} introspector driver`, async () => {
           on_update: null,
           referenced_columns: null,
           referenced_table: null,
-          schema: "public",
+          schema: schemaName,
           table: "users",
           type: "UNIQUE",
           columns: ["email"],
@@ -185,7 +247,7 @@ describe(`${dialectName} introspector driver`, async () => {
       ],
       foreignKey: [
         {
-          schema: "public",
+          schema: schemaName,
           table: "posts",
           name: "fk_user",
           type: "FOREIGN KEY",
@@ -196,9 +258,14 @@ describe(`${dialectName} introspector driver`, async () => {
           onUpdate: "cascade",
         },
       ],
-    });
+    };
+    
+    expect(constraints).toEqual(expectedConstraints);
 
     await using db = client.getDB();
-    await sql`DROP TABLE public.posts, public.users`.execute(db);
+    const dropSql = isMysqlLike
+      ? sql`DROP TABLE posts, users`
+      : sql`DROP TABLE public.posts, public.users`;
+    await dropSql.execute(db);
   });
 });
