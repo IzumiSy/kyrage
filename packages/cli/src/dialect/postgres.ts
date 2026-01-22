@@ -82,6 +82,7 @@ export const convertPSQLTypeName = (typeName: string) => {
     int2: "smallint",
     int4: "integer",
     int8: "bigint",
+    bpchar: "char",
   };
 
   return nameDict[typeName as keyof typeof nameDict] ?? typeName;

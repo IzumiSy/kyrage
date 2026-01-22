@@ -16,7 +16,7 @@ beforeAll(async () => {
   await using db = client.getDB();
 
   // Use dialect-specific SQL
-  if (dialectName === "mysql") {
+  if (dialectName === "mysql" || dialectName === "mariadb") {
     await sql`
       CREATE TABLE members (
         id CHAR(36) NOT NULL,

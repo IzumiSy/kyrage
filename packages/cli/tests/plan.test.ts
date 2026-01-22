@@ -12,7 +12,7 @@ const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
 
 // Determine SQL syntax based on dialect
 const dialectName = dialect.getName();
-const quote = dialectName === "mysql" ? "`" : '"';
+const quote = dialectName === "mysql" || dialectName === "mariadb" ? "`" : '"';
 const uuidSql = "char(36)";
 const textSql = "text";
 
