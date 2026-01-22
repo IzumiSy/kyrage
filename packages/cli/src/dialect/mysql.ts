@@ -125,7 +125,7 @@ export const introspectMysqlIndexes = async (db: PlannableKysely) => {
       s.TABLE_NAME as table_name,
       s.INDEX_NAME as index_name,
       s.NON_UNIQUE = 0 as is_unique,
-      JSON_ARRAYAGG(s.COLUMN_NAME ORDER BY s.SEQ_IN_INDEX) as column_names
+      GROUP_CONCAT(s.COLUMN_NAME ORDER BY s.SEQ_IN_INDEX) as column_names
     FROM information_schema.STATISTICS s
     WHERE s.TABLE_SCHEMA = DATABASE()
       AND s.INDEX_NAME != 'PRIMARY'
@@ -136,7 +136,7 @@ export const introspectMysqlIndexes = async (db: PlannableKysely) => {
   return rows.map((r) => ({
     table: r.table_name,
     name: r.index_name,
-    columns: JSON.parse(r.column_names as unknown as string),
+    columns: (r.column_names as unknown as string).split(','),
     unique: Boolean(r.is_unique),
   }));
 };
@@ -155,7 +155,7 @@ export const introspectMysqlConstraints = async (db: PlannableKysely) => {
       tc.TABLE_NAME as table_name,
       tc.CONSTRAINT_NAME as constraint_name,
       tc.CONSTRAINT_TYPE as constraint_type,
-      JSON_ARRAYAGG(kcu.COLUMN_NAME ORDER BY kcu.ORDINAL_POSITION) as columns,
+      GROUP_CONCAT(kcu.COLUMN_NAME ORDER BY kcu.ORDINAL_POSITION) as columns,
       -- Foreign Key specific information
       kcu.REFERENCED_TABLE_NAME as referenced_table,
       rc.UPDATE_RULE as on_update,
@@ -184,7 +184,7 @@ export const introspectMysqlConstraints = async (db: PlannableKysely) => {
     foreignKeyRows.map(async (fkRow) => {
       const { rows: refColRows } = await sql`
         SELECT
-          JSON_ARRAYAGG(kcu.REFERENCED_COLUMN_NAME ORDER BY kcu.ORDINAL_POSITION) as referenced_columns
+          GROUP_CONCAT(kcu.REFERENCED_COLUMN_NAME ORDER BY kcu.ORDINAL_POSITION) as referenced_columns
         FROM information_schema.KEY_COLUMN_USAGE kcu
         WHERE kcu.TABLE_SCHEMA = DATABASE()
           AND kcu.CONSTRAINT_NAME = ${fkRow.constraint_name}
@@ -197,7 +197,7 @@ export const introspectMysqlConstraints = async (db: PlannableKysely) => {
       return {
         ...fkRow,
         referenced_columns: refColRows[0] 
-          ? JSON.parse(refColRows[0].referenced_columns)
+          ? refColRows[0].referenced_columns.split(',')
           : [],
       };
     })
@@ -211,7 +211,7 @@ export const introspectMysqlConstraints = async (db: PlannableKysely) => {
         table: row.table_name,
         name: row.constraint_name,
         type: "PRIMARY KEY" as const,
-        columns: JSON.parse(row.columns as unknown as string),
+        columns: (row.columns as unknown as string).split(','),
       })),
     unique: rows
       .filter((row) => row.constraint_type === "UNIQUE")
@@ -220,14 +220,14 @@ export const introspectMysqlConstraints = async (db: PlannableKysely) => {
         table: row.table_name,
         name: row.constraint_name,
         type: "UNIQUE" as const,
-        columns: JSON.parse(row.columns as unknown as string),
+        columns: (row.columns as unknown as string).split(','),
       })),
     foreignKey: foreignKeysWithReferencedColumns.map((row) => ({
       schema: row.schema_name,
       table: row.table_name,
       name: row.constraint_name,
       type: "FOREIGN KEY" as const,
-      columns: JSON.parse(row.columns as unknown as string),
+      columns: (row.columns as unknown as string).split(','),
       referencedTable: row.referenced_table!,
       referencedColumns: row.referenced_columns,
       onDelete: convertMysqlReferentialAction(row.on_delete),
