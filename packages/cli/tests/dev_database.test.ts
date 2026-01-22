@@ -51,7 +51,7 @@ describe.skip("generate with dev database", () => {
           ...configBase,
           tables: [
             defineTable("members", {
-              id: column("uuid", { primaryKey: true }),
+              id: column("char(36)", { primaryKey: true }),
               name: column("text"),
             }),
           ],
@@ -67,7 +67,7 @@ describe.skip("generate with dev database", () => {
           ...configBase,
           tables: [
             defineTable("members", {
-              id: column("uuid", { primaryKey: true }),
+              id: column("char(36)", { primaryKey: true }),
               age: column("integer"),
             }),
           ],
@@ -87,7 +87,7 @@ describe.skip("generate with dev database", () => {
         ...configBase,
         tables: [
           defineTable("members", {
-            id: column("uuid", { primaryKey: true }),
+            id: column("char(36)", { primaryKey: true }),
             name: column("text"),
           }),
         ],
@@ -109,7 +109,7 @@ describe.skip("generate with dev database", () => {
           ...configBase,
           tables: [
             defineTable("members", {
-              id: column("uuid", { primaryKey: true }),
+              id: column("char(36)", { primaryKey: true }),
               name: column("text"),
               age: column("integer"),
               email: column("text"), // Add email field
