@@ -1,5 +1,13 @@
 # @izumisy/kyrage
 
+## 1.5.8
+
+### Patch Changes
+
+- [#197](https://github.com/IzumiSy/kyrage/pull/197) [`26695c5`](https://github.com/IzumiSy/kyrage/commit/26695c53959193035b2d2c2f38fbd5050738dd17) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [better-sqlite3](https://www.npmjs.com/package/better-sqlite3) (^12.4.1 -> ^12.6.2)
+
+- [#198](https://github.com/IzumiSy/kyrage/pull/198) [`1371d2b`](https://github.com/IzumiSy/kyrage/commit/1371d2bda6ffdfe2eb03d981f859e7e9a311cd25) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [sql-formatter](https://www.npmjs.com/package/sql-formatter) (^15.6.12 -> ^15.7.0)
+
 ## 1.5.7
 
 ### Patch Changes
