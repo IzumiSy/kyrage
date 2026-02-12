@@ -29,6 +29,8 @@ const getConfigForTest = (kyrageDialect: KyrageDialect) => {
           image: "cockroachdb/cockroach:latest-v24.3",
         },
       };
+    case "sqlite":
+      return {};
     default:
       throw new Error("unsupported dialect specified");
   }
