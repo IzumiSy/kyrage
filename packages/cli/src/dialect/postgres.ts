@@ -82,6 +82,7 @@ export const convertPSQLTypeName = (typeName: string) => {
     int2: "smallint",
     int4: "integer",
     int8: "bigint",
+    bpchar: "char",
   };
 
   return nameDict[typeName as keyof typeof nameDict] ?? typeName;
@@ -95,7 +96,7 @@ export const introspectPSQLTables = async (db: PlannableKysely) => {
       a.attname AS column_name,
       pg_get_expr(d.adbin, d.adrelid) AS column_default,
       CASE 
-        WHEN t.typname = 'varchar' OR t.typname = 'char' THEN a.atttypmod - 4
+        WHEN t.typname = 'varchar' OR t.typname = 'bpchar' THEN a.atttypmod - 4
         ELSE NULL 
       END AS character_maximum_length
     FROM pg_class c

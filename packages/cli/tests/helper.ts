@@ -29,6 +29,18 @@ const getConfigForTest = (kyrageDialect: KyrageDialect) => {
           image: "cockroachdb/cockroach:latest-v24.3",
         },
       };
+    case "mysql":
+      return {
+        container: {
+          image: "mysql:8",
+        },
+      };
+    case "mariadb":
+      return {
+        container: {
+          image: "mariadb:11",
+        },
+      };
     default:
       throw new Error("unsupported dialect specified");
   }

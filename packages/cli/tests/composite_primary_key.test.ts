@@ -5,7 +5,11 @@ import { defineTable, column } from "../src/config/builder";
 import { fs } from "memfs";
 import { FSPromiseAPIs } from "../src/commands/common";
 
-const { database, client } = await setupTestDB();
+const { database, client, dialect } = await setupTestDB();
+const dialectName = dialect.getName();
+const isMysqlLike = dialectName === "mysql" || dialectName === "mariadb";
+// MySQL/MariaDB require VARCHAR for UNIQUE constraints, not TEXT
+const textType = isMysqlLike ? "varchar(255)" : "text";
 
 describe("Composite Primary Key", () => {
   it("should not generate unnecessary migrations for nullable columns in composite primary key", async () => {
@@ -17,9 +21,9 @@ describe("Composite Primary Key", () => {
           defineTable(
             "posts",
             {
-              id: column("uuid"), // nullable in schema definition
-              author_id: column("uuid"), // nullable in schema definition
-              slug: column("text", { notNull: true }),
+              id: column("char(36)"), // nullable in schema definition
+              author_id: column("char(36)"), // nullable in schema definition
+              slug: column(textType, { notNull: true }),
               title: column("text"),
               content: column("text", { notNull: true }),
             },

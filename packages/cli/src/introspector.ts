@@ -34,11 +34,19 @@ export const getIntrospector = (client: DBClient) => {
             continue;
           }
 
+          const convertedType = extIntrospectorDriver.convertTypeName(column.dataType);
+          // Reconstruct type with length for char and varchar types
+          let dataType = convertedType;
+          if (extraInfo.characterMaximumLength !== null && 
+              (convertedType === "char" || convertedType === "varchar")) {
+            dataType = `${convertedType}(${extraInfo.characterMaximumLength})`;
+          }
+
           columns[column.name] = {
             schema: table.schema,
             table: table.name,
             name: column.name,
-            dataType: extIntrospectorDriver.convertTypeName(column.dataType),
+            dataType,
             default: extraInfo.default ?? null,
             characterMaximumLength: extraInfo.characterMaximumLength ?? null,
             notNull: !column.isNullable,
