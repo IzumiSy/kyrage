@@ -3,7 +3,7 @@
   "private": false,
   "type": "module",
   "version": "1.5.8",
-  "description": "A minimal, schema-based declarative migration tool for Node.js ecosystem",
+  "description": "A minimal, database-agnostic, schema-based declarative migration tool for Node.js ecosystem",
   "author": "Seiya Izumi (https://github.com/IzumiSy)",
   "license": "MIT",
   "repository": {
