@@ -48,12 +48,12 @@ type ContainerFactory = (image: string) => StartableContainer;
 export class ContainerDevDatabaseProvider implements DevDatabaseProvider {
   constructor(
     private dialect: DialectEnum,
-    private containerFactory: ContainerFactory
+    private containerFactory: ContainerFactory,
   ) {}
 
   async setup(
     config: ContainerDevDatabaseConfig,
-    manageType: DevDatabaseManageType
+    manageType: DevDatabaseManageType,
   ): Promise<DevDatabaseInstance> {
     return new ContainerDevDatabaseInstance({
       dialect: this.dialect,
@@ -94,7 +94,7 @@ class ContainerDevDatabaseInstance implements DevDatabaseInstance {
       manageType: DevDatabaseManageType;
       containerName?: string;
       containerFactory: () => StartableContainer;
-    }
+    },
   ) {
     this.container = this.setupContainer();
   }
@@ -143,24 +143,29 @@ class ContainerDevDatabaseInstance implements DevDatabaseInstance {
   }
 
   async getStatus(): Promise<DevDatabaseStatus> {
-    // Use runtime client to inspect container
-    const runtime = await getContainerRuntimeClient();
-    const runningContainer = await runtime.container.fetchByLabel(
-      DialectKey,
-      this.options.dialect,
-      { status: ["running"] }
-    );
-
-    if (runningContainer) {
-      const r = await runningContainer.inspect();
-      return {
-        type: "container" as const,
-        imageName: r.Config.Image,
-        containerID: r.Id,
-      };
+    if (!this.startedContainer) {
+      return { type: "unavailable" as const };
     }
 
-    return { type: "unavailable" as const };
+    const runtime = await getContainerRuntimeClient();
+
+    try {
+      const inspected = await runtime.container
+        .getById(this.startedContainer.getId())
+        .inspect();
+
+      if (!inspected.State.Running) {
+        return { type: "unavailable" as const };
+      }
+
+      return {
+        type: "container" as const,
+        imageName: inspected.Config.Image,
+        containerID: inspected.Id,
+      };
+    } catch {
+      return { type: "unavailable" as const };
+    }
   }
 
   async isAvailable(): Promise<boolean> {
@@ -173,7 +178,7 @@ class ContainerDevDatabaseInstance implements DevDatabaseInstance {
  * dev start コンテナが実行中かどうかを確認する
  */
 export const hasRunningDevStartContainer = async (
-  dialect: DialectEnum
+  dialect: DialectEnum,
 ): Promise<boolean> => {
   const runtime = await getContainerRuntimeClient();
   const allContainers = await runtime.container.list();
@@ -183,7 +188,7 @@ export const hasRunningDevStartContainer = async (
       container.Labels[ManagedKey] === "true" &&
       container.Labels[DevStartKey] === "dev-start" &&
       container.Labels[DialectKey] === dialect &&
-      container.State === "running"
+      container.State === "running",
   );
 };
 
@@ -200,7 +205,7 @@ export const removeAllKyrageManagedContainers = async () => {
 
   await Promise.allSettled(
     kyrageManagedContainers.map(async (id) =>
-      runtime.container.getById(id).remove({ force: true })
-    )
+      runtime.container.getById(id).remove({ force: true }),
+    ),
   );
 };

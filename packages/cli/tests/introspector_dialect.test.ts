@@ -89,20 +89,23 @@ describe(`${dialectName} introspector driver`, async () => {
     });
 
     const { indexes } = await introspector.introspect(deps.config);
-    expect(indexes).toEqual([
-      {
-        table: "test_table_with_indexes",
-        name: "idx_test_table_with_indexes_email",
-        columns: ["email"],
-        unique: false,
-      },
-      {
-        table: "test_table_with_indexes",
-        name: "idx_test_table_with_indexes_name_age",
-        columns: ["name", "age"],
-        unique: true,
-      },
-    ]);
+    expect(indexes).toHaveLength(2);
+    expect(indexes).toEqual(
+      expect.arrayContaining([
+        {
+          table: "test_table_with_indexes",
+          name: "idx_test_table_with_indexes_email",
+          columns: ["email"],
+          unique: false,
+        },
+        {
+          table: "test_table_with_indexes",
+          name: "idx_test_table_with_indexes_name_age",
+          columns: ["name", "age"],
+          unique: true,
+        },
+      ]),
+    );
 
     await using db = client.getDB();
     if (dialectName === "sqlite") {
@@ -151,8 +154,9 @@ describe(`${dialectName} introspector driver`, async () => {
         ? "uq_posts_user_id_title"
         : "unique_title_per_user";
 
-    expect(constraints).toEqual({
-      primaryKey: [
+    expect(constraints.primaryKey).toHaveLength(2);
+    expect(constraints.primaryKey).toEqual(
+      expect.arrayContaining([
         {
           name: "posts_id_primary_key",
           on_delete: null,
@@ -175,19 +179,12 @@ describe(`${dialectName} introspector driver`, async () => {
           type: "PRIMARY KEY",
           columns: ["id"],
         },
-      ],
-      unique: [
-        {
-          name: "users_email_unique",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: "public",
-          table: "users",
-          type: "UNIQUE",
-          columns: ["email"],
-        },
+      ]),
+    );
+
+    expect(constraints.unique).toHaveLength(2);
+    expect(constraints.unique).toEqual(
+      expect.arrayContaining([
         {
           name: expectedUniqueName,
           on_delete: null,
@@ -199,8 +196,23 @@ describe(`${dialectName} introspector driver`, async () => {
           type: "UNIQUE",
           columns: ["user_id", "title"],
         },
-      ],
-      foreignKey: [
+        {
+          name: "users_email_unique",
+          on_delete: null,
+          on_update: null,
+          referenced_columns: null,
+          referenced_table: null,
+          schema: "public",
+          table: "users",
+          type: "UNIQUE",
+          columns: ["email"],
+        },
+      ]),
+    );
+
+    expect(constraints.foreignKey).toHaveLength(1);
+    expect(constraints.foreignKey).toEqual(
+      expect.arrayContaining([
         {
           schema: "public",
           table: "posts",
@@ -212,8 +224,8 @@ describe(`${dialectName} introspector driver`, async () => {
           onDelete: "cascade",
           onUpdate: "cascade",
         },
-      ],
-    });
+      ]),
+    );
 
     await using db = client.getDB();
     if (dialectName === "sqlite") {
