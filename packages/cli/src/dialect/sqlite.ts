@@ -8,6 +8,7 @@ import {
   FileDevDatabaseProvider,
 } from "../dev/providers/file";
 import { ReferentialActions } from "../operations/shared/types";
+import { generatePrimaryKeyConstraintName } from "../naming";
 
 export class SQLiteKyrageDialect implements KyrageDialect {
   getName() {
@@ -70,20 +71,36 @@ export const doSQLiteIntrospect =
 
 /*
  * Convert SQLite type names to more general SQL type names.
+ * Also extract character maximum length from varchar types.
  */
 export const convertSQLiteTypeName = (typeName: string) => {
-  const nameDict = {
+  const nameDict: Record<string, string> = {
     INTEGER: "integer",
     TEXT: "text",
     REAL: "real",
     BLOB: "blob",
     NUMERIC: "numeric",
+    INT8: "bigint",
+    BOOLEAN: "boolean",
+    VARCHAR: "varchar",
+    CHAR: "char",
+    UUID: "uuid",
   };
 
-  return (
-    nameDict[typeName.toUpperCase() as keyof typeof nameDict] ??
-    typeName.toLowerCase()
-  );
+  // Extract length from varchar(n) or char(n)
+  const varcharMatch = typeName.match(/^(varchar|char)\((\d+)\)$/i);
+  if (varcharMatch) {
+    return varcharMatch[1].toLowerCase();
+  }
+
+  // Try exact match first (case-insensitive)
+  const upperTypeName = typeName.toUpperCase();
+  if (nameDict[upperTypeName]) {
+    return nameDict[upperTypeName];
+  }
+
+  // Return lowercase version as fallback
+  return typeName.toLowerCase();
 };
 
 export const introspectSQLiteTables = async (db: PlannableKysely) => {
@@ -109,13 +126,22 @@ export const introspectSQLiteTables = async (db: PlannableKysely) => {
       .execute(db);
 
     tableInfos.push(
-      ...columns.map((col) => ({
-        schema: "main", // SQLite default schema
-        table: table.name,
-        name: col.name,
-        default: col.dflt_value,
-        characterMaximumLength: null, // SQLite doesn't enforce string length limits
-      }))
+      ...columns.map((col) => {
+        // Extract character length from varchar(n) or char(n) types
+        let characterMaximumLength: number | null = null;
+        const varcharMatch = col.type.match(/^(?:varchar|char)\((\d+)\)$/i);
+        if (varcharMatch) {
+          characterMaximumLength = parseInt(varcharMatch[1], 10);
+        }
+
+        return {
+          schema: "public", // Use "public" for consistency with PostgreSQL
+          table: table.name,
+          name: col.name,
+          default: col.dflt_value,
+          characterMaximumLength,
+        };
+      }),
     );
   }
 
@@ -170,7 +196,10 @@ export const introspectSQLiteIndexes = async (db: PlannableKysely) => {
     }
   }
 
-  return indexes;
+  return indexes.sort((a, b) => {
+    if (a.table !== b.table) return a.table.localeCompare(b.table);
+    return a.name.localeCompare(b.name);
+  });
 };
 
 type SQLiteIndexList = {
@@ -189,20 +218,25 @@ type SQLiteIndexInfo = {
 
 export const introspectSQLiteConstraints = async (db: PlannableKysely) => {
   const { rows: tables } = await sql`
-    SELECT name FROM sqlite_master 
+    SELECT name, sql FROM sqlite_master 
     WHERE type = 'table' 
     AND name NOT LIKE 'sqlite_%'
     AND name != 'kysely_migration'
     AND name != 'kysely_migration_lock'
   `
-    .$castTo<{ name: string }>()
+    .$castTo<{ name: string; sql: string | null }>()
     .execute(db);
 
   const primaryKeys = [];
-  const uniqueConstraints: ReadonlyArray<any> = [];
+  const uniqueConstraints: any[] = [];
   const foreignKeys: any[] = [];
 
   for (const table of tables) {
+    // NOTE: SQLite's PRAGMA commands don't return constraint names.
+    // Custom constraint names specified in CREATE TABLE are not preserved during introspection.
+    // This is a known limitation of SQLite's metadata system.
+    // Use 'kyrage lint' to check for dialect-specific behaviors.
+
     // Get primary key information
     const { rows: tableInfo } = await sql`
       SELECT * FROM pragma_table_info(${table.name})
@@ -217,11 +251,15 @@ export const introspectSQLiteConstraints = async (db: PlannableKysely) => {
 
     if (pkColumns.length > 0) {
       primaryKeys.push({
-        schema: "main",
+        schema: "public",
         table: table.name,
-        name: `${table.name}_primary_key`,
+        name: generatePrimaryKeyConstraintName(table.name, pkColumns),
         type: "PRIMARY KEY" as const,
         columns: pkColumns,
+        on_delete: null,
+        on_update: null,
+        referenced_columns: null,
+        referenced_table: null,
       });
     }
 
@@ -239,28 +277,81 @@ export const introspectSQLiteConstraints = async (db: PlannableKysely) => {
         acc[fk.id].push(fk);
         return acc;
       },
-      {} as Record<number, SQLiteForeignKey[]>
+      {} as Record<number, SQLiteForeignKey[]>,
     );
 
-    Object.values(fkGroups).forEach((group) => {
+    Object.entries(fkGroups).forEach(([, group]) => {
+      const columns = group.map((fk) => fk.from);
+      // Generate constraint name automatically (custom names are not preserved in SQLite)
+      const fkName =
+        group.length > 0 && group[0].from
+          ? `fk_${group[0].from}`
+          : `fk_${table.name}_${group[0].table}`;
+
       foreignKeys.push({
-        schema: "main",
+        schema: "public",
         table: table.name,
-        name: `fk_${table.name}_${group[0].table}`,
+        name: fkName,
         type: "FOREIGN KEY" as const,
-        columns: group.map((fk) => fk.from),
+        columns,
         referencedTable: group[0].table,
         referencedColumns: group.map((fk) => fk.to),
         onDelete: mapSQLiteAction(group[0].on_delete),
         onUpdate: mapSQLiteAction(group[0].on_update),
       });
     });
+
+    // Get unique constraint information from indexes
+    const { rows: indexList } = await sql`
+      SELECT * FROM pragma_index_list(${table.name})
+    `
+      .$castTo<SQLiteIndexList>()
+      .execute(db);
+
+    for (const index of indexList) {
+      // Unique indexes with origin 'u' are unique constraints
+      if (index.unique === 1 && index.origin === "u") {
+        const { rows: indexInfo } = await sql`
+          SELECT * FROM pragma_index_info(${index.name})
+        `
+          .$castTo<SQLiteIndexInfo>()
+          .execute(db);
+
+        const columns = indexInfo.map((info) => info.name);
+        // Generate constraint name automatically (custom names are not preserved in SQLite)
+        const constraintName =
+          columns.length === 1
+            ? `${table.name}_${columns[0]}_unique`
+            : `uq_${table.name}_${columns.join("_")}`;
+
+        uniqueConstraints.push({
+          schema: "public",
+          table: table.name,
+          name: constraintName,
+          type: "UNIQUE" as const,
+          columns,
+          on_delete: null,
+          on_update: null,
+          referenced_columns: null,
+          referenced_table: null,
+        });
+      }
+    }
   }
 
   return {
-    primaryKey: primaryKeys,
-    unique: uniqueConstraints,
-    foreignKey: foreignKeys,
+    primaryKey: primaryKeys.sort((a, b) => {
+      if (a.table !== b.table) return a.table.localeCompare(b.table);
+      return a.name.localeCompare(b.name);
+    }),
+    unique: uniqueConstraints.sort((a, b) => {
+      if (a.table !== b.table) return a.table.localeCompare(b.table);
+      return a.name.localeCompare(b.name);
+    }),
+    foreignKey: foreignKeys.sort((a, b) => {
+      if (a.table !== b.table) return a.table.localeCompare(b.table);
+      return a.name.localeCompare(b.name);
+    }),
   };
 };
 

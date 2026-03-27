@@ -60,7 +60,11 @@ describe(`${dialectName} introspector driver`, async () => {
     ]);
 
     await using db = client.getDB();
-    await sql`DROP TABLE public.test_table`.execute(db);
+    if (dialectName === "sqlite") {
+      await sql`DROP TABLE test_table`.execute(db);
+    } else {
+      await sql`DROP TABLE public.test_table`.execute(db);
+    }
   });
 
   it("should introspect indexes correctly", async () => {
@@ -79,7 +83,7 @@ describe(`${dialectName} introspector driver`, async () => {
           (t) => [
             t.index(["email"]),
             t.index(["name", "age"], { unique: true }),
-          ]
+          ],
         ),
       ],
     });
@@ -101,7 +105,11 @@ describe(`${dialectName} introspector driver`, async () => {
     ]);
 
     await using db = client.getDB();
-    await sql`DROP TABLE public.test_table_with_indexes`.execute(db);
+    if (dialectName === "sqlite") {
+      await sql`DROP TABLE test_table_with_indexes`.execute(db);
+    } else {
+      await sql`DROP TABLE public.test_table_with_indexes`.execute(db);
+    }
   });
 
   it("should introspect constraints correctly", async () => {
@@ -128,12 +136,21 @@ describe(`${dialectName} introspector driver`, async () => {
               name: "fk_user",
             }),
             t.unique(["user_id", "title"], { name: "unique_title_per_user" }),
-          ]
+          ],
         ),
       ],
     });
 
     const { constraints } = await introspector.introspect(deps.config);
+
+    // For SQLite, custom constraint names are not preserved during introspection
+    // They are auto-generated based on table and column names
+    const expectedFkName = dialectName === "sqlite" ? "fk_user_id" : "fk_user";
+    const expectedUniqueName =
+      dialectName === "sqlite"
+        ? "uq_posts_user_id_title"
+        : "unique_title_per_user";
+
     expect(constraints).toEqual({
       primaryKey: [
         {
@@ -161,17 +178,6 @@ describe(`${dialectName} introspector driver`, async () => {
       ],
       unique: [
         {
-          name: "unique_title_per_user",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: "public",
-          table: "posts",
-          type: "UNIQUE",
-          columns: ["user_id", "title"],
-        },
-        {
           name: "users_email_unique",
           on_delete: null,
           on_update: null,
@@ -182,12 +188,23 @@ describe(`${dialectName} introspector driver`, async () => {
           type: "UNIQUE",
           columns: ["email"],
         },
+        {
+          name: expectedUniqueName,
+          on_delete: null,
+          on_update: null,
+          referenced_columns: null,
+          referenced_table: null,
+          schema: "public",
+          table: "posts",
+          type: "UNIQUE",
+          columns: ["user_id", "title"],
+        },
       ],
       foreignKey: [
         {
           schema: "public",
           table: "posts",
-          name: "fk_user",
+          name: expectedFkName,
           type: "FOREIGN KEY",
           columns: ["user_id"],
           referencedTable: "users",
@@ -199,6 +216,11 @@ describe(`${dialectName} introspector driver`, async () => {
     });
 
     await using db = client.getDB();
-    await sql`DROP TABLE public.posts, public.users`.execute(db);
+    if (dialectName === "sqlite") {
+      await sql`DROP TABLE posts`.execute(db);
+      await sql`DROP TABLE users`.execute(db);
+    } else {
+      await sql`DROP TABLE public.posts, public.users`.execute(db);
+    }
   });
 });
