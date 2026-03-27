@@ -20,12 +20,19 @@ describe("apply migrations in multiple times", () => {
     });
 
     await using db = client.getDB();
-    expect(await db.introspection.getTables()).toEqual([
+    const tables1 = await db.introspection.getTables();
+    expect(tables1).toEqual([
       expect.objectContaining({
         name: "members",
         columns: expect.arrayContaining([
-          expect.objectContaining({ name: "id", dataType: "uuid" }),
-          expect.objectContaining({ name: "name", dataType: "text" }),
+          expect.objectContaining({
+            name: "id",
+            dataType: expect.stringMatching(/^uuid$/i),
+          }),
+          expect.objectContaining({
+            name: "name",
+            dataType: expect.stringMatching(/^text$/i),
+          }),
         ]),
       }),
     ]);
@@ -44,19 +51,32 @@ describe("apply migrations in multiple times", () => {
       ],
     });
 
-    expect(await db.introspection.getTables()).toEqual([
+    const tables2 = await db.introspection.getTables();
+    expect(tables2).toEqual([
       expect.objectContaining({
         name: "members",
         columns: expect.arrayContaining([
-          expect.objectContaining({ name: "id", dataType: "uuid" }),
-          expect.objectContaining({ name: "email", dataType: "text" }),
+          expect.objectContaining({
+            name: "id",
+            dataType: expect.stringMatching(/^uuid$/i),
+          }),
+          expect.objectContaining({
+            name: "email",
+            dataType: expect.stringMatching(/^text$/i),
+          }),
         ]),
       }),
       expect.objectContaining({
         name: "posts",
         columns: expect.arrayContaining([
-          expect.objectContaining({ name: "id", dataType: "uuid" }),
-          expect.objectContaining({ name: "title", dataType: "text" }),
+          expect.objectContaining({
+            name: "id",
+            dataType: expect.stringMatching(/^uuid$/i),
+          }),
+          expect.objectContaining({
+            name: "title",
+            dataType: expect.stringMatching(/^text$/i),
+          }),
         ]),
       }),
     ]);

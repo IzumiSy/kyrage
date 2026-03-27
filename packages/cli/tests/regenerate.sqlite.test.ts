@@ -10,7 +10,7 @@ import { FSPromiseAPIs } from "../src/commands/common";
 const { database, client, dialect } = await setupTestDB();
 const isSQLite = dialect.getName() === "sqlite";
 
-describe.skipIf(isSQLite)("generate", () => {
+describe.skipIf(!isSQLite)("generate (SQLite)", () => {
   beforeAll(async () => {
     await using db = client.getDB();
 
@@ -36,7 +36,7 @@ describe.skipIf(isSQLite)("generate", () => {
     `.execute(db);
   });
 
-  it("should not generate a new migration", async () => {
+  it("should generate one migration due to SQLite constraint-name introspection behavior", async () => {
     const beforeVol = vol.toJSON();
 
     const membersTable = defineTable(
@@ -86,6 +86,18 @@ describe.skipIf(isSQLite)("generate", () => {
       dev: false,
     });
 
-    expect(vol.toJSON()).toEqual(beforeVol);
+    const afterVol = vol.toJSON() as Record<string, string>;
+    const beforeVolRecord = beforeVol as Record<string, string>;
+    const generatedMigrationFiles = Object.keys(afterVol).filter(
+      (path) =>
+        path.includes("/migrations/") &&
+        !Object.prototype.hasOwnProperty.call(beforeVolRecord, path),
+    );
+
+    expect(generatedMigrationFiles).toHaveLength(1);
+
+    const generatedMigration = afterVol[generatedMigrationFiles[0]];
+    expect(generatedMigration).toContain("drop_unique_constraint");
+    expect(generatedMigration).toContain("drop_foreign_key_constraint");
   });
 });

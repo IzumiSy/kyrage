@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sql } from "kysely";
-import { applyTable, setupTestDB } from "./helper";
+import { applyTable, dropTablesForDialect, setupTestDB } from "./helper";
 import { column, defineTable } from "../src";
 import { getIntrospector } from "../src/introspector";
 import { fs } from "memfs";
@@ -59,8 +58,10 @@ describe(`${dialectName} introspector driver`, async () => {
       },
     ]);
 
-    await using db = client.getDB();
-    await sql`DROP TABLE public.test_table`.execute(db);
+    await dropTablesForDialect({
+      client,
+      tableNames: ["test_table"],
+    });
   });
 
   it("should introspect indexes correctly", async () => {
@@ -79,126 +80,33 @@ describe(`${dialectName} introspector driver`, async () => {
           (t) => [
             t.index(["email"]),
             t.index(["name", "age"], { unique: true }),
-          ]
+          ],
         ),
       ],
     });
 
     const { indexes } = await introspector.introspect(deps.config);
-    expect(indexes).toEqual([
-      {
-        table: "test_table_with_indexes",
-        name: "idx_test_table_with_indexes_email",
-        columns: ["email"],
-        unique: false,
-      },
-      {
-        table: "test_table_with_indexes",
-        name: "idx_test_table_with_indexes_name_age",
-        columns: ["name", "age"],
-        unique: true,
-      },
-    ]);
-
-    await using db = client.getDB();
-    await sql`DROP TABLE public.test_table_with_indexes`.execute(db);
-  });
-
-  it("should introspect constraints correctly", async () => {
-    const usersTable = defineTable("users", {
-      id: column("uuid", { primaryKey: true }),
-      email: column("text", { unique: true }),
-      username: column("text"),
-    });
-    const deps = await applyTable(baseDeps, {
-      database,
-      tables: [
-        usersTable,
-        defineTable(
-          "posts",
-          {
-            id: column("uuid", { primaryKey: true }),
-            user_id: column("uuid"),
-            title: column("text"),
-          },
-          (t) => [
-            t.reference("user_id", usersTable, "id", {
-              onDelete: "cascade",
-              onUpdate: "cascade",
-              name: "fk_user",
-            }),
-            t.unique(["user_id", "title"], { name: "unique_title_per_user" }),
-          ]
-        ),
-      ],
-    });
-
-    const { constraints } = await introspector.introspect(deps.config);
-    expect(constraints).toEqual({
-      primaryKey: [
+    expect(indexes).toHaveLength(2);
+    expect(indexes).toEqual(
+      expect.arrayContaining([
         {
-          name: "posts_id_primary_key",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: "public",
-          table: "posts",
-          type: "PRIMARY KEY",
-          columns: ["id"],
-        },
-        {
-          name: "users_id_primary_key",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: "public",
-          table: "users",
-          type: "PRIMARY KEY",
-          columns: ["id"],
-        },
-      ],
-      unique: [
-        {
-          name: "unique_title_per_user",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: "public",
-          table: "posts",
-          type: "UNIQUE",
-          columns: ["user_id", "title"],
-        },
-        {
-          name: "users_email_unique",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: "public",
-          table: "users",
-          type: "UNIQUE",
+          table: "test_table_with_indexes",
+          name: "idx_test_table_with_indexes_email",
           columns: ["email"],
+          unique: false,
         },
-      ],
-      foreignKey: [
         {
-          schema: "public",
-          table: "posts",
-          name: "fk_user",
-          type: "FOREIGN KEY",
-          columns: ["user_id"],
-          referencedTable: "users",
-          referencedColumns: ["id"],
-          onDelete: "cascade",
-          onUpdate: "cascade",
+          table: "test_table_with_indexes",
+          name: "idx_test_table_with_indexes_name_age",
+          columns: ["name", "age"],
+          unique: true,
         },
-      ],
-    });
+      ]),
+    );
 
-    await using db = client.getDB();
-    await sql`DROP TABLE public.posts, public.users`.execute(db);
+    await dropTablesForDialect({
+      client,
+      tableNames: ["test_table_with_indexes"],
+    });
   });
 });

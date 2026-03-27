@@ -22,31 +22,44 @@ export const getIntrospector = (client: DBClient) => {
       constraints,
     } = await extIntrospectorDriver.introspect({ config });
 
+    // Build a set of primary key columns for quick lookup
+    const primaryKeyColumns = new Set<string>();
+    for (const pk of constraints.primaryKey) {
+      for (const column of pk.columns) {
+        primaryKeyColumns.add(`${pk.table}.${column}`);
+      }
+    }
+
     const getTables = () =>
       kyselyIntrospection.map((table) => {
         const columns: Record<string, any> = {};
 
         for (const column of table.columns) {
           const extraInfo = extTables.find(
-            (c) => c.table === table.name && c.name === column.name
+            (c) => c.table === table.name && c.name === column.name,
           );
           if (!extraInfo) {
             continue;
           }
 
+          // Primary key columns should always be notNull
+          const isPrimaryKey = primaryKeyColumns.has(
+            `${table.name}.${column.name}`,
+          );
+
           columns[column.name] = {
-            schema: table.schema,
+            schema: table.schema ?? "public",
             table: table.name,
             name: column.name,
             dataType: extIntrospectorDriver.convertTypeName(column.dataType),
             default: extraInfo.default ?? null,
             characterMaximumLength: extraInfo.characterMaximumLength ?? null,
-            notNull: !column.isNullable,
+            notNull: !column.isNullable || isPrimaryKey,
           };
         }
 
         return {
-          schema: table.schema,
+          schema: table.schema ?? "public",
           name: table.name,
           columns,
         };
