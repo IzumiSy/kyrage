@@ -32,6 +32,8 @@ jobs:
         dialect:
           - postgres
           - cockroachdb
+          - mysql
+          - mariadb
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

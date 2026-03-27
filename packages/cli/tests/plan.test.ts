@@ -7,8 +7,17 @@ import { executeApply } from "../src/commands/apply";
 import { fs } from "memfs";
 import { FSPromiseAPIs } from "../src/commands/common";
 
-const { database, client } = await setupTestDB();
+const { database, client, dialect } = await setupTestDB();
 const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
+
+// Determine SQL syntax based on dialect
+const dialectName = dialect.getName();
+const quote = dialectName === "mysql" || dialectName === "mariadb" ? "`" : '"';
+const uuidSql = "char(36)";
+// MySQL/MariaDB require VARCHAR for UNIQUE/INDEX constraints, not TEXT
+const isMysqlLike = dialectName === "mysql" || dialectName === "mariadb";
+const textTypeUnique = isMysqlLike ? "varchar(255)" : "text";
+const textSql = isMysqlLike ? "varchar(255)" : "text";
 
 it("generate with planned apply", async () => {
   const loggerStdout = vi
@@ -20,9 +29,9 @@ it("generate with planned apply", async () => {
     const membersTable = defineTable(
       "members",
       {
-        id: column("uuid", { primaryKey: true }),
-        name: column("text", { unique: true }),
-        email: column("text"),
+        id: column("char(36)", { primaryKey: true }),
+        name: column(textTypeUnique, { unique: true }),
+        email: column(textTypeUnique),
       },
       (t) => [t.index(["name", "email"]), t.unique(["name", "email"])]
     );
@@ -35,9 +44,9 @@ it("generate with planned apply", async () => {
           defineTable(
             "category",
             {
-              id: column("uuid"),
-              member_id: column("uuid"),
-              name: column("text", { unique: true }),
+              id: column("char(36)"),
+              member_id: column("char(36)"),
+              name: column(textTypeUnique, { unique: true }),
             },
             (t) => [
               t.primaryKey(["id", "member_id"]),
@@ -66,9 +75,9 @@ it("generate with planned apply", async () => {
     const membersTable = defineTable(
       "members",
       {
-        id: column("uuid", { primaryKey: true }),
+        id: column("char(36)", { primaryKey: true }),
         name: column("text"),
-        email: column("text", { unique: true }),
+        email: column(textTypeUnique, { unique: true }),
       },
       (t) => [t.index(["id", "email"], { unique: true })]
     );
@@ -82,9 +91,9 @@ it("generate with planned apply", async () => {
           defineTable(
             "posts",
             {
-              id: column("uuid", { primaryKey: true }),
+              id: column("char(36)", { primaryKey: true }),
               content: column("text"),
-              author_id: column("uuid", { notNull: true }),
+              author_id: column("char(36)", { notNull: true }),
             },
             (t) => [
               t.reference("author_id", membersTable, "id", {
@@ -112,18 +121,18 @@ it("generate with planned apply", async () => {
 
   [
     // 1st phase
-    `create table "members" ("id" uuid not null, "name" text, "email" text, constraint "members_id_primary_key" primary key ("id"), constraint "uq_members_name_email" unique ("name", "email"), constraint "members_name_unique" unique ("name"))`,
-    `create table "category" ("id" uuid not null, "member_id" uuid not null, "name" text, constraint "pk_category_id_member_id" primary key ("id", "member_id"), constraint "category_name_unique" unique ("name"), constraint "category_member_fk" foreign key ("member_id") references "members" ("id") on delete cascade)`,
-    `create index "idx_members_name_email" on "members" ("name", "email")`,
+    `create table ${quote}members${quote} (${quote}id${quote} ${uuidSql} not null, ${quote}name${quote} ${textSql}, ${quote}email${quote} ${textSql}, constraint ${quote}members_id_primary_key${quote} primary key (${quote}id${quote}), constraint ${quote}uq_members_name_email${quote} unique (${quote}name${quote}, ${quote}email${quote}), constraint ${quote}members_name_unique${quote} unique (${quote}name${quote}))`,
+    `create table ${quote}category${quote} (${quote}id${quote} ${uuidSql} not null, ${quote}member_id${quote} ${uuidSql} not null, ${quote}name${quote} ${textSql}, constraint ${quote}pk_category_id_member_id${quote} primary key (${quote}id${quote}, ${quote}member_id${quote}), constraint ${quote}category_name_unique${quote} unique (${quote}name${quote}), constraint ${quote}category_member_fk${quote} foreign key (${quote}member_id${quote}) references ${quote}members${quote} (${quote}id${quote}) on delete cascade)`,
+    `create index ${quote}idx_members_name_email${quote} on ${quote}members${quote} (${quote}name${quote}, ${quote}email${quote})`,
 
     // 2nd phase
-    `alter table "members" drop constraint "members_name_unique"`,
-    `alter table "members" drop constraint "uq_members_name_email"`,
-    `drop index "idx_members_name_email"`,
-    `drop table "category"`,
-    `create table "posts" ("id" uuid not null, "content" text, "author_id" uuid not null, constraint "posts_id_primary_key" primary key ("id"), constraint "posts_author_fk" foreign key ("author_id") references "members" ("id") on delete set null on update cascade)`,
-    `create unique index "idx_members_id_email" on "members" ("id", "email")`,
-    `alter table "members" add constraint "members_email_unique" unique ("email")`,
+    `alter table ${quote}members${quote} drop constraint ${quote}members_name_unique${quote}`,
+    `alter table ${quote}members${quote} drop constraint ${quote}uq_members_name_email${quote}`,
+    `drop index ${quote}idx_members_name_email${quote}`,
+    `drop table ${quote}category${quote}`,
+    `create table ${quote}posts${quote} (${quote}id${quote} ${uuidSql} not null, ${quote}content${quote} ${textSql}, ${quote}author_id${quote} ${uuidSql} not null, constraint ${quote}posts_id_primary_key${quote} primary key (${quote}id${quote}), constraint ${quote}posts_author_fk${quote} foreign key (${quote}author_id${quote}) references ${quote}members${quote} (${quote}id${quote}) on delete set null on update cascade)`,
+    `create unique index ${quote}idx_members_id_email${quote} on ${quote}members${quote} (${quote}id${quote}, ${quote}email${quote})`,
+    `alter table ${quote}members${quote} add constraint ${quote}members_email_unique${quote} unique (${quote}email${quote})`,
   ].forEach((expectedCall, index) => {
     expect(loggerStdout).toHaveBeenNthCalledWith(index + 1, expectedCall);
   });
