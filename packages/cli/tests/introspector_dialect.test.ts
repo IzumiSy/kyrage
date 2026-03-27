@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sql } from "kysely";
-import { applyTable, setupTestDB } from "./helper";
+import { applyTable, dropTablesForDialect, setupTestDB } from "./helper";
 import { column, defineTable } from "../src";
 import { getIntrospector } from "../src/introspector";
 import { fs } from "memfs";
@@ -59,12 +58,10 @@ describe(`${dialectName} introspector driver`, async () => {
       },
     ]);
 
-    await using db = client.getDB();
-    if (dialectName === "sqlite") {
-      await sql`DROP TABLE test_table`.execute(db);
-    } else {
-      await sql`DROP TABLE public.test_table`.execute(db);
-    }
+    await dropTablesForDialect({
+      client,
+      tableNames: ["test_table"],
+    });
   });
 
   it("should introspect indexes correctly", async () => {
@@ -107,11 +104,9 @@ describe(`${dialectName} introspector driver`, async () => {
       ]),
     );
 
-    await using db = client.getDB();
-    if (dialectName === "sqlite") {
-      await sql`DROP TABLE test_table_with_indexes`.execute(db);
-    } else {
-      await sql`DROP TABLE public.test_table_with_indexes`.execute(db);
-    }
+    await dropTablesForDialect({
+      client,
+      tableNames: ["test_table_with_indexes"],
+    });
   });
 });
