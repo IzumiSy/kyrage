@@ -21,7 +21,17 @@ Traditional database migrations require manually writing up/down migration files
 
 This is a style of managing database schema that is called as [Versioned Migration Authoring](https://atlasgo.io/blog/2022/08/11/announcing-versioned-migration-authoring) by Atlas. 
 
-## 📦 Installation
+## Supported Databases
+
+| Dialect | `dialect` value | Dev Database |
+|---------|----------------|--------------|
+| PostgreSQL | `postgres` | ✅ Docker container |
+| CockroachDB | `cockroachdb` | ✅ Docker container |
+| SQLite | `sqlite` | ✅ File-based (no Docker required) |
+
+> **Note:** The Dev Database container reuse feature (`kyrage dev start`) is only available for PostgreSQL and CockroachDB. SQLite uses a file-based dev database instead.
+
+## Installation
 
 ```bash
 # Install globally
@@ -31,7 +41,7 @@ npm install -g @izumisy/kyrage
 npx @izumisy/kyrage --help
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Create Configuration File
 
@@ -346,7 +356,7 @@ In this workflow:
 
 This approach keeps your production migration history clean while allowing flexible development iterations.
 
-## 📚 API Reference
+## API Reference
 
 ### Commands
 
@@ -524,7 +534,7 @@ kyrage automatically generates constraint names following these patterns:
 
 You can override these by providing a custom `name` option.
 
-## 🏗️ Examples
+## Examples
 
 Check out the [examples/basic](./examples/basic) directory for a complete working example with:
 - Configuration setup
@@ -532,10 +542,10 @@ Check out the [examples/basic](./examples/basic) directory for a complete workin
 - Generated migrations
 - Applied database changes
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit issues and pull requests.
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](./LICENSE) file for details.
