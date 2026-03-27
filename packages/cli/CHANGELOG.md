@@ -1,5 +1,23 @@
 # @izumisy/kyrage
 
+## 1.6.0
+
+### Minor Changes
+
+- [#113](https://github.com/IzumiSy/kyrage/pull/113) [`e7dab87`](https://github.com/IzumiSy/kyrage/commit/e7dab87c01f841cba0551ce104f6b75a8d63d83f) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Add SQLite dialect and file-based provider support
+
+### Patch Changes
+
+- [#204](https://github.com/IzumiSy/kyrage/pull/204) [`3522b8a`](https://github.com/IzumiSy/kyrage/commit/3522b8a3a8b52cc38fa31d55d1e873edc3d86768) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [zod](https://www.npmjs.com/package/zod) (^4.3.5 -> ^4.3.6)
+
+- [#205](https://github.com/IzumiSy/kyrage/pull/205) [`804557f`](https://github.com/IzumiSy/kyrage/commit/804557f84f2b0b7fa6c960bd635a305e44d27014) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [mysql2](https://www.npmjs.com/package/mysql2) (^3.16.0 -> ^3.17.2)
+
+- [#210](https://github.com/IzumiSy/kyrage/pull/210) [`035b2e1`](https://github.com/IzumiSy/kyrage/commit/035b2e18179b024379820f0c2cfe719b00e52109) Thanks [@dependabot](https://github.com/apps/dependabot)! - Dependencies updated
+
+  - Updated [@testcontainers/cockroachdb](https://www.npmjs.com/package/@testcontainers/cockroachdb) (^11.11.0 -> ^11.13.0)
+  - Updated [@testcontainers/postgresql](https://www.npmjs.com/package/@testcontainers/postgresql) (^11.11.0 -> ^11.13.0)
+  - Updated [testcontainers](https://www.npmjs.com/package/testcontainers) (^11.11.0 -> ^11.13.0)
+
 ## 1.5.8
 
 ### Patch Changes
