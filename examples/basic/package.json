@@ -9,6 +9,6 @@
     "@izumisy/kyrage": "workspace:^",
     "@types/node": "^25.5.0",
     "kysely": "^0.28.9",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   }
 }
