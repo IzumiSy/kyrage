@@ -60,7 +60,7 @@
     "memfs": "^4.56.11",
     "prettier": "^3",
     "tsdown": "^0.21.7",
-    "typescript": "^5",
+    "typescript": "^6",
     "vitest": "^4.1.2"
   }
 }
