@@ -1,5 +1,21 @@
 # @izumisy/kyrage
 
+## 1.6.1
+
+### Patch Changes
+
+- [#218](https://github.com/IzumiSy/kyrage/pull/218) [`cb58869`](https://github.com/IzumiSy/kyrage/commit/cb58869019a7077f4a54c016f2fd6d9d2fd465b5) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [mysql2](https://www.npmjs.com/package/mysql2) (^3.17.2 -> ^3.20.0)
+
+- [#219](https://github.com/IzumiSy/kyrage/pull/219) [`0e91c24`](https://github.com/IzumiSy/kyrage/commit/0e91c24d5a1db434259763cfc3e5a875cddda2a8) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [citty](https://www.npmjs.com/package/citty) (^0.1.6 -> ^0.2.1)
+
+- [#226](https://github.com/IzumiSy/kyrage/pull/226) [`a9d5833`](https://github.com/IzumiSy/kyrage/commit/a9d5833515be205a9049208c1713edc4622cf094) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [pg](https://www.npmjs.com/package/pg) (^8.16.3 -> ^8.20.0)
+
+- [#230](https://github.com/IzumiSy/kyrage/pull/230) [`9df65c0`](https://github.com/IzumiSy/kyrage/commit/9df65c065977c49e985a4fd211ecef72ecba4529) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [zod](https://www.npmjs.com/package/zod) (^4.3.6 -> ^4.4.3)
+
+- [#227](https://github.com/IzumiSy/kyrage/pull/227) [`2372e90`](https://github.com/IzumiSy/kyrage/commit/2372e90a55395848940b63d42338c240b80a2f42) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [c12](https://www.npmjs.com/package/c12) (^3.3.3 -> ^3.3.4)
+
+- [#228](https://github.com/IzumiSy/kyrage/pull/228) [`c1e8c5a`](https://github.com/IzumiSy/kyrage/commit/c1e8c5af8467d2738a9ddd40baff60b7fab8d2eb) Thanks [@dependabot](https://github.com/apps/dependabot)! - Updated [sql-formatter](https://www.npmjs.com/package/sql-formatter) (^15.7.0 -> ^15.7.3)
+
 ## 1.6.0
 
 ### Minor Changes
