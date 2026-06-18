@@ -36,8 +36,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@testcontainers/cockroachdb": "^11.13.0",
-    "@testcontainers/postgresql": "^11.13.0",
+    "@testcontainers/cockroachdb": "^12.0.3",
+    "@testcontainers/postgresql": "^12.0.3",
     "better-sqlite3": "^12.6.2",
     "c12": "^3.3.4",
     "citty": "^0.2.1",
@@ -48,7 +48,7 @@
     "pg": "^8.20.0",
     "ramda": "^0.32.0",
     "sql-formatter": "^15.7.3",
-    "testcontainers": "^11.13.0",
+    "testcontainers": "^12.0.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
