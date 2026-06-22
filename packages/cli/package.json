@@ -38,7 +38,7 @@
   "dependencies": {
     "@testcontainers/cockroachdb": "^11.13.0",
     "@testcontainers/postgresql": "^11.13.0",
-    "better-sqlite3": "^12.6.2",
+    "better-sqlite3": "^12.11.1",
     "c12": "^3.3.4",
     "citty": "^0.2.1",
     "consola": "^3.4.2",
