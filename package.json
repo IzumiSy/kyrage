@@ -7,6 +7,9 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "lint": "oxlint packages examples",
+    "format": "oxfmt 'packages/**/*.ts' 'examples/**/*.ts'",
+    "format:check": "oxfmt --check 'packages/**/*.ts' 'examples/**/*.ts'",
     "test": "turbo test",
     "type-check": "turbo type-check",
     "changeset:publish": "pnpm build && changeset publish"

@@ -39,14 +39,14 @@ const getConfigForTest = (kyrageDialect: KyrageDialect) => {
 
 const getContainer = () => {
   const kyrageDialect = getDialect(
-    (process.env.TEST_DIALECT as DialectEnum) || "postgres",
+    (process.env.TEST_DIALECT as DialectEnum) || "postgres"
   );
 
   return {
     dialect: kyrageDialect,
     provider: kyrageDialect.createDevDatabaseProvider(),
     config: kyrageDialect.parseDevDatabaseConfig(
-      getConfigForTest(kyrageDialect),
+      getConfigForTest(kyrageDialect)
     ),
   };
 };
@@ -89,7 +89,7 @@ export const applyTable = async (
   },
   hooks?: {
     beforeApply?: (deps: CommonDependencies) => Promise<void> | void;
-  },
+  }
 ) => {
   const deps = {
     ...baseDeps,
@@ -120,9 +120,7 @@ export const dropTablesForDialect = async (props: {
 }) => {
   const targets = props.tableNames
     .map((tableName) =>
-      props.client.getDialect() === "sqlite"
-        ? tableName
-        : `public.${tableName}`,
+      props.client.getDialect() === "sqlite" ? tableName : `public.${tableName}`
     )
     .join(", ");
 

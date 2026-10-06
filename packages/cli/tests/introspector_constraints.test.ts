@@ -36,7 +36,7 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
               name: "fk_user",
             }),
             t.unique(["user_id", "title"], { name: "unique_title_per_user" }),
-          ],
+          ]
         ),
       ],
     });
@@ -68,7 +68,7 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
           type: "PRIMARY KEY",
           columns: ["id"],
         },
-      ]),
+      ])
     );
 
     expect(constraints.unique).toHaveLength(2);
@@ -96,7 +96,7 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
           type: "UNIQUE",
           columns: ["email"],
         },
-      ]),
+      ])
     );
 
     expect(constraints.foreignKey).toHaveLength(1);
@@ -113,7 +113,7 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
           onDelete: "cascade",
           onUpdate: "cascade",
         },
-      ]),
+      ])
     );
 
     await using db = client.getDB();

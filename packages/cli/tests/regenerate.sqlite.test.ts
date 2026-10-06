@@ -46,7 +46,7 @@ describe.skipIf(!isSQLite)("generate (SQLite)", () => {
         name: column("text", { notNull: true }),
         email: column("text", { unique: true, notNull: true }),
       },
-      (t) => [t.index(["name", "email"], { unique: true })],
+      (t) => [t.index(["name", "email"], { unique: true })]
     );
     const deps = {
       client,
@@ -75,7 +75,7 @@ describe.skipIf(!isSQLite)("generate (SQLite)", () => {
                 onUpdate: "cascade",
                 name: "fk_orders_customer_id",
               }),
-            ],
+            ]
           ),
         ],
       }),
@@ -91,7 +91,7 @@ describe.skipIf(!isSQLite)("generate (SQLite)", () => {
     const generatedMigrationFiles = Object.keys(afterVol).filter(
       (path) =>
         path.includes("/migrations/") &&
-        !Object.prototype.hasOwnProperty.call(beforeVolRecord, path),
+        !Object.prototype.hasOwnProperty.call(beforeVolRecord, path)
     );
 
     expect(generatedMigrationFiles).toHaveLength(1);

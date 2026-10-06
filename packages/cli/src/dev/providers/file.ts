@@ -33,7 +33,7 @@ export type FileDevDatabaseConfig = z.infer<
 export class FileDevDatabaseProvider implements DevDatabaseProvider {
   async setup(
     config: FileDevDatabaseConfig,
-    manageType: DevDatabaseManageType,
+    manageType: DevDatabaseManageType
   ): Promise<DevDatabaseInstance> {
     return new FileDevDatabaseInstance({
       manageType: manageType,
@@ -68,7 +68,7 @@ export class FileDevDatabaseProvider implements DevDatabaseProvider {
       const kyrageFiles = files.filter((f) => f.startsWith("kyrage___dev-"));
 
       await Promise.allSettled(
-        kyrageFiles.map((f) => fs.unlink(path.join(tempDir, f))),
+        kyrageFiles.map((f) => fs.unlink(path.join(tempDir, f)))
       );
     } catch {
       // Ignore cleanup errors
@@ -89,7 +89,7 @@ class FileDevDatabaseInstance implements DevDatabaseInstance {
     private options: {
       manageType: DevDatabaseManageType;
       name?: string;
-    },
+    }
   ) {}
 
   async start(): Promise<void> {
@@ -101,7 +101,7 @@ class FileDevDatabaseInstance implements DevDatabaseInstance {
       // one-off: Use temp file instead of :memory: to support multiple connections
       const tmpFile = path.join(
         os.tmpdir(),
-        `kyrage-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`,
+        `kyrage-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`
       );
       this.filePath = tmpFile;
       this.connectionString = tmpFile;

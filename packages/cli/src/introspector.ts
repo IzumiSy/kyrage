@@ -36,7 +36,7 @@ export const getIntrospector = (client: DBClient) => {
 
         for (const column of table.columns) {
           const extraInfo = extTables.find(
-            (c) => c.table === table.name && c.name === column.name,
+            (c) => c.table === table.name && c.name === column.name
           );
           if (!extraInfo) {
             continue;
@@ -44,7 +44,7 @@ export const getIntrospector = (client: DBClient) => {
 
           // Primary key columns should always be notNull
           const isPrimaryKey = primaryKeyColumns.has(
-            `${table.name}.${column.name}`,
+            `${table.name}.${column.name}`
           );
 
           columns[column.name] = {

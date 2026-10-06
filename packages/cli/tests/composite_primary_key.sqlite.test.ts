@@ -29,10 +29,10 @@ describe.skipIf(!isSQLite)("Composite Primary Key (SQLite)", () => {
               t.unique(["author_id", "slug"], {
                 name: "unique_author_slug",
               }),
-            ],
+            ]
           ),
         ],
-      },
+      }
     );
 
     expect(await deps.fs.readdir("migrations")).toHaveLength(1);

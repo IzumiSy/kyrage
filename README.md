@@ -545,6 +545,9 @@ Check out the [examples/basic](./examples/basic) directory for a complete workin
 ## Contributing
 
 Contributions are welcome! Please feel free to submit issues and pull requests.
+After installing dependencies with `pnpm install`, run `pnpm lint` and
+`pnpm format:check` to check TypeScript sources. Run `pnpm format` to format
+them with oxfmt. CI also runs the lint and formatting checks.
 
 ## License
 
