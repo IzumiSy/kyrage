@@ -405,8 +405,19 @@ export function createCommonDependencies(
   - `dev/container.ts`: Development database container lifecycle management with dialect factory integration.
   - `tests/`: Unit tests for core logic including comprehensive Operation array validation.
 
+- `packages/cli/tests/`
+  Integration tests for migration generation, application, introspection, and development databases.
+  - `fixtures.ts`: Vitest `test.extend()` context with lazy file-scoped database setup and teardown.
+  - `helper.ts`: Independent dialect expectation profiles and shared migration helpers.
+
 - `examples/basic/`  
   Example project and configuration.
+
+## Integration Test Context
+
+The CI matrix selects one dialect per invocation through `TEST_DIALECT`. Integration tests receive `{ testDB, expectations }` from `databaseTest`, rather than starting databases during module collection. The file-scoped fixture keeps one isolated database per file and registers cleanup through Vitest; tests that deliberately share state must remain sequential.
+
+`testForDialects(...)` declares dialect-specific coverage with Vitest's `runIf`, so unsupported tests do not start a database. Catalog names and SQL spellings come from an independent test profile, not the production schema adapter. Common indexed string fixtures use `varchar(255)` across dialects, eliminating conditional column types without weakening exact SQL assertions.
 
 ## Main Flow
 

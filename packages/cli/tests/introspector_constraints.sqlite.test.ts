@@ -1,18 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect } from "vitest";
 import { sql } from "kysely";
-import { applyTable, setupTestDB } from "./helper";
+import { applyTable } from "./helper";
+import { testForDialects } from "./fixtures";
 import { column, defineTable } from "../src";
-import { getIntrospector } from "../src/introspector";
-import { fs } from "memfs";
-import { FSPromiseAPIs } from "../src/commands/common";
 
-const { client, dialect, database } = await setupTestDB();
-const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
-const introspector = getIntrospector(client);
-const isSQLite = dialect.getName() === "sqlite";
+const it = testForDialects("sqlite");
 
-describe.skipIf(!isSQLite)("sqlite introspector constraints", () => {
-  it("should introspect constraints with sqlite naming behavior", async () => {
+describe("sqlite introspector constraints", () => {
+  it("should introspect constraints with sqlite naming behavior", async ({
+    testDB,
+  }) => {
+    const { client, database, baseDeps, introspector } = testDB;
     const usersTable = defineTable("users", {
       id: column("uuid", { primaryKey: true }),
       email: column("text", { unique: true }),
@@ -36,7 +34,7 @@ describe.skipIf(!isSQLite)("sqlite introspector constraints", () => {
               name: "fk_user",
             }),
             t.unique(["user_id", "title"], { name: "unique_title_per_user" }),
-          ],
+          ]
         ),
       ],
     });
@@ -68,7 +66,7 @@ describe.skipIf(!isSQLite)("sqlite introspector constraints", () => {
           type: "PRIMARY KEY",
           columns: ["id"],
         },
-      ]),
+      ])
     );
 
     expect(constraints.unique).toHaveLength(2);
@@ -96,7 +94,7 @@ describe.skipIf(!isSQLite)("sqlite introspector constraints", () => {
           type: "UNIQUE",
           columns: ["email"],
         },
-      ]),
+      ])
     );
 
     expect(constraints.foreignKey).toHaveLength(1);
@@ -113,7 +111,7 @@ describe.skipIf(!isSQLite)("sqlite introspector constraints", () => {
           onDelete: "cascade",
           onUpdate: "cascade",
         },
-      ]),
+      ])
     );
 
     await using db = client.getDB();

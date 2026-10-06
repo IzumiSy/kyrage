@@ -1,22 +1,25 @@
-import { describe, it, expect } from "vitest";
-import { applyTable, defineConfigForTest, dropTablesForDialect, setupTestDB } from "./helper";
+import { describe, expect } from "vitest";
+import {
+  applyTable,
+  defineConfigForTest,
+  dropTablesForDialect,
+} from "./helper";
 import { column, defineTable } from "../src";
-import { getIntrospector } from "../src/introspector";
-import { fs, vol } from "memfs";
+import { vol } from "memfs";
 import { executeGenerate } from "../src/commands/generate";
-import { FSPromiseAPIs } from "../src/commands/common";
 import { defaultConsolaLogger } from "../src/logger";
+import { testForDialects } from "./fixtures";
 
-const { client, dialect, database } = await setupTestDB();
-const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
-const introspector = getIntrospector(client);
-const dialectName = dialect.getName();
-const isSQLite = dialectName === "sqlite";
-const isMysqlLike = dialectName === "mysql" || dialectName === "mariadb";
-const schemaName = isMysqlLike ? "test" : "public";
+const it = testForDialects("postgres", "cockroachdb", "mysql", "mariadb");
+const mysqlIt = testForDialects("mysql", "mariadb");
 
-describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
-  it("should introspect constraints with explicit constraint names", async () => {
+describe("non-sqlite introspector constraints", () => {
+  it("should introspect constraints with explicit constraint names", async ({
+    testDB,
+    expectations,
+  }) => {
+    const { client, database, baseDeps, introspector } = testDB;
+    const { schema: schemaName, primaryKeyName } = expectations;
     const usersTable = defineTable("users", {
       id: column("char(36)", { primaryKey: true }),
       email: column("varchar(255)", { unique: true }),
@@ -40,7 +43,7 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
               name: "fk_user",
             }),
             t.unique(["user_id", "title"], { name: "unique_title_per_user" }),
-          ],
+          ]
         ),
       ],
     });
@@ -51,20 +54,20 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
     expect(constraints.primaryKey).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          name: isMysqlLike ? "PRIMARY" : "posts_id_primary_key",
+          name: primaryKeyName("posts_id_primary_key"),
           schema: schemaName,
           table: "posts",
           type: "PRIMARY KEY",
           columns: ["id"],
         }),
         expect.objectContaining({
-          name: isMysqlLike ? "PRIMARY" : "users_id_primary_key",
+          name: primaryKeyName("users_id_primary_key"),
           schema: schemaName,
           table: "users",
           type: "PRIMARY KEY",
           columns: ["id"],
         }),
-      ]),
+      ])
     );
 
     expect(constraints.unique).toHaveLength(2);
@@ -84,7 +87,7 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
           type: "UNIQUE",
           columns: ["email"],
         }),
-      ]),
+      ])
     );
 
     expect(constraints.foreignKey).toHaveLength(1);
@@ -101,15 +104,16 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
           onDelete: "cascade",
           onUpdate: "cascade",
         }),
-      ]),
+      ])
     );
 
     await dropTablesForDialect({ client, tableNames: ["posts", "users"] });
   });
 
-  it.skipIf(!isMysqlLike)(
+  mysqlIt(
     "should apply constraint, index, and column changes and then regenerate cleanly",
-    async () => {
+    async ({ testDB }) => {
+      const { client, database, baseDeps, introspector } = testDB;
       const users = defineTable("users", {
         id: column("char(36)", { primaryKey: true }),
       });
@@ -132,7 +136,7 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
               t.primaryKey(["id", "owner_id"], { name: "custom_orders_pk" }),
               t.reference("owner_id", users, "id", { name: "fk_orders_owner" }),
               t.index(["quantity"]),
-            ],
+            ]
           ),
         ],
       });
@@ -149,9 +153,7 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
               code: column("varchar(255)"),
               quantity: column("bigint"),
             },
-            (t) => [
-              t.primaryKey(["id", "code"], { name: "changed_orders_pk" }),
-            ],
+            (t) => [t.primaryKey(["id", "code"], { name: "changed_orders_pk" })]
           ),
         ],
       });
@@ -163,13 +165,13 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
           table: "orders",
           name: "PRIMARY",
           columns: ["id", "code"],
-        }),
+        })
       );
       expect(
         snapshot.tables.find((table) => table.name === "orders")?.columns
-          .quantity,
+          .quantity
       ).toEqual(
-        expect.objectContaining({ dataType: "bigint", notNull: false }),
+        expect.objectContaining({ dataType: "bigint", notNull: false })
       );
       await using db = client.getDB();
       await db.insertInto("orders").values({ id: 1, code: "test" }).execute();
@@ -183,12 +185,13 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
       await executeGenerate(deps, { ignorePending: false, dev: false });
       expect(vol.toJSON()).toEqual(before);
       await dropTablesForDialect({ client, tableNames: ["orders", "users"] });
-    },
+    }
   );
 
-  it.skipIf(!isMysqlLike)(
+  mysqlIt(
     "should reject alterations that would discard auto-increment",
-    async () => {
+    async ({ testDB }) => {
+      const { client, database, baseDeps } = testDB;
       await using db = client.getDB();
       await db.schema
         .createTable("legacy")
@@ -209,11 +212,11 @@ describe.skipIf(isSQLite)("non-sqlite introspector constraints", () => {
               ],
             }),
           },
-          { ignorePending: false, dev: false },
-        ),
+          { ignorePending: false, dev: false }
+        )
       ).rejects.toThrow("auto_increment");
       expect(vol.toJSON()).toEqual(before);
       await dropTablesForDialect({ client, tableNames: ["legacy"] });
-    },
+    }
   );
 });

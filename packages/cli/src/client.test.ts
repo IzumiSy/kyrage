@@ -1,11 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { setupTestDB } from "../tests/helper";
-
-const { client } = await setupTestDB();
+import { describe, expect } from "vitest";
+import { databaseTest as it } from "../tests/fixtures";
 
 describe("DBClient", () => {
   describe("should be switchable to plan mode and able to be back", async () => {
-    it("should create a test table in non-plan mode", async () => {
+    it("should create a test table in non-plan mode", async ({ testDB }) => {
+      const { client } = testDB;
       await using actualDB = client.getDB();
       await actualDB.schema
         .createTable("test_table")
@@ -17,7 +16,8 @@ describe("DBClient", () => {
       expect(tablesBefore[0].name).toBe("test_table");
     });
 
-    it("should not mutate tables in plan mode", async () => {
+    it("should not mutate tables in plan mode", async ({ testDB }) => {
+      const { client } = testDB;
       await using actualDB = client.getDB();
       await using planDB = client.getDB({
         plan: true,

@@ -1,4 +1,3 @@
-import { afterAll } from "vitest";
 import { getClient } from "../src/client";
 import {
   defineConfig,
@@ -11,59 +10,99 @@ import { getDialect } from "../src/dialect/factory";
 import { executeApply } from "../src/commands/apply";
 import { executeGenerate } from "../src/commands/generate";
 import { defaultConsolaLogger } from "../src/logger";
-import { KyrageDialect } from "../src/dialect/types";
 import { ManagedKey } from "../src/dev/providers/container";
 import { CommonDependencies } from "../src/commands/common";
-import { sql } from "kysely";
 
-const getConfigForTest = (kyrageDialect: KyrageDialect) => {
-  switch (kyrageDialect.getName()) {
-    case "postgres":
-      return {
-        container: {
-          image: "postgres:16",
-        },
-      };
-    case "cockroachdb":
-      return {
-        container: {
-          image: "cockroachdb/cockroach:latest-v24.3",
-        },
-      };
-    case "mysql":
-      return {
-        container: {
-          image: "mysql:8",
-        },
-      };
-    case "mariadb":
-      return {
-        container: {
-          image: "mariadb:11",
-        },
-      };
-    case "sqlite":
-      return {};
-    default:
-      throw new Error("unsupported dialect specified");
-  }
+/** Expected catalog and SQL spellings, independent of production normalization. */
+export type DialectTestExpectations = {
+  schema: string;
+  booleanDefault: string;
+  rawCharType: string;
+  rawTextType: string;
+  primaryKeyName: (declaredName: string) => string;
+  constraintMetadata: Record<string, null>;
+  quote: string;
+  dropUniqueSql: string;
+  dropIndexTableSql: (table: string) => string;
 };
 
+const postgresExpectations: DialectTestExpectations = {
+  schema: "public",
+  booleanDefault: "true",
+  rawCharType: "bpchar",
+  rawTextType: "text",
+  primaryKeyName: (name) => name,
+  constraintMetadata: {
+    on_delete: null,
+    on_update: null,
+    referenced_columns: null,
+    referenced_table: null,
+  },
+  quote: '"',
+  dropUniqueSql: "drop constraint",
+  dropIndexTableSql: () => "",
+};
+const mysqlExpectations: DialectTestExpectations = {
+  schema: "test",
+  booleanDefault: "1",
+  rawCharType: "char",
+  rawTextType: "text",
+  primaryKeyName: () => "PRIMARY",
+  constraintMetadata: {},
+  quote: "`",
+  dropUniqueSql: "drop index",
+  dropIndexTableSql: (table) => ` on \`${table}\``,
+};
+
+/** Selects independent test data once, rather than branching inside assertions. */
+export const dialectTestProfiles = {
+  postgres: {
+    config: { container: { image: "postgres:16" } },
+    expectations: postgresExpectations,
+  },
+  cockroachdb: {
+    config: { container: { image: "cockroachdb/cockroach:latest-v24.3" } },
+    expectations: postgresExpectations,
+  },
+  mysql: {
+    config: { container: { image: "mysql:8" } },
+    expectations: mysqlExpectations,
+  },
+  mariadb: {
+    config: { container: { image: "mariadb:11" } },
+    expectations: mysqlExpectations,
+  },
+  sqlite: {
+    config: {},
+    expectations: {
+      ...postgresExpectations,
+      rawCharType: "char(36)",
+      rawTextType: "TEXT",
+    },
+  },
+} satisfies Record<
+  DialectEnum,
+  { config: unknown; expectations: DialectTestExpectations }
+>;
+
+/** The CI matrix runs one dialect per Vitest invocation. */
+export const testDialect = (process.env.TEST_DIALECT ??
+  "postgres") as DialectEnum;
+
 const getContainer = () => {
-  const kyrageDialect = getDialect(
-    (process.env.TEST_DIALECT as DialectEnum) || "postgres",
-  );
+  const kyrageDialect = getDialect(testDialect);
 
   return {
     dialect: kyrageDialect,
     provider: kyrageDialect.createDevDatabaseProvider(),
     config: kyrageDialect.parseDevDatabaseConfig(
-      getConfigForTest(kyrageDialect),
+      dialectTestProfiles[testDialect].config
     ),
   };
 };
 
-export const setupTestDB = async () => {
+/** Starts an isolated database with an explicit teardown owned by the test fixture. */
+export const startTestDB = async () => {
   const { provider, dialect, config } = getContainer();
   const instance = await provider.setup(config, "one-off");
   await instance.start();
@@ -76,14 +115,11 @@ export const setupTestDB = async () => {
     database,
   });
 
-  afterAll(async () => {
-    await instance.stop();
-  });
-
   return {
     database,
     client,
     dialect,
+    stop: () => instance.stop(),
   };
 };
 
@@ -101,7 +137,7 @@ export const applyTable = async (
   },
   hooks?: {
     beforeApply?: (deps: CommonDependencies) => Promise<void> | void;
-  },
+  }
 ) => {
   const deps = {
     ...baseDeps,
@@ -123,23 +159,15 @@ export const applyTable = async (
   return deps;
 };
 
-/**
- * Drop test tables with dialect-aware schema qualification.
- */
+/** Drops test tables in dependency order using each database's native identifier quoting. */
 export const dropTablesForDialect = async (props: {
   client: CommonDependencies["client"];
   tableNames: ReadonlyArray<string>;
 }) => {
-  const targets = props.tableNames
-    .map((tableName) =>
-      ["sqlite", "mysql", "mariadb"].includes(props.client.getDialect())
-        ? tableName
-        : `public.${tableName}`,
-    )
-    .join(", ");
-
   await using db = props.client.getDB();
-  await sql.raw(`DROP TABLE ${targets}`).execute(db);
+  for (const tableName of props.tableNames) {
+    await db.schema.dropTable(tableName).execute();
+  }
 };
 
 /**

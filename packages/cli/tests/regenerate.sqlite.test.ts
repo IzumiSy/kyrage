@@ -1,17 +1,19 @@
-import { describe, beforeAll, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 import { defineTable, column } from "../src/config/builder";
-import { defineConfigForTest, setupTestDB } from "./helper";
+import { defineConfigForTest } from "./helper";
+import { testForDialects } from "./fixtures";
 import { sql } from "kysely";
 import { executeGenerate } from "../src/commands/generate";
-import { vol, fs } from "memfs";
+import { vol } from "memfs";
 import { defaultConsolaLogger } from "../src/logger";
-import { FSPromiseAPIs } from "../src/commands/common";
 
-const { database, client, dialect } = await setupTestDB();
-const isSQLite = dialect.getName() === "sqlite";
+const it = testForDialects("sqlite");
 
-describe.skipIf(!isSQLite)("generate (SQLite)", () => {
-  beforeAll(async () => {
+describe("generate (SQLite)", () => {
+  it("should generate one migration due to SQLite constraint-name introspection behavior", async ({
+    testDB,
+  }) => {
+    const { database, client, baseDeps } = testDB;
     await using db = client.getDB();
 
     await sql`
@@ -34,9 +36,6 @@ describe.skipIf(!isSQLite)("generate (SQLite)", () => {
         CONSTRAINT fk_orders_customer_id FOREIGN KEY (customer_id) REFERENCES members (id) ON DELETE CASCADE ON UPDATE CASCADE
       );
     `.execute(db);
-  });
-
-  it("should generate one migration due to SQLite constraint-name introspection behavior", async () => {
     const beforeVol = vol.toJSON();
 
     const membersTable = defineTable(
@@ -46,11 +45,10 @@ describe.skipIf(!isSQLite)("generate (SQLite)", () => {
         name: column("text", { notNull: true }),
         email: column("text", { unique: true, notNull: true }),
       },
-      (t) => [t.index(["name", "email"], { unique: true })],
+      (t) => [t.index(["name", "email"], { unique: true })]
     );
     const deps = {
-      client,
-      fs: fs.promises as unknown as FSPromiseAPIs,
+      ...baseDeps,
       logger: defaultConsolaLogger,
       config: defineConfigForTest({
         database,
@@ -75,7 +73,7 @@ describe.skipIf(!isSQLite)("generate (SQLite)", () => {
                 onUpdate: "cascade",
                 name: "fk_orders_customer_id",
               }),
-            ],
+            ]
           ),
         ],
       }),
@@ -91,7 +89,7 @@ describe.skipIf(!isSQLite)("generate (SQLite)", () => {
     const generatedMigrationFiles = Object.keys(afterVol).filter(
       (path) =>
         path.includes("/migrations/") &&
-        !Object.prototype.hasOwnProperty.call(beforeVolRecord, path),
+        !Object.prototype.hasOwnProperty.call(beforeVolRecord, path)
     );
 
     expect(generatedMigrationFiles).toHaveLength(1);
