@@ -68,7 +68,7 @@ export const doMysqlIntrospect =
       constraints,
     });
 
-    // ponytail: index provenance is unavailable; infer implicit FK indexes by name.
+    // Caveat: index provenance is unavailable; infer implicit FK indexes by name.
     // Declare the index explicitly to manage it independently of its constraint.
     const normalizedIndexes = normalized.indexes.filter(
       (index) =>
