@@ -46,6 +46,11 @@ export class DBClient {
   getDialect() {
     return this.constructorProps.databaseProps.dialect;
   }
+
+  /** Supplies the dialect's schema behavior to generation and migration execution. */
+  getSchemaAdapter() {
+    return getDialect(this.getDialect()).createSchemaAdapter();
+  }
 }
 
 /**

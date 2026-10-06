@@ -6,6 +6,9 @@ import { diffSchema } from "../diff";
 import { executeOperation, type Operation } from "../operations/executor";
 import type { SchemaSnapshot } from "../operations/shared/types";
 import { convertMysqlTypeName, doMysqlIntrospect } from "./mysql";
+import { getDialect } from "./factory";
+import type { SchemaComparison } from "./schema-adapter";
+import { createMigrationProvider } from "../migration";
 
 /** Creates a connection-free SQL collector using the actual target dialect. */
 const createPlanDB = (dialect: "mysql" | "mariadb" | "postgres") =>
@@ -27,6 +30,16 @@ const emptySnapshot: SchemaSnapshot = {
 describe.each(["mysql", "mariadb"] as const)(
   "%s schema semantics",
   (dialect) => {
+    const adapter = getDialect(dialect).createSchemaAdapter();
+    /** Applies the selected adapter's comparison policy before the generic diff. */
+    const compareSchemas = (comparison: SchemaComparison) =>
+      diffSchema(adapter.prepareSchemaComparison(comparison));
+    /** Injects operation overrides explicitly instead of relying on DB identification. */
+    const execute = (
+      db: Parameters<typeof executeOperation>[0],
+      operation: Operation,
+    ) => executeOperation(db, operation, adapter.operationExecutors);
+
     it("normalizes omitted type parameters without hiding precision changes", () => {
       const current = {
         ...emptySnapshot,
@@ -52,9 +65,9 @@ describe.each(["mysql", "mariadb"] as const)(
           },
         ],
       };
-      expect(diffSchema({ current, ideal, dialect }).operations).toEqual([]);
+      expect(compareSchemas({ current, ideal }).operations).toEqual([]);
       expect(
-        diffSchema({
+        compareSchemas({
           current,
           ideal: {
             ...ideal,
@@ -68,7 +81,6 @@ describe.each(["mysql", "mariadb"] as const)(
               },
             ],
           },
-          dialect,
         }).operations,
       ).toHaveLength(2);
     });
@@ -94,10 +106,10 @@ describe.each(["mysql", "mariadb"] as const)(
           },
         ],
       };
-      expect(diffSchema({ current, ideal, dialect }).operations).toEqual([]);
+      expect(compareSchemas({ current, ideal }).operations).toEqual([]);
       expect(diffSchema({ current, ideal }).operations).toHaveLength(2);
       expect(
-        diffSchema({
+        compareSchemas({
           current,
           ideal: {
             ...ideal,
@@ -105,7 +117,6 @@ describe.each(["mysql", "mariadb"] as const)(
               { ...ideal.primaryKeyConstraints[0], columns: ["product_id"] },
             ],
           },
-          dialect,
         }).operations,
       ).toEqual([
         expect.objectContaining({
@@ -114,11 +125,12 @@ describe.each(["mysql", "mariadb"] as const)(
         }),
         expect.objectContaining({
           type: "create_primary_key_constraint",
+          name: "PRIMARY",
           columns: ["product_id"],
         }),
       ]);
       expect(
-        diffSchema({ current, ideal: emptySnapshot, dialect }).operations,
+        compareSchemas({ current, ideal: emptySnapshot }).operations,
       ).toEqual([
         {
           type: "drop_primary_key_constraint",
@@ -153,16 +165,15 @@ describe.each(["mysql", "mariadb"] as const)(
             { ...fk, onDelete: action, onUpdate: action },
           ],
         };
-        expect(diffSchema({ current, ideal, dialect }).operations).toEqual([]);
+        expect(compareSchemas({ current, ideal }).operations).toEqual([]);
       }
       expect(
-        diffSchema({
+        compareSchemas({
           current,
           ideal: {
             ...emptySnapshot,
             foreignKeyConstraints: [{ ...fk, onDelete: "cascade" }],
           },
-          dialect,
         }).operations.map((op) => op.type),
       ).toEqual([
         "drop_foreign_key_constraint",
@@ -200,7 +211,7 @@ describe.each(["mysql", "mariadb"] as const)(
           after: { type: "bigint", notNull: false, defaultSql: "5" },
         },
       ];
-      for (const operation of operations) await executeOperation(db, operation);
+      for (const operation of operations) await execute(db, operation);
       expect(db.getPlannedQueries().map((query) => query.sql)).toEqual([
         "alter table `orders` drop primary key",
         "alter table `orders` drop foreign key `fk``user`",
@@ -209,7 +220,7 @@ describe.each(["mysql", "mariadb"] as const)(
         "alter table `orders` modify column `quantity` bigint default 3 not null",
         "alter table `orders` modify column `quantity` bigint default 5",
       ]);
-      await executeOperation(db, {
+      await execute(db, {
         type: "alter_column",
         table: "orders",
         column: "token",
@@ -221,7 +232,7 @@ describe.each(["mysql", "mariadb"] as const)(
         "alter table `orders` modify column `token` binary(16) default (uuid_to_bin(uuid())) not null",
       );
       await expect(
-        executeOperation(db, {
+        execute(db, {
           type: "alter_column",
           table: "orders",
           column: "id",
@@ -233,8 +244,7 @@ describe.each(["mysql", "mariadb"] as const)(
         }),
       ).rejects.toThrow("Cannot safely modify column: auto_increment");
       expect(() =>
-        diffSchema({
-          dialect,
+        compareSchemas({
           current: {
             ...emptySnapshot,
             tables: [
@@ -256,7 +266,7 @@ describe.each(["mysql", "mariadb"] as const)(
         }),
       ).toThrow("Cannot safely modify column");
       await expect(
-        executeOperation(db, {
+        execute(db, {
           type: "alter_column",
           table: "orders",
           column: "quantity",
@@ -264,6 +274,52 @@ describe.each(["mysql", "mariadb"] as const)(
           after: { type: "integer; drop table orders" },
         }),
       ).rejects.toThrow("Unsupported data type");
+    });
+
+    it("uses the standard executor when an operation has no override", async () => {
+      await using db = createPlanDB(dialect);
+      expect(adapter.operationExecutors.create_index).toBeUndefined();
+      await execute(db, {
+        type: "create_index",
+        table: "orders",
+        name: "idx_order_quantity",
+        columns: ["quantity"],
+        unique: false,
+      });
+      expect(db.getPlannedQueries().map((query) => query.sql)).toEqual([
+        "create index `idx_order_quantity` on `orders` (`quantity`)",
+      ]);
+    });
+
+    it("retains injected migration executors on a plain transaction Kysely", async () => {
+      await using db = createPlanDB(dialect);
+      const provider = createMigrationProvider({
+        options: { plan: true },
+        operationExecutors: adapter.operationExecutors,
+        migrationsResolver: async () => [
+          {
+            id: "drop_order_key",
+            version: "1",
+            diff: {
+              operations: [
+                {
+                  type: "drop_primary_key_constraint",
+                  table: "orders",
+                  name: "custom_pk",
+                },
+              ],
+            },
+          },
+        ],
+      });
+      const migrations = await provider.getMigrations();
+      await db.transaction().execute(async (transaction) => {
+        expect("getPlannedQueries" in transaction).toBe(false);
+        await migrations.drop_order_key.up(transaction);
+      });
+      expect(db.getPlannedQueries().map((query) => query.sql)).toEqual([
+        "alter table `orders` drop primary key",
+      ]);
     });
   },
 );

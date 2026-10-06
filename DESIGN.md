@@ -44,12 +44,15 @@ type SchemaDiff = {
 **kyrage** uses a **Dialect-based Architecture** to provide unified database support through a clean abstraction layer:
 
 ```typescript
-export interface KyrageDialect {
-  getDevDatabaseImageName: () => string;
+export type KyrageDialect = {
+  getName: () => string;
   createKyselyDialect: (connectionString: string) => Dialect;
   createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;
-  createDevDatabaseContainer: (image: string) => StartableContainer;
-}
+  createSchemaAdapter: () => SchemaAdapter;
+  createDevDatabaseProvider: () => DevDatabaseProvider;
+  parseDevDatabaseConfig: (config: unknown) => DevDatabaseConfig;
+  hasReusableDevDatabase: () => Promise<boolean>;
+};
 
 // Factory pattern for dialect management
 export const getDialect = (dialectName: DialectEnum): KyrageDialect => {
@@ -73,6 +76,15 @@ export const getDialect = (dialectName: DialectEnum): KyrageDialect => {
 2. **Extensibility**: New databases can be added by implementing the `KyrageDialect` interface
 3. **Maintainability**: Database-specific code is isolated and centralized
 4. **Type Safety**: Factory pattern ensures only supported dialects are used
+
+#### Schema Adapters
+
+Each dialect supplies a `SchemaAdapter` through `createSchemaAdapter()`. `DBClient.getSchemaAdapter()` resolves this behavior at the database configuration boundary:
+
+- `prepareSchemaComparison`: Normalizes current/ideal snapshots before the generic diff engine compares them.
+- `operationExecutors`: A typed, partial map of operation overrides; omitted operations use their registered standard executor.
+
+PostgreSQL, CockroachDB, and SQLite use the default adapter. MySQL and MariaDB share `mysqlSchemaAdapter`, which owns their comparison rules and nonstandard DDL. Core diffing, commands, migration execution, and operation implementations do not inspect dialect names or native Kysely adapter classes.
 
 ### Benefits
 
@@ -149,8 +161,8 @@ function diffSchema(props: {
 **Strategy**:
 - Compare current vs ideal schema snapshots using functional utilities (Ramda)
 - Generate operations in dependency-safe order
-- Ignore primary-key name differences for MySQL and MariaDB, which store primary keys as `PRIMARY`
-- Normalize MySQL's omitted type parameters and equivalent default foreign-key actions before comparison
+- Compare snapshots prepared by the selected schema adapter; the diff engine itself has no dialect-specific options or branches
+- MySQL/MariaDB adapters align primary-key names, omitted type parameters, and equivalent default foreign-key actions before comparison
 - Return unified operation array for consistent processing
 
 **Operation Types**:
@@ -233,35 +245,25 @@ export const createTableOp = defineOperation({
 
 **Architecture**:
 ```typescript
-async function buildMigrationFromDiff(
-  db: Kysely<any>, 
-  diff: SchemaDiff
-) {
-  // Apply operation reconciliation before execution
-  const reconciledOperations = buildReconciledOperations(diff.operations);
-  
-  for (const operation of reconciledOperations) {
-    await executeOperation(db, operation);
+const adapter = client.getSchemaAdapter();
+const comparison = adapter.prepareSchemaComparison({ current, ideal });
+const diff = diffSchema(comparison);
+
+const provider = createMigrationProvider({
+  migrationsResolver,
+  options: { plan },
+  operationExecutors: adapter.operationExecutors,
+});
+
+// The provider captures the injected executors, including for transactional Kysely instances.
+const up = async (db: Kysely<any>) => {
+  for (const operation of buildReconciledOperations(diff.operations)) {
+    await executeOperation(db, operation, adapter.operationExecutors);
   }
-}
+};
 
-// Dynamic operation execution using type-safe dispatch
-async function executeOperation(db: Kysely<any>, operation: Operation) {
-  const execute = getOperationExecutor(operation.type);
-  return await execute(db, operation);
-}
-
-function getOperationExecutor<T extends Operation["type"]>(operationType: T) {
-  const operation = operations.find((op) => op.typeName === operationType);
-  if (!operation) {
-    throw new Error(`Unknown operation type: ${operationType}`);
-  }
-
-  return operation.execute as (
-    db: Kysely<any>,
-    operation: Extract<Operation, { type: T }>
-  ) => Promise<void>;
-}
+// Dispatch prefers the injected override and falls back to the registered standard executor.
+const execute = executors[operation.type] ?? registeredOperation.execute;
 ```
 
 **Benefits**: 
@@ -271,7 +273,7 @@ function getOperationExecutor<T extends Operation["type"]>(operationType: T) {
 - Consistent error handling and transaction management
 - Automatic operation registration and schema validation
 
-Existing column, constraint, and index operations use MySQL-specific SQL paths where the standard syntax differs: `MODIFY COLUMN`, `DROP PRIMARY KEY`, `DROP FOREIGN KEY`, and index-based unique-constraint drops. These paths are shared by MariaDB and participate in SQL planning as well as execution. Catalog defaults are reconstructed as SQL literals or parenthesized expressions. Full-definition column alterations are rejected during generation and execution when catalog metadata identifies unsupported attributes that would otherwise be lost (for example, auto-increment or custom collation). MySQL and MariaDB DDL is nontransactional, so a migration failure can leave preceding operations applied.
+Generic column, constraint, and index operations contain only standard SQL. The MySQL/MariaDB schema adapter supplies overrides for `MODIFY COLUMN`, `DROP PRIMARY KEY`, `DROP FOREIGN KEY`, unique-constraint index drops, and table-qualified index drops. The migration provider receives these executors explicitly, so plan mode and real or transactional execution use the same behavior without inspecting database identity. Catalog defaults are reconstructed as SQL literals or parenthesized expressions. Full-definition column alterations are rejected during generation and execution when catalog metadata identifies unsupported attributes that would otherwise be lost (for example, auto-increment or custom collation). MySQL and MariaDB DDL is nontransactional, so a migration failure can leave preceding operations applied.
 
 ### 7. Development Database Management (`dev/container.ts`)
 
@@ -383,6 +385,8 @@ export function createCommonDependencies(
   - `dialect/`: Centralized database dialect management and abstractions.
     - `types.ts`: Dialect interface definitions and schema representation types (`KyrageDialect`, `ColumnExtraAttribute`, `ConstraintAttributes`).
     - `factory.ts`: Centralized dialect instantiation and management (`getDialect`, `getSupportedDialects`).
+    - `schema-adapter.ts`: Schema adapter contract, typed executor overrides, and default behavior.
+    - `mysql-schema-adapter.ts`: MySQL/MariaDB comparison policies and operation executor overrides.
     - `postgres.ts`: PostgreSQL dialect implementation with introspection driver (`PostgresKyrageDialect`, `postgresExtraIntrospectorDriver`).
     - `cockroachdb.ts`: CockroachDB dialect implementation extending PostgreSQL compatibility (`CockroachDBKyrageDialect`).
     - `mysql.ts`: MySQL dialect implementation with catalog introspection (`MysqlKyrageDialect`).

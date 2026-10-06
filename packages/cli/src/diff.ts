@@ -21,8 +21,7 @@ import { dropUniqueConstraint } from "./operations/constraint/dropUniqueConstrai
 import { createForeignKeyConstraint } from "./operations/constraint/createForeignKeyConstraint";
 import { dropForeignKeyConstraint } from "./operations/constraint/dropForeignKeyConstraint";
 import * as R from "ramda";
-import { normalizeMysqlColumnType } from "./dialect/shared";
-import { DialectEnum, IndexSchema } from "./config/loader"; // 汎用的なdiff演算子
+import { IndexSchema } from "./config/loader"; // 汎用的なdiff演算子
 const createDiffOperations = <K>() => ({
   added: <T>(
     currentKeys: ReadonlyArray<K>,
@@ -225,17 +224,16 @@ export function diffIndexes(props: {
   return operations;
 }
 
-/** Compares primary keys, ignoring names on databases that always use PRIMARY. */
+/** Compares primary keys by their normalized table, name, and ordered columns. */
 export function diffPrimaryKeyConstraints(props: {
   current: ReadonlyArray<PrimaryKeyConstraintSchema>;
   ideal: ReadonlyArray<PrimaryKeyConstraintSchema>;
-  ignoreNames?: boolean;
 }) {
   const { current, ideal } = props;
   const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
   const constraintKey = (pk: PrimaryKeyConstraintSchema) =>
-    props.ignoreNames ? pk.table : `${pk.table}:${pk.name}`;
+    `${pk.table}:${pk.name}`;
 
   const currentPKMap = new Map(current.map((pk) => [constraintKey(pk), pk]));
   const idealPKMap = new Map(ideal.map((pk) => [constraintKey(pk), pk]));
@@ -343,11 +341,10 @@ export function diffUniqueConstraints(props: {
   return operations;
 }
 
-/** Compares foreign keys, including MySQL's equivalent default actions. */
+/** Compares normalized foreign-key columns, references, and actions. */
 function diffForeignKeyConstraints(props: {
   current: ReadonlyArray<ForeignKeyConstraintSchema>;
   ideal: ReadonlyArray<ForeignKeyConstraintSchema>;
-  mysqlDefaultActions?: boolean;
 }) {
   const operations: Array<Operation> = [];
   const diffOps = createDiffOperations<string>();
@@ -378,11 +375,6 @@ function diffForeignKeyConstraints(props: {
     })
   );
 
-  const normalizeAction = (action: ForeignKeyConstraintSchema["onDelete"]) =>
-    props.mysqlDefaultActions && (!action || action === "no action")
-      ? "restrict"
-      : action;
-
   // 変更されたForeign Key制約（削除→追加で対応）
   const foreignKeyChanged = (name: string) => {
     const current = props.current.find((f) => f.name === name);
@@ -393,8 +385,8 @@ function diffForeignKeyConstraints(props: {
       R.equals(current.columns, ideal.columns) &&
       current.referencedTable === ideal.referencedTable &&
       R.equals(current.referencedColumns, ideal.referencedColumns) &&
-      normalizeAction(current.onDelete) === normalizeAction(ideal.onDelete) &&
-      normalizeAction(current.onUpdate) === normalizeAction(ideal.onUpdate)
+      current.onDelete === ideal.onDelete &&
+      current.onUpdate === ideal.onUpdate
     );
   };
 
@@ -421,24 +413,14 @@ function diffForeignKeyConstraints(props: {
   return operations;
 }
 
-/** Builds schema operations using the target dialect's constraint semantics. */
+/** Builds operations from already-normalized schemas without database-specific rules. */
 export function diffSchema(props: {
   current: SchemaSnapshot;
   ideal: SchemaSnapshot;
-  dialect?: DialectEnum;
 }) {
-  const isMysql = props.dialect === "mysql" || props.dialect === "mariadb";
-  const normalizeTables = (tables: Tables) => isMysql
-    ? tables.map((table) => ({
-        ...table,
-        columns: Object.fromEntries(Object.entries(table.columns).map(([name, column]) => [
-          name, { ...column, type: normalizeMysqlColumnType(column.type) },
-        ])),
-      }))
-    : tables;
   const tableOperations = diffTables({
-    current: normalizeTables(props.current.tables),
-    ideal: normalizeTables(props.ideal.tables),
+    current: props.current.tables,
+    ideal: props.ideal.tables,
   });
   const indexOperations = diffIndexes({
     current: props.current.indexes,
@@ -447,7 +429,6 @@ export function diffSchema(props: {
   const primaryKeyOperations = diffPrimaryKeyConstraints({
     current: props.current.primaryKeyConstraints,
     ideal: props.ideal.primaryKeyConstraints,
-    ignoreNames: isMysql,
   });
   const uniqueOperations = diffUniqueConstraints({
     current: props.current.uniqueConstraints,
@@ -456,7 +437,6 @@ export function diffSchema(props: {
   const foreignKeyOperations = diffForeignKeyConstraints({
     current: props.current.foreignKeyConstraints,
     ideal: props.ideal.foreignKeyConstraints,
-    mysqlDefaultActions: isMysql,
   });
 
   return {

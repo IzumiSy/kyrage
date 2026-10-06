@@ -1,5 +1,6 @@
 import z from "zod";
-import { Kysely } from "kysely";
+import type { Kysely } from "kysely";
+import type { OperationExecutors } from "../dialect/schema-adapter";
 import { createTableWithConstraintsOp } from "./table/createTableWithConstraints";
 import { dropTableOp } from "./table/dropTable";
 import { addColumnOp } from "./column/addColumn";
@@ -37,19 +38,28 @@ const operations = [
 
 export const operationSchema = z.union(operations.map((s) => s.schema));
 export type Operation = z.infer<typeof operationSchema>;
-export async function executeOperation(db: Kysely<any>, operation: Operation) {
-  const execute = getOperationExecutor(operation.type);
+/** Executes an injected override or the registered standard operation implementation. */
+export const executeOperation = async (
+  db: Kysely<any>,
+  operation: Operation,
+  executors: OperationExecutors = {}
+) => {
+  const execute = getOperationExecutor(operation.type, executors);
   return await execute(db, operation);
-}
+};
 
-function getOperationExecutor<T extends Operation["type"]>(operationType: T) {
+/** Resolves a typed executor without inspecting the database's identity. */
+const getOperationExecutor = <T extends Operation["type"]>(
+  operationType: T,
+  executors: OperationExecutors
+) => {
   const operation = operations.find((op) => op.typeName === operationType);
   if (!operation) {
     throw new Error(`Unknown operation type: ${operationType}`);
   }
 
-  return operation.execute as (
+  return (executors[operationType] ?? operation.execute) as (
     db: Kysely<any>,
     operation: Extract<Operation, { type: T }>
   ) => Promise<void>;
-}
+};

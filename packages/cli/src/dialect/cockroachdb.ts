@@ -9,6 +9,7 @@ import {
   PostgresDialect,
 } from "kysely";
 import { convertPSQLTypeName, doPSQLintrospect } from "./postgres";
+import { defaultSchemaAdapter } from "./schema-adapter";
 import {
   buildContainerDevDatabaseConfigSchema,
   ContainerDevDatabaseProvider,
@@ -24,6 +25,11 @@ export class CockroachDBKyrageDialect implements KyrageDialect {
     return new CockroachDBDialect({
       pool: new Pool({ connectionString }),
     });
+  }
+
+  /** Uses standard schema comparison and operation executors. */
+  createSchemaAdapter() {
+    return defaultSchemaAdapter;
   }
 
   createIntrospectionDriver(client: DBClient) {

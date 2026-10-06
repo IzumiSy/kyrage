@@ -26,6 +26,7 @@ export async function executeApply(
   });
 
   const provider = createMigrationProvider({
+    operationExecutors: client.getSchemaAdapter().operationExecutors,
     migrationsResolver: async () => {
       if (options.plan) {
         return await getPendingMigrations(deps);

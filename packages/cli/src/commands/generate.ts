@@ -240,8 +240,7 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const diff = diffSchema({
-    dialect: client.getDialect(),
+  const comparison = client.getSchemaAdapter().prepareSchemaComparison({
     current: {
       tables: dbTables,
       indexes,
@@ -254,6 +253,7 @@ const generateMigrationFromIntrospection = async (props: {
       tables: configTables,
     },
   });
+  const diff = diffSchema(comparison);
 
   if (diff.operations.length === 0) {
     return null;

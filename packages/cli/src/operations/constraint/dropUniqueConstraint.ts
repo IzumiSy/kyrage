@@ -1,9 +1,8 @@
 import z from "zod";
 import { tableOpSchemaBase, TableOpValue } from "../shared/types";
 import { defineOperation } from "../shared/operation";
-import { isMysqlDatabase } from "../shared/utils";
 
-/** Drops a unique constraint (a unique index on MySQL-compatible databases). */
+/** Drops a unique constraint using standard constraint syntax. */
 export const dropUniqueConstraintOp = defineOperation({
   typeName: "drop_unique_constraint",
   schema: z.object({
@@ -11,13 +10,6 @@ export const dropUniqueConstraintOp = defineOperation({
     type: z.literal("drop_unique_constraint"),
   }),
   execute: async (db, operation) => {
-    if (isMysqlDatabase(db)) {
-      await db.schema
-        .alterTable(operation.table)
-        .dropIndex(operation.name)
-        .execute();
-      return;
-    }
     await db.schema
       .alterTable(operation.table)
       .dropConstraint(operation.name)

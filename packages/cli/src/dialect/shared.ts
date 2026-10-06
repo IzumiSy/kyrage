@@ -2,22 +2,6 @@ import { ConfigValue } from "../config/loader";
 import { IndexAttributes, ConstraintAttributes } from "./types";
 import * as R from "ramda";
 
-/** Canonicalizes MySQL's omitted type parameters and equivalent numeric aliases. */
-export const normalizeMysqlColumnType = (type: string) => {
-  const defaultTypes: Record<string, string> = {
-    decimal: "decimal(10, 0)",
-    numeric: "decimal(10, 0)",
-    binary: "binary(1)",
-    char: "char(1)",
-  };
-  return (
-    defaultTypes[type] ??
-    type
-      .replace(/^numeric\(/, "decimal(")
-      .replace(/^(datetime|time|timestamp)\(0\)$/, "$1")
-  );
-};
-
 /*
  * Some databases automatically create unique constraints for unique indexes, and vice versa (e.g., CockroachDB),
  * and there is no way to distinguish between automatically generated unique constraints and user-defined unique constraints.

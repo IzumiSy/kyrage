@@ -5,27 +5,10 @@ import {
   TableColumnOpValue,
   TableColumnAttributes,
 } from "../shared/types";
-import { assertDataType, isMysqlDatabase } from "../shared/utils";
-import { sql } from "kysely";
+import { assertColumnModificationAllowed, assertDataType } from "../shared/utils";
 import { defineOperation } from "../shared/operation";
 
-/** Rejects changes that would silently discard attributes not modeled by the schema API. */
-const assertColumnModificationAllowed = (
-  before: TableColumnAttributes,
-  after: TableColumnAttributes
-) => {
-  if (
-    before.alterationBlockedReason &&
-    (before.type !== after.type ||
-      Boolean(before.notNull) !== Boolean(after.notNull))
-  ) {
-    throw new Error(
-      `Cannot safely modify column: ${before.alterationBlockedReason}`
-    );
-  }
-};
-
-/** Alters column definitions with MODIFY COLUMN on MySQL-compatible databases. */
+/** Alters column types and nullability using standard schema operations. */
 export const alterColumnOp = defineOperation({
   typeName: "alter_column",
   schema: z.object({
@@ -36,28 +19,6 @@ export const alterColumnOp = defineOperation({
   }),
   execute: async (db, operation) => {
     const { table, column, before, after } = operation;
-
-    if (isMysqlDatabase(db)) {
-      assertColumnModificationAllowed(before, after);
-      if (
-        before.type === after.type &&
-        Boolean(before.notNull) === Boolean(after.notNull)
-      )
-        return;
-      assertDataType(after.type);
-      await db.schema
-        .alterTable(table)
-        .modifyColumn(column, after.type, (col) => {
-          let builder = after.notNull ? col.notNull() : col;
-          const defaultSql = after.defaultSql ?? before.defaultSql;
-          if (typeof defaultSql === "string") {
-            builder = builder.defaultTo(sql.raw(defaultSql));
-          }
-          return builder;
-        })
-        .execute();
-      return;
-    }
 
     // dataType
     if (before.type !== after.type) {

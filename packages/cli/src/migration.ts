@@ -4,7 +4,9 @@ import z from "zod";
 import { operationSchema, executeOperation } from "./operations/executor";
 import { buildReconciledOperations } from "./operations/reconciler";
 import { CommonDependencies, FSPromiseAPIs } from "./commands/common";
+import type { OperationExecutors } from "./dialect/schema-adapter";
 
+/** Migration sources and injected executors shared by actual and planned execution. */
 type CreateMigrationProviderProps = {
   migrationsResolver: () => Promise<
     ReadonlyArray<z.infer<typeof migrationSchema>>
@@ -12,8 +14,10 @@ type CreateMigrationProviderProps = {
   options: {
     plan: boolean;
   };
+  operationExecutors: OperationExecutors;
 };
 
+/** Captures dialect behavior outside the plain Kysely instances supplied by Migrator. */
 export const createMigrationProvider = (
   props: CreateMigrationProviderProps
 ) => {
@@ -27,7 +31,7 @@ export const createMigrationProvider = (
             for (const operation of buildReconciledOperations(
               migration.diff.operations
             )) {
-              await executeOperation(db, operation);
+              await executeOperation(db, operation, props.operationExecutors);
             }
           },
         };

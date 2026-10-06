@@ -3,6 +3,7 @@ import { DBClient } from "../client";
 import { ReferentialActions } from "../operations/shared/types";
 import { ConfigValue } from "../config/loader";
 import { DevDatabaseProvider, DevDatabaseConfig } from "../dev/types";
+import type { SchemaAdapter } from "./schema-adapter";
 
 /** Additional column metadata, optionally overriding Kysely's unparameterized type. */
 export type ColumnExtraAttribute = {
@@ -68,11 +69,14 @@ export type IntrospectorDriver = {
   convertTypeName: (typeName: string) => string;
 };
 
-export interface KyrageDialect<T extends string = string> {
+/** Provides connections, introspection, schema behavior, and development databases. */
+export type KyrageDialect<T extends string = string> = {
   getName: () => T;
   createKyselyDialect: (connectionString: string) => Dialect;
+  /** Supplies schema comparison policies and operation executor overrides. */
+  createSchemaAdapter: () => SchemaAdapter;
   createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;
   createDevDatabaseProvider: () => DevDatabaseProvider;
   parseDevDatabaseConfig: (config: unknown) => DevDatabaseConfig;
   hasReusableDevDatabase: () => Promise<boolean>;
-}
+};

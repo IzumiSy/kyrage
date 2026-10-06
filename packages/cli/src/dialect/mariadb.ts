@@ -4,6 +4,7 @@ import { MariaDbContainer } from "@testcontainers/mariadb";
 import { KyrageDialect } from "./types";
 import { DBClient } from "../client";
 import { convertMysqlTypeName, doMysqlIntrospect } from "./mysql";
+import { mysqlSchemaAdapter } from "./mysql-schema-adapter";
 import {
   buildContainerDevDatabaseConfigSchema,
   ContainerDevDatabaseProvider,
@@ -24,6 +25,11 @@ export class MariadbKyrageDialect implements KyrageDialect {
     return new MysqlDialect({
       pool: createPool(connectionString) as unknown as MysqlPool,
     });
+  }
+
+  /** Reuses MySQL's schema comparison policies and operation overrides. */
+  createSchemaAdapter() {
+    return mysqlSchemaAdapter;
   }
 
   createIntrospectionDriver(client: DBClient) {
