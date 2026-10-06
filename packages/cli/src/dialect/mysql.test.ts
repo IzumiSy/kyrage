@@ -140,6 +140,62 @@ describe.each(["mysql", "mariadb"] as const)(
       ]);
     });
 
+    it("omits the reserved PRIMARY name when recreating keys or creating tables", async () => {
+      await using db = createPlanDB(dialect);
+      const diff = compareSchemas({
+        current: {
+          ...emptySnapshot,
+          primaryKeyConstraints: [
+            { table: "orders", name: "PRIMARY", columns: ["id"] },
+          ],
+        },
+        ideal: {
+          ...emptySnapshot,
+          primaryKeyConstraints: [
+            {
+              table: "orders",
+              name: "custom_pk",
+              columns: ["id", "tenant_id"],
+            },
+          ],
+        },
+      });
+      for (const operation of diff.operations) await execute(db, operation);
+      await execute(db, {
+        type: "create_table_with_constraints",
+        table: "orders",
+        columns: {
+          id: { type: "integer", notNull: true },
+          tenant_id: { type: "integer", notNull: true },
+        },
+        constraints: {
+          primaryKey: { name: "PRIMARY", columns: ["id", "tenant_id"] },
+          unique: [{ name: "uq_order_id", columns: ["id"] }],
+          foreignKeys: [
+            {
+              name: "fk_tenant",
+              columns: ["tenant_id"],
+              referencedTable: "tenants",
+              referencedColumns: ["id"],
+              onDelete: "cascade",
+            },
+          ],
+        },
+      });
+      await execute(db, {
+        type: "create_primary_key_constraint",
+        table: "orders",
+        name: "custom_pk",
+        columns: ["id", "tenant_id"],
+      });
+      expect(db.getPlannedQueries().map((query) => query.sql)).toEqual([
+        "alter table `orders` drop primary key",
+        "alter table `orders` add primary key (`id`, `tenant_id`)",
+        "create table `orders` (`id` integer not null, `tenant_id` integer not null, primary key (`id`, `tenant_id`), constraint `uq_order_id` unique (`id`), constraint `fk_tenant` foreign key (`tenant_id`) references `tenants` (`id`) on delete cascade)",
+        "alter table `orders` add constraint `custom_pk` primary key (`id`, `tenant_id`)",
+      ]);
+    });
+
     it("treats omitted, RESTRICT, and NO ACTION foreign-key actions as equivalent", () => {
       const fk = {
         table: "posts",

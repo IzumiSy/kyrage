@@ -8,6 +8,11 @@ import {
   assertColumnModificationAllowed,
   assertDataType,
 } from "../operations/shared/utils";
+import { createTableWithConstraintsOp } from "../operations/table/createTableWithConstraints";
+
+/** PRIMARY is a catalog identifier, not a valid explicit MariaDB index name. */
+const primaryKeySqlName = (name: string) =>
+  name.toUpperCase() === "PRIMARY" ? "" : name;
 
 /** Canonicalizes omitted type parameters and equivalent MySQL numeric aliases. */
 const normalizeColumnType = (type: string) => {
@@ -83,6 +88,27 @@ const prepareSchemaComparison = ({ current, ideal }: SchemaComparison) => ({
 export const mysqlSchemaAdapter: SchemaAdapter = {
   prepareSchemaComparison,
   operationExecutors: {
+    create_primary_key_constraint: async (db, operation) => {
+      await db.schema
+        .alterTable(operation.table)
+        .addPrimaryKeyConstraint(primaryKeySqlName(operation.name), [
+          ...operation.columns,
+        ])
+        .execute();
+    },
+    create_table_with_constraints: async (db, operation) => {
+      const primaryKey = operation.constraints?.primaryKey;
+      await createTableWithConstraintsOp.execute(db, {
+        ...operation,
+        constraints: operation.constraints && {
+          ...operation.constraints,
+          primaryKey: primaryKey && {
+            ...primaryKey,
+            name: primaryKeySqlName(primaryKey.name),
+          },
+        },
+      });
+    },
     drop_primary_key_constraint: async (db, operation) => {
       await sql`alter table ${sql.table(operation.table)} drop primary key`.execute(
         db
