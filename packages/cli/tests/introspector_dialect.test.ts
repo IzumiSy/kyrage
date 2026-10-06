@@ -77,6 +77,8 @@ describe("introspector driver", () => {
         database,
         tables: [
           defineTable(tableName, {
+            // Keep CockroachDB's implicit rowid primary key out of this type regression.
+            id: column("char(36)", { primaryKey: true }),
             unbounded: column("varchar"),
             bounded: column("varchar(255)"),
             fixed: column("char(36)"),
@@ -90,6 +92,11 @@ describe("introspector driver", () => {
           name: tableName,
           schema: expectations.schema,
           columns: {
+            id: expect.objectContaining({
+              dataType: "char(36)",
+              characterMaximumLength: 36,
+              notNull: true,
+            }),
             unbounded: expect.objectContaining({
               dataType: "varchar",
               characterMaximumLength: null,
