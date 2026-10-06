@@ -29,10 +29,10 @@ describe.skipIf(isSQLite)("Composite Primary Key", () => {
               t.unique(["author_id", "slug"], {
                 name: "unique_author_slug",
               }),
-            ],
+            ]
           ),
         ],
-      },
+      }
     );
 
     // Check if migration file was generated

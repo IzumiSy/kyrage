@@ -141,7 +141,7 @@ export const introspectSQLiteTables = async (db: PlannableKysely) => {
           default: col.dflt_value,
           characterMaximumLength,
         };
-      }),
+      })
     );
   }
 
@@ -277,7 +277,7 @@ export const introspectSQLiteConstraints = async (db: PlannableKysely) => {
         acc[fk.id].push(fk);
         return acc;
       },
-      {} as Record<number, SQLiteForeignKey[]>,
+      {} as Record<number, SQLiteForeignKey[]>
     );
 
     Object.entries(fkGroups).forEach(([, group]) => {

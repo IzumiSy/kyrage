@@ -80,7 +80,7 @@ describe(`${dialectName} introspector driver`, async () => {
           (t) => [
             t.index(["email"]),
             t.index(["name", "age"], { unique: true }),
-          ],
+          ]
         ),
       ],
     });
@@ -101,7 +101,7 @@ describe(`${dialectName} introspector driver`, async () => {
           columns: ["name", "age"],
           unique: true,
         },
-      ]),
+      ])
     );
 
     await dropTablesForDialect({

@@ -46,7 +46,7 @@ describe.skipIf(isSQLite)("generate", () => {
         name: column("text", { notNull: true }),
         email: column("text", { unique: true, notNull: true }),
       },
-      (t) => [t.index(["name", "email"], { unique: true })],
+      (t) => [t.index(["name", "email"], { unique: true })]
     );
     const deps = {
       client,
@@ -75,7 +75,7 @@ describe.skipIf(isSQLite)("generate", () => {
                 onUpdate: "cascade",
                 name: "fk_orders_customer_id",
               }),
-            ],
+            ]
           ),
         ],
       }),
