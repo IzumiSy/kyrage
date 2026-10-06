@@ -1,7 +1,9 @@
 import z from "zod";
 import { tableOpSchemaBase, TableOpValue } from "../shared/types";
 import { defineOperation } from "../shared/operation";
+import { isMysqlDatabase } from "../shared/utils";
 
+/** Drops an index, qualifying its table when MySQL requires it. */
 export const dropIndexOp = defineOperation({
   typeName: "drop_index",
   schema: z.object({
@@ -9,7 +11,9 @@ export const dropIndexOp = defineOperation({
     type: z.literal("drop_index"),
   }),
   execute: async (db, operation) => {
-    await db.schema.dropIndex(operation.name).execute();
+    let builder = db.schema.dropIndex(operation.name);
+    if (isMysqlDatabase(db)) builder = builder.on(operation.table);
+    await builder.execute();
   },
 });
 

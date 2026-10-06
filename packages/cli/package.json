@@ -37,6 +37,8 @@
   },
   "dependencies": {
     "@testcontainers/cockroachdb": "^12.0.3",
+    "@testcontainers/mariadb": "12.0.3",
+    "@testcontainers/mysql": "12.0.3",
     "@testcontainers/postgresql": "^12.0.3",
     "better-sqlite3": "^12.11.1",
     "c12": "^3.3.4",

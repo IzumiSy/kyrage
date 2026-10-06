@@ -12,7 +12,7 @@ const config = defineConfigForTest({
   database,
   tables: [
     defineTable("users", {
-      id: column("uuid", { primaryKey: true }),
+      id: column("char(36)", { primaryKey: true }),
       email: column("text", { notNull: true, unique: true }),
       name: column("text"),
     }),
@@ -40,7 +40,7 @@ describe("generate --squash", () => {
       database,
       tables: [
         defineTable("users", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
         }),
       ],
     });
@@ -62,7 +62,7 @@ describe("generate --squash", () => {
       database,
       tables: [
         defineTable("users", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
           email: column("text", { notNull: true }),
         }),
       ],
@@ -119,7 +119,7 @@ describe("generate --squash", () => {
           type: "create_table",
           table: "users",
           columns: expect.objectContaining({
-            id: expect.objectContaining({ type: "uuid", primaryKey: true }),
+            id: expect.objectContaining({ type: "char(36)", primaryKey: true }),
             email: expect.objectContaining({
               type: "text",
               notNull: true,

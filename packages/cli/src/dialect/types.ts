@@ -4,10 +4,14 @@ import { ReferentialActions } from "../operations/shared/types";
 import { ConfigValue } from "../config/loader";
 import { DevDatabaseProvider, DevDatabaseConfig } from "../dev/types";
 
+/** Additional column metadata, optionally overriding Kysely's unparameterized type. */
 export type ColumnExtraAttribute = {
   schema?: string;
   table: string;
   name: string;
+  dataType?: string;
+  /** Blocks full-definition column alterations that would lose unsupported attributes. */
+  alterationBlockedReason?: string;
   default: string | null;
   characterMaximumLength: number | null;
 };

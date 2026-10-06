@@ -6,6 +6,10 @@ import { fs } from "memfs";
 import { FSPromiseAPIs } from "../src/commands/common";
 
 const { database, client, dialect } = await setupTestDB();
+const dialectName = dialect.getName();
+const isMysqlLike = dialectName === "mysql" || dialectName === "mariadb";
+// MySQL/MariaDB require VARCHAR for UNIQUE constraints, not TEXT
+const textType = isMysqlLike ? "varchar(255)" : "text";
 const isSQLite = dialect.getName() === "sqlite";
 
 describe.skipIf(isSQLite)("Composite Primary Key", () => {
@@ -18,9 +22,9 @@ describe.skipIf(isSQLite)("Composite Primary Key", () => {
           defineTable(
             "posts",
             {
-              id: column("uuid"), // nullable in schema definition
-              author_id: column("uuid"), // nullable in schema definition
-              slug: column("text", { notNull: true }),
+              id: column("char(36)"), // nullable in schema definition
+              author_id: column("char(36)"), // nullable in schema definition
+              slug: column(textType, { notNull: true }),
               title: column("text"),
               content: column("text", { notNull: true }),
             },

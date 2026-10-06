@@ -30,6 +30,18 @@ const getConfigForTest = (kyrageDialect: KyrageDialect) => {
           image: "cockroachdb/cockroach:latest-v24.3",
         },
       };
+    case "mysql":
+      return {
+        container: {
+          image: "mysql:8",
+        },
+      };
+    case "mariadb":
+      return {
+        container: {
+          image: "mariadb:11",
+        },
+      };
     case "sqlite":
       return {};
     default:
@@ -120,7 +132,7 @@ export const dropTablesForDialect = async (props: {
 }) => {
   const targets = props.tableNames
     .map((tableName) =>
-      props.client.getDialect() === "sqlite"
+      ["sqlite", "mysql", "mariadb"].includes(props.client.getDialect())
         ? tableName
         : `public.${tableName}`,
     )

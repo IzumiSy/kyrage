@@ -205,6 +205,9 @@ const generateMigrationFromIntrospection = async (props: {
             defaultSql: colDef.default ?? undefined,
             primaryKey,
             unique,
+            ...(colDef.alterationBlockedReason ? {
+              alterationBlockedReason: colDef.alterationBlockedReason,
+            } : {}),
           },
         ];
       })
@@ -238,6 +241,7 @@ const generateMigrationFromIntrospection = async (props: {
   }));
 
   const diff = diffSchema({
+    dialect: client.getDialect(),
     current: {
       tables: dbTables,
       indexes,

@@ -15,6 +15,7 @@ export class SQLCollectingDriver extends DummyDriver {
   }
 }
 
+/** Collects schema queries, including dialect-specific raw ALTER TABLE statements. */
 class CollectorConnection implements DatabaseConnection {
   constructor(private queries: Array<CompiledQuery>) {}
 
@@ -35,7 +36,8 @@ class CollectorConnection implements DatabaseConnection {
       this.queries.push(query);
     } else if (
       queryKind === "CreateIndexNode" ||
-      queryKind === "DropIndexNode"
+      queryKind === "DropIndexNode" ||
+      (queryKind === "RawNode" && /^alter table\b/i.test(query.sql))
     ) {
       this.queries.push(query);
     }

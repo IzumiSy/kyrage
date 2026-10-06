@@ -9,16 +9,20 @@ const { client, dialect, database } = await setupTestDB();
 const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
 const introspector = getIntrospector(client);
 const dialectName = dialect.getName();
+const isMysqlLike = dialectName === "mysql" || dialectName === "mariadb";
+const textTypeUnique = isMysqlLike ? "varchar(255)" : "text";
+const schemaName = isMysqlLike ? "test" : "public";
+const booleanDefault = isMysqlLike ? "1" : "true";
 
-describe(`${dialectName} introspector driver`, async () => {
+describe(`${dialectName} introspector driver`, () => {
   it("should introspect table columns correctly", async () => {
     const deps = await applyTable(baseDeps, {
       database,
       tables: [
         defineTable("test_table", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
           name: column("varchar(255)", { notNull: true }),
-          age: column("int8", { defaultSql: "0" }),
+          age: column("bigint", { defaultSql: "0" }),
           is_active: column("boolean", { defaultSql: "true" }),
         }),
       ],
@@ -28,16 +32,16 @@ describe(`${dialectName} introspector driver`, async () => {
     expect(tables).toEqual([
       {
         name: "test_table",
-        schema: "public",
+        schema: schemaName,
         columns: {
           id: expect.objectContaining({
-            dataType: "uuid",
+            dataType: "char(36)",
             notNull: true,
             default: null,
-            characterMaximumLength: null,
+            characterMaximumLength: 36,
           }),
           name: expect.objectContaining({
-            dataType: "varchar",
+            dataType: "varchar(255)",
             notNull: true,
             default: null,
             characterMaximumLength: 255,
@@ -51,17 +55,14 @@ describe(`${dialectName} introspector driver`, async () => {
           is_active: expect.objectContaining({
             dataType: "boolean",
             notNull: false,
-            default: "true",
+            default: booleanDefault,
             characterMaximumLength: null,
           }),
         },
       },
     ]);
 
-    await dropTablesForDialect({
-      client,
-      tableNames: ["test_table"],
-    });
+    await dropTablesForDialect({ client, tableNames: ["test_table"] });
   });
 
   it("should introspect indexes correctly", async () => {
@@ -71,10 +72,10 @@ describe(`${dialectName} introspector driver`, async () => {
         defineTable(
           "test_table_with_indexes",
           {
-            id: column("uuid", { primaryKey: true }),
-            email: column("text"),
-            alias: column("text", { unique: true }),
-            name: column("text"),
+            id: column("char(36)", { primaryKey: true }),
+            email: column(textTypeUnique),
+            alias: column(textTypeUnique, { unique: true }),
+            name: column(textTypeUnique),
             age: column("integer"),
           },
           (t) => [
@@ -108,5 +109,101 @@ describe(`${dialectName} introspector driver`, async () => {
       client,
       tableNames: ["test_table_with_indexes"],
     });
+  });
+
+  it.skipIf(dialectName === "sqlite")("should introspect constraints correctly", async () => {
+    const usersTable = defineTable("users", {
+      id: column("char(36)", { primaryKey: true }),
+      email: column(textTypeUnique, { unique: true }),
+      username: column("text"),
+    });
+    const deps = await applyTable(baseDeps, {
+      database,
+      tables: [
+        usersTable,
+        defineTable(
+          "posts",
+          {
+            id: column("char(36)", { primaryKey: true }),
+            user_id: column("char(36)"),
+            title: column(textTypeUnique),
+          },
+          (t) => [
+            t.reference("user_id", usersTable, "id", {
+              onDelete: "cascade",
+              onUpdate: "cascade",
+              name: "fk_user",
+            }),
+            t.unique(["user_id", "title"], { name: "unique_title_per_user" }),
+          ],
+        ),
+      ],
+    });
+
+    const { constraints } = await introspector.introspect(deps.config);
+    const primaryKeyName = isMysqlLike ? "PRIMARY" : "posts_id_primary_key";
+    const usersKeyName = isMysqlLike ? "PRIMARY" : "users_id_primary_key";
+    const metadata = isMysqlLike
+      ? {}
+      : {
+          on_delete: null,
+          on_update: null,
+          referenced_columns: null,
+          referenced_table: null,
+        };
+
+    expect(constraints).toEqual({
+      primaryKey: [
+        {
+          name: primaryKeyName,
+          ...metadata,
+          schema: schemaName,
+          table: "posts",
+          type: "PRIMARY KEY",
+          columns: ["id"],
+        },
+        {
+          name: usersKeyName,
+          ...metadata,
+          schema: schemaName,
+          table: "users",
+          type: "PRIMARY KEY",
+          columns: ["id"],
+        },
+      ],
+      unique: [
+        {
+          name: "unique_title_per_user",
+          ...metadata,
+          schema: schemaName,
+          table: "posts",
+          type: "UNIQUE",
+          columns: ["user_id", "title"],
+        },
+        {
+          name: "users_email_unique",
+          ...metadata,
+          schema: schemaName,
+          table: "users",
+          type: "UNIQUE",
+          columns: ["email"],
+        },
+      ],
+      foreignKey: [
+        {
+          schema: schemaName,
+          table: "posts",
+          name: "fk_user",
+          type: "FOREIGN KEY",
+          columns: ["user_id"],
+          referencedTable: "users",
+          referencedColumns: ["id"],
+          onDelete: "cascade",
+          onUpdate: "cascade",
+        },
+      ],
+    });
+
+    await dropTablesForDialect({ client, tableNames: ["posts", "users"] });
   });
 });
