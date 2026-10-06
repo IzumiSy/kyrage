@@ -5,7 +5,11 @@ import { configSchema } from "../config/loader";
 import { diffSchema } from "../diff";
 import { executeOperation, type Operation } from "../operations/executor";
 import type { SchemaSnapshot } from "../operations/shared/types";
-import { convertMysqlTypeName, doMysqlIntrospect } from "./mysql";
+import {
+  convertMysqlTypeName,
+  doMysqlIntrospect,
+  MysqlCompatibleKyrageDialect,
+} from "./mysql-compatible";
 import { getDialect } from "./factory";
 import type { SchemaComparison } from "./schema-adapter";
 import { createMigrationProvider } from "../migration";
@@ -30,7 +34,28 @@ const emptySnapshot: SchemaSnapshot = {
 describe.each(["mysql", "mariadb"] as const)(
   "%s schema semantics",
   (dialect) => {
-    const adapter = getDialect(dialect).createSchemaAdapter();
+    const kyrageDialect = getDialect(dialect);
+    const adapter = kyrageDialect.createSchemaAdapter();
+
+    it("inherits compatible behavior without sharing database identity or image defaults", () => {
+      expect(kyrageDialect).toBeInstanceOf(MysqlCompatibleKyrageDialect);
+      expect(kyrageDialect.getName()).toBe(dialect);
+      expect(kyrageDialect.parseDevDatabaseConfig({})).toEqual({
+        container: {
+          image: { mysql: "mysql:8", mariadb: "mariadb:11" }[dialect],
+        },
+      });
+      expect(
+        kyrageDialect.createIntrospectionDriver(
+          getClient({
+            database: {
+              dialect,
+              connectionString: `${dialect}://localhost/test`,
+            },
+          }),
+        ).convertTypeName,
+      ).toBe(convertMysqlTypeName);
+    });
     /** Applies the selected adapter's comparison policy before the generic diff. */
     const compareSchemas = (comparison: SchemaComparison) =>
       diffSchema(adapter.prepareSchemaComparison(comparison));

@@ -68,7 +68,7 @@ export const getDialect = (dialectName: DialectEnum): KyrageDialect => {
 - **PostgreSQL**: Full support with native introspection
 - **CockroachDB**: Built on PostgreSQL compatibility with custom adapter
 - **MySQL**: Kysely's MySQL dialect with `information_schema` introspection and container-backed development databases
-- **MariaDB**: Reuses MySQL introspection and SQL handling with a MariaDB development container
+- **MariaDB**: Shares the MySQL-compatible base implementation with a MariaDB development container
 - **SQLite**: File-backed development databases with SQLite-specific introspection
 
 **Dialect Benefits**:
@@ -84,7 +84,7 @@ Each dialect supplies a `SchemaAdapter` through `createSchemaAdapter()`. `DBClie
 - `prepareSchemaComparison`: Normalizes current/ideal snapshots before the generic diff engine compares them.
 - `operationExecutors`: A typed, partial map of operation overrides; omitted operations use their registered standard executor.
 
-PostgreSQL, CockroachDB, and SQLite use the default adapter. MySQL and MariaDB share `mysqlSchemaAdapter`, which owns their comparison rules and nonstandard DDL. Core diffing, commands, migration execution, and operation implementations do not inspect dialect names or native Kysely adapter classes.
+PostgreSQL, CockroachDB, and SQLite use the default adapter. MySQL and MariaDB extend `MysqlCompatibleKyrageDialect`, which supplies their shared connections, introspection, schema adapter, and container reuse detection. Their concrete classes supply only database identity, container construction, and development configuration defaults. Both use `mysqlSchemaAdapter`, which owns their comparison rules and nonstandard DDL. Core diffing, commands, migration execution, and operation implementations do not inspect dialect names or native Kysely adapter classes.
 
 ### Benefits
 
@@ -121,8 +121,9 @@ export const members = t("members", {
 - `introspector.ts`: Core interface and coordination using dialect factory
 - `dialect/postgres.ts`: PostgreSQL-specific implementation with introspection driver
 - `dialect/cockroachdb.ts`: CockroachDB implementation reusing PostgreSQL introspection
-- `dialect/mysql.ts`: MySQL catalog introspection and normalization of implicitly generated foreign-key indexes
-- `dialect/mariadb.ts`: MariaDB implementation reusing MySQL introspection
+- `dialect/mysql-compatible.ts`: Shared MySQL-compatible base class, catalog introspection, and normalization of implicitly generated foreign-key indexes
+- `dialect/mysql.ts`: MySQL identity and development-container configuration
+- `dialect/mariadb.ts`: MariaDB identity and development-container configuration
 - `dialect/types.ts`: Dialect interface and schema representation types
 - `dialect/factory.ts`: Centralized dialect management and instantiation
 
@@ -389,8 +390,9 @@ export function createCommonDependencies(
     - `mysql-schema-adapter.ts`: MySQL/MariaDB comparison policies and operation executor overrides.
     - `postgres.ts`: PostgreSQL dialect implementation with introspection driver (`PostgresKyrageDialect`, `postgresExtraIntrospectorDriver`).
     - `cockroachdb.ts`: CockroachDB dialect implementation extending PostgreSQL compatibility (`CockroachDBKyrageDialect`).
-    - `mysql.ts`: MySQL dialect implementation with catalog introspection (`MysqlKyrageDialect`).
-    - `mariadb.ts`: MariaDB dialect implementation reusing MySQL behavior (`MariadbKyrageDialect`).
+    - `mysql-compatible.ts`: Shared MySQL/MariaDB base class (`MysqlCompatibleKyrageDialect`) and catalog introspection.
+    - `mysql.ts`: MySQL-specific identity and development-container configuration (`MysqlKyrageDialect`).
+    - `mariadb.ts`: MariaDB-specific identity and development-container configuration (`MariadbKyrageDialect`).
     - `sqlite.ts`: SQLite dialect implementation with file-backed development databases.
   - `introspector.ts`: Database schema introspection coordination using dialect factory (moved from `introspection/`).
   - `migration.ts`: Executes Operation arrays against the database.

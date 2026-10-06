@@ -1,44 +1,18 @@
-import { MysqlDialect, type MysqlPool } from "kysely";
-import { createPool } from "mysql2";
 import { MariaDbContainer } from "@testcontainers/mariadb";
-import { KyrageDialect } from "./types";
-import { DBClient } from "../client";
-import { convertMysqlTypeName, doMysqlIntrospect } from "./mysql";
-import { mysqlSchemaAdapter } from "./mysql-schema-adapter";
+import { MysqlCompatibleKyrageDialect } from "./mysql-compatible";
 import {
   buildContainerDevDatabaseConfigSchema,
   ContainerDevDatabaseProvider,
-  hasRunningDevStartContainer,
 } from "../dev/providers/container";
 
-/**
- * MariaDB dialect that reuses MySQL implementation.
- * MariaDB is MySQL-compatible, so we use the same Kysely dialect
- * and introspection logic as MySQL.
- */
-export class MariadbKyrageDialect implements KyrageDialect {
+/** Adds MariaDB-specific identity and container configuration to shared behavior. */
+export class MariadbKyrageDialect extends MysqlCompatibleKyrageDialect {
+  /** Identifies MariaDB for configuration and container reuse. */
   getName() {
     return "mariadb" as const;
   }
 
-  createKyselyDialect(connectionString: string) {
-    return new MysqlDialect({
-      pool: createPool(connectionString) as unknown as MysqlPool,
-    });
-  }
-
-  /** Reuses MySQL's schema comparison policies and operation overrides. */
-  createSchemaAdapter() {
-    return mysqlSchemaAdapter;
-  }
-
-  createIntrospectionDriver(client: DBClient) {
-    return {
-      convertTypeName: convertMysqlTypeName,
-      introspect: doMysqlIntrospect(client),
-    };
-  }
-
+  /** Creates MariaDB development containers. */
   createDevDatabaseProvider() {
     return new ContainerDevDatabaseProvider(
       this.getName(),
@@ -46,13 +20,10 @@ export class MariadbKyrageDialect implements KyrageDialect {
     );
   }
 
+  /** Uses the default MariaDB development image unless explicitly configured. */
   parseDevDatabaseConfig(config: unknown) {
     return buildContainerDevDatabaseConfigSchema({
       defaultImage: "mariadb:11",
     }).parse(config);
-  }
-
-  async hasReusableDevDatabase(): Promise<boolean> {
-    return hasRunningDevStartContainer(this.getName());
   }
 }
