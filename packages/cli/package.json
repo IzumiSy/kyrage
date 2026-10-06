@@ -2,8 +2,8 @@
   "name": "@izumisy/kyrage",
   "private": false,
   "type": "module",
-  "version": "1.5.7",
-  "description": "A minimal, schema-based declarative migration tool for Node.js ecosystem",
+  "version": "1.6.0",
+  "description": "A minimal, database-agnostic, schema-based declarative migration tool for Node.js ecosystem",
   "author": "Seiya Izumi (https://github.com/IzumiSy)",
   "license": "MIT",
   "repository": {
@@ -36,33 +36,33 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@testcontainers/cockroachdb": "^11.11.0",
-    "@testcontainers/mariadb": "^11.11.0",
-    "@testcontainers/mysql": "^11.11.0",
-    "@testcontainers/postgresql": "^11.11.0",
-    "better-sqlite3": "^12.4.1",
-    "c12": "^3.3.3",
-    "citty": "^0.1.6",
+    "@testcontainers/cockroachdb": "^12.0.3",
+    "@testcontainers/mariadb": "12.0.3",
+    "@testcontainers/mysql": "12.0.3",
+    "@testcontainers/postgresql": "^12.0.3",
+    "better-sqlite3": "^12.6.2",
+    "c12": "^3.3.4",
+    "citty": "^0.2.1",
     "consola": "^3.4.2",
     "graph-data-structure": "^4.5.0",
     "kysely": "^0.28.9",
-    "mysql2": "^3.16.0",
-    "pg": "^8.16.3",
+    "mysql2": "^3.20.0",
+    "pg": "^8.20.0",
     "ramda": "^0.32.0",
-    "sql-formatter": "^15.6.12",
-    "testcontainers": "^11.11.0",
-    "zod": "^4.3.5"
+    "sql-formatter": "^15.7.3",
+    "testcontainers": "^12.0.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@swc/core": "^1.15.8",
+    "@swc/core": "^1.15.18",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25",
-    "@types/pg": "^8.16.0",
+    "@types/pg": "^8.20.0",
     "@types/ramda": "^0.31.1",
-    "memfs": "^4.49.0",
+    "memfs": "^4.56.11",
     "prettier": "^3",
-    "tsdown": "^0.19.0",
+    "tsdown": "^0.21.7",
     "typescript": "^5",
-    "vitest": "^4.0.16"
+    "vitest": "^4.1.2"
   }
 }

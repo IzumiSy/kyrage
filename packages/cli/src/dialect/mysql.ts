@@ -1,4 +1,4 @@
-import { MysqlDialect, sql } from "kysely";
+import { MysqlDialect, sql, type MysqlPool } from "kysely";
 import { createPool } from "mysql2";
 import { MySqlContainer } from "@testcontainers/mysql";
 import { IntrospectProps, KyrageDialect } from "./types";
@@ -18,7 +18,7 @@ export class MysqlKyrageDialect implements KyrageDialect {
 
   createKyselyDialect(connectionString: string) {
     return new MysqlDialect({
-      pool: createPool(connectionString),
+      pool: createPool(connectionString) as unknown as MysqlPool,
     });
   }
 

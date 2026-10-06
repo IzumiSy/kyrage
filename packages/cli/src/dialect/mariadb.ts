@@ -1,4 +1,4 @@
-import { MysqlDialect } from "kysely";
+import { MysqlDialect, type MysqlPool } from "kysely";
 import { createPool } from "mysql2";
 import { MariaDbContainer } from "@testcontainers/mariadb";
 import { KyrageDialect } from "./types";
@@ -22,7 +22,7 @@ export class MariadbKyrageDialect implements KyrageDialect {
 
   createKyselyDialect(connectionString: string) {
     return new MysqlDialect({
-      pool: createPool(connectionString),
+      pool: createPool(connectionString) as unknown as MysqlPool,
     });
   }
 

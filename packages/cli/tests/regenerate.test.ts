@@ -11,7 +11,7 @@ const { database, client, dialect } = await setupTestDB();
 const dialectName = dialect.getName();
 
 // PostgreSQL/CockroachDB tests
-describe.skipIf(dialectName === "mysql" || dialectName === "mariadb")(
+describe.skipIf(dialectName !== "postgres" && dialectName !== "cockroachdb")(
   "generate - PostgreSQL/CockroachDB",
   () => {
     beforeAll(async () => {
@@ -92,7 +92,7 @@ describe.skipIf(dialectName === "mysql" || dialectName === "mariadb")(
 );
 
 // MySQL/MariaDB tests
-describe.skipIf(dialectName === "postgres" || dialectName === "cockroachdb")(
+describe.skipIf(dialectName !== "mysql" && dialectName !== "mariadb")(
   "generate - MySQL/MariaDB",
   () => {
     beforeAll(async () => {

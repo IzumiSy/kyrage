@@ -14,6 +14,7 @@ import { defaultConsolaLogger } from "../src/logger";
 import { KyrageDialect } from "../src/dialect/types";
 import { ManagedKey } from "../src/dev/providers/container";
 import { CommonDependencies } from "../src/commands/common";
+import { sql } from "kysely";
 
 const getConfigForTest = (kyrageDialect: KyrageDialect) => {
   switch (kyrageDialect.getName()) {
@@ -41,6 +42,8 @@ const getConfigForTest = (kyrageDialect: KyrageDialect) => {
           image: "mariadb:11",
         },
       };
+    case "sqlite":
+      return {};
     default:
       throw new Error("unsupported dialect specified");
   }
@@ -48,14 +51,14 @@ const getConfigForTest = (kyrageDialect: KyrageDialect) => {
 
 const getContainer = () => {
   const kyrageDialect = getDialect(
-    (process.env.TEST_DIALECT as DialectEnum) || "postgres"
+    (process.env.TEST_DIALECT as DialectEnum) || "postgres",
   );
 
   return {
     dialect: kyrageDialect,
     provider: kyrageDialect.createDevDatabaseProvider(),
     config: kyrageDialect.parseDevDatabaseConfig(
-      getConfigForTest(kyrageDialect)
+      getConfigForTest(kyrageDialect),
     ),
   };
 };
@@ -98,7 +101,7 @@ export const applyTable = async (
   },
   hooks?: {
     beforeApply?: (deps: CommonDependencies) => Promise<void> | void;
-  }
+  },
 ) => {
   const deps = {
     ...baseDeps,
@@ -118,6 +121,25 @@ export const applyTable = async (
   });
 
   return deps;
+};
+
+/**
+ * Drop test tables with dialect-aware schema qualification.
+ */
+export const dropTablesForDialect = async (props: {
+  client: CommonDependencies["client"];
+  tableNames: ReadonlyArray<string>;
+}) => {
+  const targets = props.tableNames
+    .map((tableName) =>
+      ["sqlite", "mysql", "mariadb"].includes(props.client.getDialect())
+        ? tableName
+        : `public.${tableName}`,
+    )
+    .join(", ");
+
+  await using db = props.client.getDB();
+  await sql.raw(`DROP TABLE ${targets}`).execute(db);
 };
 
 /**

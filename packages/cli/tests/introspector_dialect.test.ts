@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sql } from "kysely";
-import { applyTable, setupTestDB } from "./helper";
+import { applyTable, dropTablesForDialect, setupTestDB } from "./helper";
 import { column, defineTable } from "../src";
 import { getIntrospector } from "../src/introspector";
 import { fs } from "memfs";
@@ -11,12 +10,11 @@ const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
 const introspector = getIntrospector(client);
 const dialectName = dialect.getName();
 const isMysqlLike = dialectName === "mysql" || dialectName === "mariadb";
-// MySQL/MariaDB require VARCHAR for UNIQUE/INDEX constraints, not TEXT
 const textTypeUnique = isMysqlLike ? "varchar(255)" : "text";
 const schemaName = isMysqlLike ? "test" : "public";
 const booleanDefault = isMysqlLike ? "1" : "true";
 
-describe(`${dialectName} introspector driver`, async () => {
+describe(`${dialectName} introspector driver`, () => {
   it("should introspect table columns correctly", async () => {
     const deps = await applyTable(baseDeps, {
       database,
@@ -64,11 +62,7 @@ describe(`${dialectName} introspector driver`, async () => {
       },
     ]);
 
-    await using db = client.getDB();
-    const dropSql = isMysqlLike
-      ? sql`DROP TABLE test_table`
-      : sql`DROP TABLE public.test_table`;
-    await dropSql.execute(db);
+    await dropTablesForDialect({ client, tableNames: ["test_table"] });
   });
 
   it("should introspect indexes correctly", async () => {
@@ -87,35 +81,37 @@ describe(`${dialectName} introspector driver`, async () => {
           (t) => [
             t.index(["email"]),
             t.index(["name", "age"], { unique: true }),
-          ]
+          ],
         ),
       ],
     });
 
     const { indexes } = await introspector.introspect(deps.config);
-    expect(indexes).toEqual([
-      {
-        table: "test_table_with_indexes",
-        name: "idx_test_table_with_indexes_email",
-        columns: ["email"],
-        unique: false,
-      },
-      {
-        table: "test_table_with_indexes",
-        name: "idx_test_table_with_indexes_name_age",
-        columns: ["name", "age"],
-        unique: true,
-      },
-    ]);
+    expect(indexes).toHaveLength(2);
+    expect(indexes).toEqual(
+      expect.arrayContaining([
+        {
+          table: "test_table_with_indexes",
+          name: "idx_test_table_with_indexes_email",
+          columns: ["email"],
+          unique: false,
+        },
+        {
+          table: "test_table_with_indexes",
+          name: "idx_test_table_with_indexes_name_age",
+          columns: ["name", "age"],
+          unique: true,
+        },
+      ]),
+    );
 
-    await using db = client.getDB();
-    const dropSql = isMysqlLike
-      ? sql`DROP TABLE test_table_with_indexes`
-      : sql`DROP TABLE public.test_table_with_indexes`;
-    await dropSql.execute(db);
+    await dropTablesForDialect({
+      client,
+      tableNames: ["test_table_with_indexes"],
+    });
   });
 
-  it("should introspect constraints correctly", async () => {
+  it.skipIf(dialectName === "sqlite")("should introspect constraints correctly", async () => {
     const usersTable = defineTable("users", {
       id: column("char(36)", { primaryKey: true }),
       email: column(textTypeUnique, { unique: true }),
@@ -139,133 +135,75 @@ describe(`${dialectName} introspector driver`, async () => {
               name: "fk_user",
             }),
             t.unique(["user_id", "title"], { name: "unique_title_per_user" }),
-          ]
+          ],
         ),
       ],
     });
 
     const { constraints } = await introspector.introspect(deps.config);
-    
-    // MySQL uses "PRIMARY" as the constraint name and omits null fields
     const primaryKeyName = isMysqlLike ? "PRIMARY" : "posts_id_primary_key";
     const usersKeyName = isMysqlLike ? "PRIMARY" : "users_id_primary_key";
-    
-    const expectedConstraints = isMysqlLike ? {
-      primaryKey: [
-        {
-          name: primaryKeyName,
-          schema: schemaName,
-          table: "posts",
-          type: "PRIMARY KEY",
-          columns: ["id"],
-        },
-        {
-          name: usersKeyName,
-          schema: schemaName,
-          table: "users",
-          type: "PRIMARY KEY",
-          columns: ["id"],
-        },
-      ],
-      unique: [
-        {
-          name: "unique_title_per_user",
-          schema: schemaName,
-          table: "posts",
-          type: "UNIQUE",
-          columns: ["user_id", "title"],
-        },
-        {
-          name: "users_email_unique",
-          schema: schemaName,
-          table: "users",
-          type: "UNIQUE",
-          columns: ["email"],
-        },
-      ],
-      foreignKey: [
-        {
-          schema: schemaName,
-          table: "posts",
-          name: "fk_user",
-          type: "FOREIGN KEY",
-          columns: ["user_id"],
-          referencedTable: "users",
-          referencedColumns: ["id"],
-          onDelete: "cascade",
-          onUpdate: "cascade",
-        },
-      ],
-    } : {
-      primaryKey: [
-        {
-          name: primaryKeyName,
+    const metadata = isMysqlLike
+      ? {}
+      : {
           on_delete: null,
           on_update: null,
           referenced_columns: null,
           referenced_table: null,
-          schema: schemaName,
-          table: "posts",
-          type: "PRIMARY KEY",
-          columns: ["id"],
-        },
-        {
-          name: usersKeyName,
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: schemaName,
-          table: "users",
-          type: "PRIMARY KEY",
-          columns: ["id"],
-        },
-      ],
-      unique: [
-        {
-          name: "unique_title_per_user",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: schemaName,
-          table: "posts",
-          type: "UNIQUE",
-          columns: ["user_id", "title"],
-        },
-        {
-          name: "users_email_unique",
-          on_delete: null,
-          on_update: null,
-          referenced_columns: null,
-          referenced_table: null,
-          schema: schemaName,
-          table: "users",
-          type: "UNIQUE",
-          columns: ["email"],
-        },
-      ],
-      foreignKey: [
-        {
-          schema: schemaName,
-          table: "posts",
-          name: "fk_user",
-          type: "FOREIGN KEY",
-          columns: ["user_id"],
-          referencedTable: "users",
-          referencedColumns: ["id"],
-          onDelete: "cascade",
-          onUpdate: "cascade",
-        },
-      ],
-    };
-    
-    expect(constraints).toEqual(expectedConstraints);
+        };
 
-    await using db = client.getDB();
-    const dropSql = isMysqlLike
-      ? sql`DROP TABLE posts, users`
-      : sql`DROP TABLE public.posts, public.users`;
-    await dropSql.execute(db);
+    expect(constraints).toEqual({
+      primaryKey: [
+        {
+          name: primaryKeyName,
+          ...metadata,
+          schema: schemaName,
+          table: "posts",
+          type: "PRIMARY KEY",
+          columns: ["id"],
+        },
+        {
+          name: usersKeyName,
+          ...metadata,
+          schema: schemaName,
+          table: "users",
+          type: "PRIMARY KEY",
+          columns: ["id"],
+        },
+      ],
+      unique: [
+        {
+          name: "unique_title_per_user",
+          ...metadata,
+          schema: schemaName,
+          table: "posts",
+          type: "UNIQUE",
+          columns: ["user_id", "title"],
+        },
+        {
+          name: "users_email_unique",
+          ...metadata,
+          schema: schemaName,
+          table: "users",
+          type: "UNIQUE",
+          columns: ["email"],
+        },
+      ],
+      foreignKey: [
+        {
+          schema: schemaName,
+          table: "posts",
+          name: "fk_user",
+          type: "FOREIGN KEY",
+          columns: ["user_id"],
+          referencedTable: "users",
+          referencedColumns: ["id"],
+          onDelete: "cascade",
+          onUpdate: "cascade",
+        },
+      ],
+    });
+
+    await dropTablesForDialect({ client, tableNames: ["posts", "users"] });
   });
 });

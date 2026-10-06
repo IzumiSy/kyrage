@@ -16,7 +16,7 @@ import { DevDatabaseValue, DialectEnum } from "../config/loader";
 export const createDevDatabaseManager = async (
   devConfig: NonNullable<DevDatabaseValue>,
   dialect: DialectEnum,
-  manageType: DevDatabaseManageType
+  manageType: DevDatabaseManageType,
 ) => {
   const kyrageDialect = getDialect(dialect);
 
@@ -47,7 +47,7 @@ type StartDevDatabaseOptions = {
  */
 async function prepareDevManager(
   dependencies: CommonDependencies,
-  options: StartDevDatabaseOptions
+  options: StartDevDatabaseOptions,
 ) {
   const { config } = dependencies;
   const kyrageDialect = getDialect(config.database.dialect);
@@ -55,16 +55,17 @@ async function prepareDevManager(
   switch (options.mode) {
     // Always reuse existing dev database container/environment
     case "dev-start": {
+      const hasDevStart = await kyrageDialect.hasReusableDevDatabase();
       const { instance, manageType } = await createDevDatabaseManager(
         config.dev!,
         config.database.dialect,
-        "dev-start" as const
+        "dev-start" as const,
       );
 
       return {
         manageType,
         manager: instance,
-        result: { reused: await instance.isAvailable() },
+        result: { reused: hasDevStart },
       };
     }
 
@@ -75,7 +76,7 @@ async function prepareDevManager(
       const { instance, manageType } = await createDevDatabaseManager(
         config.dev!,
         config.database.dialect,
-        hasDevStart ? ("dev-start" as const) : ("one-off" as const)
+        hasDevStart ? ("dev-start" as const) : ("one-off" as const),
       );
 
       return {
@@ -98,7 +99,7 @@ type DatabaseStartupResult = {
  */
 export async function startDevDatabase(
   deps: CommonDependencies,
-  options: StartDevDatabaseOptions
+  options: StartDevDatabaseOptions,
 ): Promise<DatabaseStartupResult> {
   const { config } = deps;
   const logger = options.logger || nullLogger;
@@ -135,7 +136,7 @@ export async function startDevDatabase(
   const pendingMigrations = await getPendingMigrations(deps);
   if (pendingMigrations.length > 0) {
     reporter.info(
-      `🔄 Applying ${pendingMigrations.length} pending migrations...`
+      `🔄 Applying ${pendingMigrations.length} pending migrations...`,
     );
 
     await executeApply(
@@ -148,7 +149,7 @@ export async function startDevDatabase(
       {
         plan: false,
         pretty: false,
-      }
+      },
     );
 
     reporter.success(`Applied ${pendingMigrations.length} migrations`);
@@ -161,7 +162,7 @@ export async function startDevDatabase(
     switch (options.mode) {
       case "dev-start":
         reporter.success(
-          "Persistent dev database ready: " + config.database.dialect
+          "Persistent dev database ready: " + config.database.dialect,
         );
         break;
       case "generate-dev":

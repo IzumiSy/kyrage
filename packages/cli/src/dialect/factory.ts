@@ -4,12 +4,14 @@ import { CockroachDBKyrageDialect } from "./cockroachdb";
 import { MysqlKyrageDialect } from "./mysql";
 import { MariadbKyrageDialect } from "./mariadb";
 import { DialectEnum } from "../config/loader";
+import { SQLiteKyrageDialect } from "./sqlite";
 
 const dialects = {
   postgres: new PostgresKyrageDialect(),
   cockroachdb: new CockroachDBKyrageDialect(),
   mysql: new MysqlKyrageDialect(),
   mariadb: new MariadbKyrageDialect(),
+  sqlite: new SQLiteKyrageDialect(),
 } as const;
 
 export const getDialect = (dialectName: DialectEnum) => {

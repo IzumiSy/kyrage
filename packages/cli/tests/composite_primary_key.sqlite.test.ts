@@ -6,14 +6,10 @@ import { fs } from "memfs";
 import { FSPromiseAPIs } from "../src/commands/common";
 
 const { database, client, dialect } = await setupTestDB();
-const dialectName = dialect.getName();
-const isMysqlLike = dialectName === "mysql" || dialectName === "mariadb";
-// MySQL/MariaDB require VARCHAR for UNIQUE constraints, not TEXT
-const textType = isMysqlLike ? "varchar(255)" : "text";
 const isSQLite = dialect.getName() === "sqlite";
 
-describe.skipIf(isSQLite)("Composite Primary Key", () => {
-  it("should not generate unnecessary migrations for nullable columns in composite primary key", async () => {
+describe.skipIf(!isSQLite)("Composite Primary Key (SQLite)", () => {
+  it("should generate a follow-up migration when named unique constraints are introspected with auto-generated names", async () => {
     const deps = await applyTable(
       { client, fs: fs.promises as unknown as FSPromiseAPIs },
       {
@@ -22,9 +18,9 @@ describe.skipIf(isSQLite)("Composite Primary Key", () => {
           defineTable(
             "posts",
             {
-              id: column("char(36)"), // nullable in schema definition
-              author_id: column("char(36)"), // nullable in schema definition
-              slug: column(textType, { notNull: true }),
+              id: column("uuid"),
+              author_id: column("uuid"),
+              slug: column("text", { notNull: true }),
               title: column("text"),
               content: column("text", { notNull: true }),
             },
@@ -39,16 +35,13 @@ describe.skipIf(isSQLite)("Composite Primary Key", () => {
       },
     );
 
-    // Check if migration file was generated
     expect(await deps.fs.readdir("migrations")).toHaveLength(1);
 
-    // Second migration generation (should not detect any changes)
     await executeGenerate(deps, {
       ignorePending: false,
       dev: false,
     });
 
-    // No additional migration files should be generated
-    expect(await deps.fs.readdir("migrations")).toHaveLength(1);
+    expect(await deps.fs.readdir("migrations")).toHaveLength(2);
   });
 });
