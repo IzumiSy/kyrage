@@ -94,6 +94,7 @@ export const convertPSQLTypeName = (typeName: string) => {
   return nameDict[typeName as keyof typeof nameDict] ?? typeName;
 };
 
+/** Reads column defaults and bounded string lengths from PostgreSQL-compatible catalogs. */
 export const introspectPSQLTables = async (db: PlannableKysely) => {
   const { rows } = await sql`
     SELECT
@@ -102,7 +103,8 @@ export const introspectPSQLTables = async (db: PlannableKysely) => {
       a.attname AS column_name,
       pg_get_expr(d.adbin, d.adrelid) AS column_default,
       CASE 
-        WHEN t.typname = 'varchar' OR t.typname = 'bpchar' THEN a.atttypmod - 4
+        WHEN t.typname IN ('varchar', 'bpchar') AND a.atttypmod > 4
+          THEN a.atttypmod - 4
         ELSE NULL 
       END AS character_maximum_length
     FROM pg_class c

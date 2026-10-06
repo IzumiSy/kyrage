@@ -2,6 +2,8 @@ import { describe, expect } from "vitest";
 import { applyTable, dropTablesForDialect } from "./helper";
 import { column, defineTable } from "../src";
 import { databaseTest as it, testForDialects } from "./fixtures";
+import { executeGenerate } from "../src/commands/generate";
+import { vol } from "memfs";
 
 const constraintTest = testForDialects(
   "postgres",
@@ -65,6 +67,50 @@ describe("introspector driver", () => {
 
     await dropTablesForDialect({ client, tableNames: ["test_table"] });
   });
+
+  testForDialects("postgres", "cockroachdb")(
+    "should preserve unbounded varchar and bounded string lengths when regenerating",
+    async ({ testDB, expectations }) => {
+      const { client, database, baseDeps, introspector } = testDB;
+      const tableName = "test_string_lengths";
+      const deps = await applyTable(baseDeps, {
+        database,
+        tables: [
+          defineTable(tableName, {
+            unbounded: column("varchar"),
+            bounded: column("varchar(255)"),
+            fixed: column("char(36)"),
+          }),
+        ],
+      });
+
+      const { tables } = await introspector.introspect(deps.config);
+      expect(tables).toEqual([
+        {
+          name: tableName,
+          schema: expectations.schema,
+          columns: {
+            unbounded: expect.objectContaining({
+              dataType: "varchar",
+              characterMaximumLength: null,
+            }),
+            bounded: expect.objectContaining({
+              dataType: "varchar(255)",
+              characterMaximumLength: 255,
+            }),
+            fixed: expect.objectContaining({
+              dataType: "char(36)",
+              characterMaximumLength: 36,
+            }),
+          },
+        },
+      ]);
+      const before = vol.toJSON();
+      await executeGenerate(deps, { ignorePending: false, dev: false });
+      expect(vol.toJSON()).toEqual(before);
+      await dropTablesForDialect({ client, tableNames: [tableName] });
+    }
+  );
 
   it("should introspect indexes correctly", async ({ testDB }) => {
     const { client, database, baseDeps, introspector } = testDB;
