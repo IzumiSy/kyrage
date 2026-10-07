@@ -47,7 +47,7 @@ const createDependencies = () => {
   const getDB = vi
     .spyOn(client, "getDB")
     .mockImplementation((options) =>
-      options?.plan ? collector : validationDB
+      options?.plan ? collector : validationDB,
     );
   const validateOperations = vi.fn(async () => {});
   vi.spyOn(client, "getSchemaAdapter").mockReturnValue({
@@ -114,6 +114,40 @@ describe("apply validation and planning", () => {
     expect(mocks.getAllMigrations).not.toHaveBeenCalled();
   });
 
+  it("retains applied history for actual migration discovery without a separate metadata connection", async () => {
+    const { deps, validationDB, getDB, validateOperations } =
+      createDependencies();
+    const applied = { type: "drop_table" as const, table: "already_applied" };
+    const pending = { type: "drop_table" as const, table: "pending" };
+    mocks.getAllMigrations.mockResolvedValue([
+      { id: "001", version: "1", diff: { operations: [applied] } },
+      { id: "002", version: "1", diff: { operations: [pending] } },
+    ]);
+    mocks.migrateToLatest.mockImplementation(async () => {
+      const migrations = await mocks.migratorProps!.provider.getMigrations();
+      expect(Object.keys(migrations)).toEqual(["001", "002"]);
+      await migrations["002"].up(mocks.migratorProps!.db);
+      return {};
+    });
+    await executeApply(deps, { plan: false, pretty: false });
+    expect(getDB).toHaveBeenCalledOnce();
+    expect(getDB).toHaveBeenCalledWith({ plan: false });
+    expect(validateOperations).toHaveBeenCalledTimes(2);
+    expect(validateOperations).toHaveBeenNthCalledWith(1, {
+      db: validationDB,
+      operations: [pending],
+    });
+    expect(validateOperations).toHaveBeenNthCalledWith(2, {
+      db: validationDB,
+      operations: [pending],
+    });
+    expect(mocks.getAllMigrations).toHaveBeenCalledOnce();
+    expect(mocks.getPendingMigrations).not.toHaveBeenCalled();
+    expect(validationDB.getPlannedQueries().map((query) => query.sql)).toEqual([
+      'drop table "pending"',
+    ]);
+  });
+
   it("rejects a later failure even when an earlier migration already collected SQL", async () => {
     const { deps, collector } = createDependencies();
     const failure = new Error("column validation failed");
@@ -127,14 +161,14 @@ describe("apply validation and planning", () => {
       };
     });
     await expect(
-      executeApply(deps, { plan: true, pretty: false })
+      executeApply(deps, { plan: true, pretty: false }),
     ).rejects.toBe(failure);
     expect(collector.getPlannedQueries().map((query) => query.sql)).toEqual([
       'drop table "orders"',
     ]);
     expect(deps.logger.stdout).not.toHaveBeenCalled();
     expect(deps.logger.reporter.error).toHaveBeenCalledWith(
-      "Migration failed: unsafe"
+      "Migration failed: unsafe",
     );
   });
 });

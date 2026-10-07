@@ -6,7 +6,7 @@ import type { SchemaSnapshot } from "../operations/shared/types";
 export type OperationExecutors = {
   [T in Operation["type"]]?: (
     db: Kysely<any>,
-    operation: Extract<Operation, { type: T }>
+    operation: Extract<Operation, { type: T }>,
   ) => Promise<void>;
 };
 
@@ -16,11 +16,26 @@ export type SchemaComparison = {
   ideal: SchemaSnapshot;
 };
 
+/** Identifies a rejected operation's zero-based position in the validation input. */
+export class SchemaOperationValidationError extends Error {
+  /** Preserves the operation position so callers can attribute failures to source migrations. */
+  constructor(
+    readonly operationIndex: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "SchemaOperationValidationError";
+  }
+}
+
 /** Supplies dialect behavior without exposing database identity to core logic. */
 export type SchemaAdapter = {
   operationExecutors: OperationExecutors;
   prepareSchemaComparison: (comparison: SchemaComparison) => SchemaComparison;
-  /** Checks executable operations against live database facts before any DDL. */
+  /**
+   * Checks reconciled operations in execution order, projecting live database facts without DDL.
+   * Operation-specific failures use SchemaOperationValidationError to retain input positions.
+   */
   validateOperations: (props: {
     db: Kysely<any>;
     operations: ReadonlyArray<Operation>;

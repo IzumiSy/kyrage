@@ -6,6 +6,7 @@ export type MysqlColumnMetadata = {
   table_name: string;
   column_name: string;
   column_type: string;
+  is_nullable: "YES" | "NO";
   column_default: string | null;
   character_maximum_length: number | null;
   extra: string;
@@ -21,6 +22,7 @@ export const readMysqlColumnMetadata = async (db: Kysely<any>) => {
       c.TABLE_NAME as table_name,
       c.COLUMN_NAME as column_name,
       c.COLUMN_TYPE as column_type,
+      c.IS_NULLABLE as is_nullable,
       CASE
         WHEN VERSION() LIKE '%MariaDB%' THEN NULLIF(c.COLUMN_DEFAULT, 'NULL')
         WHEN c.EXTRA LIKE '%DEFAULT_GENERATED%' AND c.COLUMN_DEFAULT IS NOT NULL

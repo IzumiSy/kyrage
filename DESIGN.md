@@ -83,7 +83,7 @@ Each dialect supplies a `SchemaAdapter` through `createSchemaAdapter()`. `DBClie
 
 - `prepareSchemaComparison`: Normalizes current/ideal snapshots before the generic diff engine compares them.
 - `operationExecutors`: A typed, partial map of operation overrides; omitted operations use their registered standard executor.
-- `validateOperations`: Asynchronously checks reconciled operations against live database metadata before saving or executing a migration. The default adapter is a no-op; MySQL/MariaDB own their full-definition column safety policy.
+- `validateOperations`: Asynchronously checks reconciled operations in execution order, starting from live database metadata and projecting the required facts without DDL. The default adapter is a no-op; MySQL/MariaDB own their full-definition column safety policy. Operation-specific failures carry their input position in `SchemaOperationValidationError`, allowing the migration provider to attribute a pending-sequence failure to its source file.
 
 PostgreSQL, CockroachDB, and SQLite use the default adapter. MySQL and MariaDB extend `MysqlCompatibleKyrageDialect`, which supplies their shared connections, introspection, schema adapter, and container reuse detection. Their concrete classes supply only database identity, container construction, and development configuration defaults. Both use `mysqlSchemaAdapter`, which owns their comparison rules, validation policy, and nonstandard DDL. Introspection returns schema facts, not stored validation verdicts; common operation constructors do not enforce dialect-specific policy. Core diffing, commands, migration execution, and operation implementations do not inspect dialect names or native Kysely adapter classes.
 
@@ -258,9 +258,13 @@ const provider = createMigrationProvider({
   validationDB: plan ? liveMetadataDB : undefined,
 });
 
-// For actual application, validation precedes every operation in this migration.
+// Files are reconciled independently; provider callbacks share the pending preflight flag.
+const operations = buildReconciledOperations(diff.operations);
 const up = async (db: Kysely<any>) => {
-  const operations = buildReconciledOperations(diff.operations);
+  if (!pendingPreflightDone) {
+    await validatePendingSequence(db, migrationIndex);
+    pendingPreflightDone = true;
+  }
   await adapter.validateOperations({ db, operations });
   for (const operation of operations) {
     await executeOperation(db, operation, adapter.operationExecutors);
@@ -282,11 +286,15 @@ Generic column, constraint, and index operations contain only standard SQL. The 
 
 #### Operation Validation Boundaries
 
-Generation validates the reconciled execution plan before saving the original diff. Actual application validates each migration inside its `up(db)` callback, using the database state left by earlier migrations. Rejected validation issues no application-schema DDL from that migration; already-applied files and internal migration-table setup are not rolled back.
+Generation validates the reconciled execution plan before saving the original diff. Actual application preflights the entire pending sequence at the start of the first `up(db)` callback, then retains live validation before each migration's application-schema operations. Kysely supplies a locked execution connection and has verified that applied migrations form a prefix of sorted migration IDs. The first invoked callback therefore identifies the pending suffix without another metadata connection or history query. The provider retains all historical files for Kysely's integrity checks; the preflight completion flag is scoped to each resolved callback set. This suffix selection relies on ordered `migrateToLatest()` and must change if unordered or targeted execution is introduced.
 
-SQL planning uses a separate real metadata connection because the collecting driver returns empty rows. It validates all pending migrations' reconciled operations, flattened in migration-name order, before collecting SQL. MySQL/MariaDB reject unknown future column states after earlier create/add/drop/modify operations rather than simulating schema effects. The same within-migration limit applies during actual execution. Errors are checked before printing any collected SQL.
+SQL planning uses a separate real metadata connection because the collecting driver returns empty rows. It validates all pending operations before collecting SQL, using exactly the same adapter policy as generation and application. Each migration is reconciled separately before concatenation in ID order; reconciling the combined history would incorrectly filter or merge historical changes. Indexed preflight failures are mapped to source migration IDs and one-based positions within their reconciled operations, rather than being attributed solely to the first callback that hosts preflight. Errors are checked before printing any collected SQL.
 
-MySQL catalog facts are read by `mysql-column-metadata.ts`, shared by compatible introspection and the schema adapter without a circular dependency. Validation performs no DDL, but does not prevent concurrent schema changes after its metadata read or prove every possible server/data conversion succeeds. SQLite connections are initialized lazily so query-free default validation and planning allocate no native database handle.
+The MySQL/MariaDB adapter keeps a per-call table/column state containing type, nullability, default SQL, and unsupported native attributes. Default and native-attribute facts are independently known or unknown. Creation and addition establish emitted definitions, full modifications validate then project their emitted definitions, and drops remove state. Recreation never inherits the old column's facts. Primary-key creation accounts for implicit NOT NULL and invalidates relevant facts when its native effects are not predictable. Definition no-ops do not change state. The executor and validator share default selection (`after.defaultSql ?? before.defaultSql`); projected state is not a copy of `after`.
+
+Projection uses a bounded allow-list of ordinary native types without implicit attributes. Default absence and canonical in-range signed integer literals have predictable catalog representations; other emitted defaults remain unknown rather than treating SQL text as future catalog text. TIMESTAMP behavior is configuration-dependent, SERIAL implies auto-increment, and MariaDB JSON can imply a custom collation, so these are not projected as ordinary attribute-free columns. Bounded numeric/arithmetic defaults, single-quoted literals without backslashes, and isolated SQL constants cannot append column clauses; other raw default SQL also leaves native-attribute effects unknown. A genuinely unknown fact rejects only a later full modification that needs it. An explicit desired default can overwrite an unknown default, but cannot bypass unknown native attributes. Unsupported attributes and stale defaults remain rejected, with distinct reasons for missing or unverifiable state. This is metadata-preservation validation, not a general schema simulator or SQL-expression equivalence engine.
+
+MySQL catalog facts, including nullability, are read by `mysql-column-metadata.ts`, shared by compatible introspection and the schema adapter without a circular dependency. A failed whole-sequence preflight issues no pending application-schema DDL, although Kysely's internal migration tables may already have been initialized. Validation performs no DDL, but the migration lock does not prevent external concurrent schema changes or prove every possible server/data conversion succeeds. Per-migration revalidation can still fail after earlier files execute, and MySQL/MariaDB DDL is nontransactional. SQLite connections are initialized lazily so query-free default validation and planning allocate no native database handle.
 
 Squash selects pending sources without deleting them, excludes them from dev baseline application, and uses a fresh one-off dev database instead of reused state that may contain their effects. The replacement is validated and written exclusively under an unused migration ID before removing source files. Validation/write failures preserve those sources; deletion/process-crash atomicity is not provided. Startup failure cleans up one-off databases while preserving persistent instances.
 
