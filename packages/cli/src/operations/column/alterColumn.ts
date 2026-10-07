@@ -5,9 +5,10 @@ import {
   TableColumnOpValue,
   TableColumnAttributes,
 } from "../shared/types";
-import { assertDataType } from "../shared/utils";
+import { assertColumnModificationAllowed, assertDataType } from "../shared/utils";
 import { defineOperation } from "../shared/operation";
 
+/** Alters column types and nullability using standard schema operations. */
 export const alterColumnOp = defineOperation({
   typeName: "alter_column",
   schema: z.object({
@@ -46,13 +47,12 @@ export const alterColumnOp = defineOperation({
   },
 });
 
+/** Builds an alteration only when existing column attributes can be retained safely. */
 export const alterColumn = (
   tableColumn: TableColumnOpValue,
   before: TableColumnAttributes,
   after: TableColumnAttributes
-) => ({
-  ...tableColumn,
-  type: "alter_column" as const,
-  before,
-  after,
-});
+) => {
+  assertColumnModificationAllowed(before, after);
+  return { ...tableColumn, type: "alter_column" as const, before, after };
+};

@@ -44,12 +44,15 @@ type SchemaDiff = {
 **kyrage** uses a **Dialect-based Architecture** to provide unified database support through a clean abstraction layer:
 
 ```typescript
-export interface KyrageDialect {
-  getDevDatabaseImageName: () => string;
+export type KyrageDialect = {
+  getName: () => string;
   createKyselyDialect: (connectionString: string) => Dialect;
   createIntrospectionDriver: (client: DBClient) => IntrospectorDriver;
-  createDevDatabaseContainer: (image: string) => StartableContainer;
-}
+  createSchemaAdapter: () => SchemaAdapter;
+  createDevDatabaseProvider: () => DevDatabaseProvider;
+  parseDevDatabaseConfig: (config: unknown) => DevDatabaseConfig;
+  hasReusableDevDatabase: () => Promise<boolean>;
+};
 
 // Factory pattern for dialect management
 export const getDialect = (dialectName: DialectEnum): KyrageDialect => {
@@ -64,12 +67,24 @@ export const getDialect = (dialectName: DialectEnum): KyrageDialect => {
 **Supported Dialects**:
 - **PostgreSQL**: Full support with native introspection
 - **CockroachDB**: Built on PostgreSQL compatibility with custom adapter
+- **MySQL**: Kysely's MySQL dialect with `information_schema` introspection and container-backed development databases
+- **MariaDB**: Shares the MySQL-compatible base implementation with a MariaDB development container
+- **SQLite**: File-backed development databases with SQLite-specific introspection
 
 **Dialect Benefits**:
 1. **Unified Interface**: All database-specific logic encapsulated in dialect implementations
 2. **Extensibility**: New databases can be added by implementing the `KyrageDialect` interface
 3. **Maintainability**: Database-specific code is isolated and centralized
 4. **Type Safety**: Factory pattern ensures only supported dialects are used
+
+#### Schema Adapters
+
+Each dialect supplies a `SchemaAdapter` through `createSchemaAdapter()`. `DBClient.getSchemaAdapter()` resolves this behavior at the database configuration boundary:
+
+- `prepareSchemaComparison`: Normalizes current/ideal snapshots before the generic diff engine compares them.
+- `operationExecutors`: A typed, partial map of operation overrides; omitted operations use their registered standard executor.
+
+PostgreSQL, CockroachDB, and SQLite use the default adapter. MySQL and MariaDB extend `MysqlCompatibleKyrageDialect`, which supplies their shared connections, introspection, schema adapter, and container reuse detection. Their concrete classes supply only database identity, container construction, and development configuration defaults. Both use `mysqlSchemaAdapter`, which owns their comparison rules and nonstandard DDL. Core diffing, commands, migration execution, and operation implementations do not inspect dialect names or native Kysely adapter classes.
 
 ### Benefits
 
@@ -106,6 +121,9 @@ export const members = t("members", {
 - `introspector.ts`: Core interface and coordination using dialect factory
 - `dialect/postgres.ts`: PostgreSQL-specific implementation with introspection driver
 - `dialect/cockroachdb.ts`: CockroachDB implementation reusing PostgreSQL introspection
+- `dialect/mysql-compatible.ts`: Shared MySQL-compatible base class, catalog introspection, and normalization of implicitly generated foreign-key indexes
+- `dialect/mysql.ts`: MySQL identity and development-container configuration
+- `dialect/mariadb.ts`: MariaDB identity and development-container configuration
 - `dialect/types.ts`: Dialect interface and schema representation types
 - `dialect/factory.ts`: Centralized dialect management and instantiation
 
@@ -123,7 +141,7 @@ export const getIntrospector = (client: DBClient) => {
 };
 ```
 
-The introspector provides a standardized interface regardless of database dialect, with all database-specific logic encapsulated in dialect implementations.
+The introspector provides a standardized interface regardless of database dialect, with all database-specific logic encapsulated in dialect implementations. Extended column metadata can supply an optional full `dataType` so MySQL length, precision, and scale are preserved rather than relying only on Kysely's base type names. MySQL foreign-key supporting indexes that are implicitly generated are normalized against the configuration to avoid unwanted index-drop migrations.
 
 ### 3. Diff Calculation (`diff.ts`)
 
@@ -144,6 +162,8 @@ function diffSchema(props: {
 **Strategy**:
 - Compare current vs ideal schema snapshots using functional utilities (Ramda)
 - Generate operations in dependency-safe order
+- Compare snapshots prepared by the selected schema adapter; the diff engine itself has no dialect-specific options or branches
+- MySQL/MariaDB adapters align primary-key names, omitted type parameters, and equivalent default foreign-key actions before comparison
 - Return unified operation array for consistent processing
 
 **Operation Types**:
@@ -226,35 +246,25 @@ export const createTableOp = defineOperation({
 
 **Architecture**:
 ```typescript
-async function buildMigrationFromDiff(
-  db: Kysely<any>, 
-  diff: SchemaDiff
-) {
-  // Apply operation reconciliation before execution
-  const reconciledOperations = buildReconciledOperations(diff.operations);
-  
-  for (const operation of reconciledOperations) {
-    await executeOperation(db, operation);
+const adapter = client.getSchemaAdapter();
+const comparison = adapter.prepareSchemaComparison({ current, ideal });
+const diff = diffSchema(comparison);
+
+const provider = createMigrationProvider({
+  migrationsResolver,
+  options: { plan },
+  operationExecutors: adapter.operationExecutors,
+});
+
+// The provider captures the injected executors, including for transactional Kysely instances.
+const up = async (db: Kysely<any>) => {
+  for (const operation of buildReconciledOperations(diff.operations)) {
+    await executeOperation(db, operation, adapter.operationExecutors);
   }
-}
+};
 
-// Dynamic operation execution using type-safe dispatch
-async function executeOperation(db: Kysely<any>, operation: Operation) {
-  const execute = getOperationExecutor(operation.type);
-  return await execute(db, operation);
-}
-
-function getOperationExecutor<T extends Operation["type"]>(operationType: T) {
-  const operation = operations.find((op) => op.typeName === operationType);
-  if (!operation) {
-    throw new Error(`Unknown operation type: ${operationType}`);
-  }
-
-  return operation.execute as (
-    db: Kysely<any>,
-    operation: Extract<Operation, { type: T }>
-  ) => Promise<void>;
-}
+// Dispatch prefers the injected override and falls back to the registered standard executor.
+const execute = executors[operation.type] ?? registeredOperation.execute;
 ```
 
 **Benefits**: 
@@ -263,6 +273,8 @@ function getOperationExecutor<T extends Operation["type"]>(operationType: T) {
 - Modular operation implementations through `defineOperation` pattern
 - Consistent error handling and transaction management
 - Automatic operation registration and schema validation
+
+Generic column, constraint, and index operations contain only standard SQL. The MySQL/MariaDB schema adapter supplies overrides for `MODIFY COLUMN`, `DROP PRIMARY KEY`, `DROP FOREIGN KEY`, unique-constraint index drops, and table-qualified index drops. Primary-key creation overrides omit the reserved catalog name `PRIMARY` from both `ALTER TABLE` and inline `CREATE TABLE` declarations, since MariaDB rejects it as an explicit index name. The migration provider receives these executors explicitly, so plan mode and real or transactional execution use the same behavior without inspecting database identity. Catalog defaults are reconstructed as SQL literals or parenthesized expressions. Full-definition column alterations are rejected during generation and execution when catalog metadata identifies unsupported attributes that would otherwise be lost (for example, auto-increment or custom collation). MySQL and MariaDB DDL is nontransactional, so a migration failure can leave preceding operations applied.
 
 ### 7. Development Database Management (`dev/container.ts`)
 
@@ -273,7 +285,7 @@ function getOperationExecutor<T extends Operation["type"]>(operationType: T) {
 - Smart container reuse and detection for `generate --dev`
 - Baseline migration application to ensure accurate schema comparison
 - Container cleanup and status management
-- Support for PostgreSQL and CockroachDB containers
+- Support for PostgreSQL, CockroachDB, MySQL, and MariaDB containers
 
 **Architecture**: Integrates with dialect factory to provide database-specific container configurations while maintaining a unified interface.
 
@@ -374,8 +386,14 @@ export function createCommonDependencies(
   - `dialect/`: Centralized database dialect management and abstractions.
     - `types.ts`: Dialect interface definitions and schema representation types (`KyrageDialect`, `ColumnExtraAttribute`, `ConstraintAttributes`).
     - `factory.ts`: Centralized dialect instantiation and management (`getDialect`, `getSupportedDialects`).
+    - `schema-adapter.ts`: Schema adapter contract, typed executor overrides, and default behavior.
+    - `mysql-schema-adapter.ts`: MySQL/MariaDB comparison policies and operation executor overrides.
     - `postgres.ts`: PostgreSQL dialect implementation with introspection driver (`PostgresKyrageDialect`, `postgresExtraIntrospectorDriver`).
     - `cockroachdb.ts`: CockroachDB dialect implementation extending PostgreSQL compatibility (`CockroachDBKyrageDialect`).
+    - `mysql-compatible.ts`: Shared MySQL/MariaDB base class (`MysqlCompatibleKyrageDialect`) and catalog introspection.
+    - `mysql.ts`: MySQL-specific identity and development-container configuration (`MysqlKyrageDialect`).
+    - `mariadb.ts`: MariaDB-specific identity and development-container configuration (`MariadbKyrageDialect`).
+    - `sqlite.ts`: SQLite dialect implementation with file-backed development databases.
   - `introspector.ts`: Database schema introspection coordination using dialect factory (moved from `introspection/`).
   - `migration.ts`: Executes Operation arrays against the database.
   - `client.ts`: Database connection and client management using dialect factory.
@@ -389,8 +407,19 @@ export function createCommonDependencies(
   - `dev/container.ts`: Development database container lifecycle management with dialect factory integration.
   - `tests/`: Unit tests for core logic including comprehensive Operation array validation.
 
+- `packages/cli/tests/`
+  Integration tests for migration generation, application, introspection, and development databases.
+  - `fixtures.ts`: Vitest `test.extend()` context with lazy file-scoped database setup and teardown.
+  - `helper.ts`: Independent dialect expectation profiles and shared migration helpers.
+
 - `examples/basic/`  
   Example project and configuration.
+
+## Integration Test Context
+
+The CI matrix selects one dialect per invocation through `TEST_DIALECT`. Integration tests receive `{ testDB, expectations }` from `databaseTest`, rather than starting databases during module collection. The file-scoped fixture keeps one isolated database per file and registers cleanup through Vitest; tests that deliberately share state must remain sequential.
+
+`testForDialects(...)` declares dialect-specific coverage with Vitest's `runIf`, so unsupported tests do not start a database. Catalog names and SQL spellings come from an independent test profile, not the production schema adapter. Common indexed string fixtures use `varchar(255)` across dialects, eliminating conditional column types without weakening exact SQL assertions.
 
 ## Main Flow
 
@@ -442,7 +471,7 @@ export function createCommonDependencies(
 
 ## Future Work
 
-- Support for MySQL, SQLite, MSSQL through dialect interface implementation.
+- Support for MSSQL through dialect interface implementation.
 - More advanced diffing (constraints, triggers, etc.).
 - Enhanced Operation types for complex schema changes.
 - Improved error handling and reporting.

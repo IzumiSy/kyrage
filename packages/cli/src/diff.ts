@@ -224,6 +224,7 @@ export function diffIndexes(props: {
   return operations;
 }
 
+/** Compares primary keys by their normalized table, name, and ordered columns. */
 export function diffPrimaryKeyConstraints(props: {
   current: ReadonlyArray<PrimaryKeyConstraintSchema>;
   ideal: ReadonlyArray<PrimaryKeyConstraintSchema>;
@@ -340,7 +341,7 @@ export function diffUniqueConstraints(props: {
   return operations;
 }
 
-// Foreign Key制約のdiff計算
+/** Compares normalized foreign-key columns, references, and actions. */
 function diffForeignKeyConstraints(props: {
   current: ReadonlyArray<ForeignKeyConstraintSchema>;
   ideal: ReadonlyArray<ForeignKeyConstraintSchema>;
@@ -412,6 +413,7 @@ function diffForeignKeyConstraints(props: {
   return operations;
 }
 
+/** Builds operations from already-normalized schemas without database-specific rules. */
 export function diffSchema(props: {
   current: SchemaSnapshot;
   ideal: SchemaSnapshot;

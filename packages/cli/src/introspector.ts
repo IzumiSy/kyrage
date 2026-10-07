@@ -1,6 +1,7 @@
 import { DBClient } from "./client";
 import { ConfigValue } from "./config/loader";
 import { getDialect } from "./dialect/factory";
+import type { ColumnExtraAttribute } from "./dialect/types";
 
 /**
  * Get an introspector for the given database client.
@@ -32,7 +33,13 @@ export const getIntrospector = (client: DBClient) => {
 
     const getTables = () =>
       kyselyIntrospection.map((table) => {
-        const columns: Record<string, any> = {};
+        const columns: Record<
+          string,
+          ColumnExtraAttribute & {
+            dataType: string;
+            notNull: boolean;
+          }
+        > = {};
 
         for (const column of table.columns) {
           const extraInfo = extTables.find(
@@ -42,6 +49,17 @@ export const getIntrospector = (client: DBClient) => {
             continue;
           }
 
+          const convertedType =
+            extraInfo.dataType ??
+            extIntrospectorDriver.convertTypeName(column.dataType);
+          // Reconstruct type with length for char and varchar types
+          let dataType = convertedType;
+          if (
+            extraInfo.characterMaximumLength != null &&
+            (convertedType === "char" || convertedType === "varchar")
+          ) {
+            dataType = `${convertedType}(${extraInfo.characterMaximumLength})`;
+          }
           // Primary key columns should always be notNull
           const isPrimaryKey = primaryKeyColumns.has(
             `${table.name}.${column.name}`,
@@ -51,10 +69,15 @@ export const getIntrospector = (client: DBClient) => {
             schema: table.schema ?? "public",
             table: table.name,
             name: column.name,
-            dataType: extIntrospectorDriver.convertTypeName(column.dataType),
+            dataType,
             default: extraInfo.default ?? null,
             characterMaximumLength: extraInfo.characterMaximumLength ?? null,
             notNull: !column.isNullable || isPrimaryKey,
+            ...(extraInfo.alterationBlockedReason
+              ? {
+                  alterationBlockedReason: extraInfo.alterationBlockedReason,
+                }
+              : {}),
           };
         }
 

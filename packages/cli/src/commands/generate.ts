@@ -205,6 +205,9 @@ const generateMigrationFromIntrospection = async (props: {
             defaultSql: colDef.default ?? undefined,
             primaryKey,
             unique,
+            ...(colDef.alterationBlockedReason ? {
+              alterationBlockedReason: colDef.alterationBlockedReason,
+            } : {}),
           },
         ];
       })
@@ -237,7 +240,7 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const diff = diffSchema({
+  const comparison = client.getSchemaAdapter().prepareSchemaComparison({
     current: {
       tables: dbTables,
       indexes,
@@ -250,6 +253,7 @@ const generateMigrationFromIntrospection = async (props: {
       tables: configTables,
     },
   });
+  const diff = diffSchema(comparison);
 
   if (diff.operations.length === 0) {
     return null;

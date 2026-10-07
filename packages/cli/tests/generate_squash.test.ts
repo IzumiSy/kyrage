@@ -1,23 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, expect, vi, beforeEach } from "vitest";
+import { databaseTest as it } from "./fixtures";
 import { executeGenerate } from "../src/commands/generate";
 import { defineTable, column } from "../src/config/builder";
-import { defineConfigForTest, setupTestDB } from "./helper";
+import { defineConfigForTest } from "./helper";
 import { defaultConsolaLogger } from "../src/logger";
 import { getAllMigrations } from "../src/migration";
 import { fs, vol } from "memfs";
-import { FSPromiseAPIs } from "../src/commands/common";
+import type { DatabaseValue } from "../src/config/loader";
 
-const { database, client } = await setupTestDB();
-const config = defineConfigForTest({
-  database,
-  tables: [
-    defineTable("users", {
-      id: column("uuid", { primaryKey: true }),
-      email: column("text", { notNull: true, unique: true }),
-      name: column("text"),
-    }),
-  ],
-});
+/** Defines the final schema shared by the squash scenarios. */
+const createConfig = (database: DatabaseValue) =>
+  defineConfigForTest({
+    database,
+    tables: [
+      defineTable("users", {
+        id: column("char(36)", { primaryKey: true }),
+        email: column("text", { notNull: true, unique: true }),
+        name: column("text"),
+      }),
+    ],
+  });
 
 describe("generate --squash", () => {
   beforeEach(async () => {
@@ -25,13 +27,12 @@ describe("generate --squash", () => {
     vol.reset();
   });
 
-  const baseDeps = {
-    client,
-    logger: defaultConsolaLogger,
-    fs: fs.promises as unknown as FSPromiseAPIs,
-  };
-
-  it("should squash multiple pending migrations into one", async () => {
+  it("should squash multiple pending migrations into one", async ({
+    testDB,
+  }) => {
+    const { database } = testDB;
+    const baseDeps = { ...testDB.baseDeps, logger: defaultConsolaLogger };
+    const config = createConfig(database);
     // First, create some pending migrations by running generate multiple times
     await baseDeps.fs.mkdir("migrations", { recursive: true });
 
@@ -40,7 +41,7 @@ describe("generate --squash", () => {
       database,
       tables: [
         defineTable("users", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
         }),
       ],
     });
@@ -62,7 +63,7 @@ describe("generate --squash", () => {
       database,
       tables: [
         defineTable("users", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
           email: column("text", { notNull: true }),
         }),
       ],
@@ -119,7 +120,7 @@ describe("generate --squash", () => {
           type: "create_table",
           table: "users",
           columns: expect.objectContaining({
-            id: expect.objectContaining({ type: "uuid", primaryKey: true }),
+            id: expect.objectContaining({ type: "char(36)", primaryKey: true }),
             email: expect.objectContaining({
               type: "text",
               notNull: true,
@@ -132,7 +133,9 @@ describe("generate --squash", () => {
     );
   });
 
-  it("should handle no pending migrations gracefully", async () => {
+  it("should handle no pending migrations gracefully", async ({ testDB }) => {
+    const baseDeps = { ...testDB.baseDeps, logger: defaultConsolaLogger };
+    const config = createConfig(testDB.database);
     await fs.mkdir("migrations", { recursive: true }, () => void 0);
 
     // Try to squash when there are no migrations

@@ -2,6 +2,7 @@ import z from "zod";
 import { tableOpSchemaBase, TableOpValue } from "../shared/types";
 import { defineOperation } from "../shared/operation";
 
+/** Drops a foreign key using standard constraint syntax. */
 export const dropForeignKeyConstraintOp = defineOperation({
   typeName: "drop_foreign_key_constraint",
   schema: z.object({

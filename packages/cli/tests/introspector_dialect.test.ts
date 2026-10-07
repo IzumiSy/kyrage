@@ -1,24 +1,31 @@
-import { describe, it, expect } from "vitest";
-import { applyTable, dropTablesForDialect, setupTestDB } from "./helper";
+import { describe, expect } from "vitest";
+import { applyTable, dropTablesForDialect } from "./helper";
 import { column, defineTable } from "../src";
-import { getIntrospector } from "../src/introspector";
-import { fs } from "memfs";
-import { FSPromiseAPIs } from "../src/commands/common";
+import { databaseTest as it, testForDialects } from "./fixtures";
+import { executeGenerate } from "../src/commands/generate";
+import { vol } from "memfs";
 
-const { client, dialect, database } = await setupTestDB();
-const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
-const introspector = getIntrospector(client);
-const dialectName = dialect.getName();
+const constraintTest = testForDialects(
+  "postgres",
+  "cockroachdb",
+  "mysql",
+  "mariadb"
+);
 
-describe(`${dialectName} introspector driver`, async () => {
-  it("should introspect table columns correctly", async () => {
+describe("introspector driver", () => {
+  it("should introspect table columns correctly", async ({
+    testDB,
+    expectations,
+  }) => {
+    const { client, database, baseDeps, introspector } = testDB;
+    const { schema: schemaName, booleanDefault } = expectations;
     const deps = await applyTable(baseDeps, {
       database,
       tables: [
         defineTable("test_table", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
           name: column("varchar(255)", { notNull: true }),
-          age: column("int8", { defaultSql: "0" }),
+          age: column("bigint", { defaultSql: "0" }),
           is_active: column("boolean", { defaultSql: "true" }),
         }),
       ],
@@ -28,16 +35,16 @@ describe(`${dialectName} introspector driver`, async () => {
     expect(tables).toEqual([
       {
         name: "test_table",
-        schema: "public",
+        schema: schemaName,
         columns: {
           id: expect.objectContaining({
-            dataType: "uuid",
+            dataType: "char(36)",
             notNull: true,
             default: null,
-            characterMaximumLength: null,
+            characterMaximumLength: 36,
           }),
           name: expect.objectContaining({
-            dataType: "varchar",
+            dataType: "varchar(255)",
             notNull: true,
             default: null,
             characterMaximumLength: 255,
@@ -51,36 +58,85 @@ describe(`${dialectName} introspector driver`, async () => {
           is_active: expect.objectContaining({
             dataType: "boolean",
             notNull: false,
-            default: "true",
+            default: booleanDefault,
             characterMaximumLength: null,
           }),
         },
       },
     ]);
 
-    await dropTablesForDialect({
-      client,
-      tableNames: ["test_table"],
-    });
+    await dropTablesForDialect({ client, tableNames: ["test_table"] });
   });
 
-  it("should introspect indexes correctly", async () => {
+  testForDialects("postgres", "cockroachdb")(
+    "should preserve unbounded varchar and bounded string lengths when regenerating",
+    async ({ testDB, expectations }) => {
+      const { client, database, baseDeps, introspector } = testDB;
+      const tableName = "test_string_lengths";
+      const deps = await applyTable(baseDeps, {
+        database,
+        tables: [
+          defineTable(tableName, {
+            // Keep CockroachDB's implicit rowid primary key out of this type regression.
+            id: column("char(36)", { primaryKey: true }),
+            unbounded: column("varchar"),
+            bounded: column("varchar(255)"),
+            fixed: column("char(36)"),
+          }),
+        ],
+      });
+
+      const { tables } = await introspector.introspect(deps.config);
+      expect(tables).toEqual([
+        {
+          name: tableName,
+          schema: expectations.schema,
+          columns: {
+            id: expect.objectContaining({
+              dataType: "char(36)",
+              characterMaximumLength: 36,
+              notNull: true,
+            }),
+            unbounded: expect.objectContaining({
+              dataType: "varchar",
+              characterMaximumLength: null,
+            }),
+            bounded: expect.objectContaining({
+              dataType: "varchar(255)",
+              characterMaximumLength: 255,
+            }),
+            fixed: expect.objectContaining({
+              dataType: "char(36)",
+              characterMaximumLength: 36,
+            }),
+          },
+        },
+      ]);
+      const before = vol.toJSON();
+      await executeGenerate(deps, { ignorePending: false, dev: false });
+      expect(vol.toJSON()).toEqual(before);
+      await dropTablesForDialect({ client, tableNames: [tableName] });
+    }
+  );
+
+  it("should introspect indexes correctly", async ({ testDB }) => {
+    const { client, database, baseDeps, introspector } = testDB;
     const deps = await applyTable(baseDeps, {
       database,
       tables: [
         defineTable(
           "test_table_with_indexes",
           {
-            id: column("uuid", { primaryKey: true }),
-            email: column("text"),
-            alias: column("text", { unique: true }),
-            name: column("text"),
+            id: column("char(36)", { primaryKey: true }),
+            email: column("varchar(255)"),
+            alias: column("varchar(255)", { unique: true }),
+            name: column("varchar(255)"),
             age: column("integer"),
           },
           (t) => [
             t.index(["email"]),
             t.index(["name", "age"], { unique: true }),
-          ],
+          ]
         ),
       ],
     });
@@ -101,7 +157,7 @@ describe(`${dialectName} introspector driver`, async () => {
           columns: ["name", "age"],
           unique: true,
         },
-      ]),
+      ])
     );
 
     await dropTablesForDialect({
@@ -109,4 +165,98 @@ describe(`${dialectName} introspector driver`, async () => {
       tableNames: ["test_table_with_indexes"],
     });
   });
+
+  constraintTest(
+    "should introspect constraints correctly",
+    async ({ testDB, expectations }) => {
+      const { client, database, baseDeps, introspector } = testDB;
+      const {
+        schema: schemaName,
+        primaryKeyName,
+        constraintMetadata: metadata,
+      } = expectations;
+      const usersTable = defineTable("users", {
+        id: column("char(36)", { primaryKey: true }),
+        email: column("varchar(255)", { unique: true }),
+        username: column("text"),
+      });
+      const deps = await applyTable(baseDeps, {
+        database,
+        tables: [
+          usersTable,
+          defineTable(
+            "posts",
+            {
+              id: column("char(36)", { primaryKey: true }),
+              user_id: column("char(36)"),
+              title: column("varchar(255)"),
+            },
+            (t) => [
+              t.reference("user_id", usersTable, "id", {
+                onDelete: "cascade",
+                onUpdate: "cascade",
+                name: "fk_user",
+              }),
+              t.unique(["user_id", "title"], { name: "unique_title_per_user" }),
+            ]
+          ),
+        ],
+      });
+
+      const { constraints } = await introspector.introspect(deps.config);
+      expect(constraints).toEqual({
+        primaryKey: [
+          {
+            name: primaryKeyName("posts_id_primary_key"),
+            ...metadata,
+            schema: schemaName,
+            table: "posts",
+            type: "PRIMARY KEY",
+            columns: ["id"],
+          },
+          {
+            name: primaryKeyName("users_id_primary_key"),
+            ...metadata,
+            schema: schemaName,
+            table: "users",
+            type: "PRIMARY KEY",
+            columns: ["id"],
+          },
+        ],
+        unique: [
+          {
+            name: "unique_title_per_user",
+            ...metadata,
+            schema: schemaName,
+            table: "posts",
+            type: "UNIQUE",
+            columns: ["user_id", "title"],
+          },
+          {
+            name: "users_email_unique",
+            ...metadata,
+            schema: schemaName,
+            table: "users",
+            type: "UNIQUE",
+            columns: ["email"],
+          },
+        ],
+        foreignKey: [
+          {
+            schema: schemaName,
+            table: "posts",
+            name: "fk_user",
+            type: "FOREIGN KEY",
+            columns: ["user_id"],
+            referencedTable: "users",
+            referencedColumns: ["id"],
+            onDelete: "cascade",
+            onUpdate: "cascade",
+          },
+        ],
+      });
+
+      await dropTablesForDialect({ client, tableNames: ["posts", "users"] });
+    }
+  );
 });

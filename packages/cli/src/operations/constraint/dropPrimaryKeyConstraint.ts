@@ -2,6 +2,7 @@ import z from "zod";
 import { tableOpSchemaBase, TableOpValue } from "../shared/types";
 import { defineOperation } from "../shared/operation";
 
+/** Drops a primary key using standard constraint syntax. */
 export const dropPrimaryKeyConstraintOp = defineOperation({
   typeName: "drop_primary_key_constraint",
   schema: z.object({

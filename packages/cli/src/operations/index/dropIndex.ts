@@ -2,6 +2,7 @@ import z from "zod";
 import { tableOpSchemaBase, TableOpValue } from "../shared/types";
 import { defineOperation } from "../shared/operation";
 
+/** Drops an index using standard schema syntax. */
 export const dropIndexOp = defineOperation({
   typeName: "drop_index",
   schema: z.object({

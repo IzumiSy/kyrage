@@ -1,19 +1,21 @@
-import { it, describe, expect } from "vitest";
+import { describe, expect } from "vitest";
+import { databaseTest as it } from "./fixtures";
 import { defineTable, column } from "../src";
-import { setupTestDB, applyTable } from "./helper";
-import { fs } from "memfs";
-import { FSPromiseAPIs } from "../src/commands/common";
-
-const { database, client } = await setupTestDB();
-const baseDeps = { client, fs: fs.promises as unknown as FSPromiseAPIs };
+import { applyTable } from "./helper";
 
 describe("apply migrations in multiple times", () => {
-  it("should update DB in multiple times by the schema in config", async () => {
+  it("should update DB in multiple times by the schema in config", async ({
+    testDB,
+    expectations,
+  }) => {
+    const { database, client, baseDeps } = testDB;
+    const { rawCharType: expectedCharType, rawTextType: expectedTextType } =
+      expectations;
     await applyTable(baseDeps, {
       database,
       tables: [
         defineTable("members", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
           name: column("text"),
         }),
       ],
@@ -25,14 +27,8 @@ describe("apply migrations in multiple times", () => {
       expect.objectContaining({
         name: "members",
         columns: expect.arrayContaining([
-          expect.objectContaining({
-            name: "id",
-            dataType: expect.stringMatching(/^uuid$/i),
-          }),
-          expect.objectContaining({
-            name: "name",
-            dataType: expect.stringMatching(/^text$/i),
-          }),
+          expect.objectContaining({ name: "id", dataType: expectedCharType }),
+          expect.objectContaining({ name: "name", dataType: expectedTextType }),
         ]),
       }),
     ]);
@@ -41,11 +37,11 @@ describe("apply migrations in multiple times", () => {
       database,
       tables: [
         defineTable("members", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
           email: column("text"),
         }),
         defineTable("posts", {
-          id: column("uuid", { primaryKey: true }),
+          id: column("char(36)", { primaryKey: true }),
           title: column("text"),
         }),
       ],
@@ -56,26 +52,20 @@ describe("apply migrations in multiple times", () => {
       expect.objectContaining({
         name: "members",
         columns: expect.arrayContaining([
-          expect.objectContaining({
-            name: "id",
-            dataType: expect.stringMatching(/^uuid$/i),
-          }),
+          expect.objectContaining({ name: "id", dataType: expectedCharType }),
           expect.objectContaining({
             name: "email",
-            dataType: expect.stringMatching(/^text$/i),
+            dataType: expectedTextType,
           }),
         ]),
       }),
       expect.objectContaining({
         name: "posts",
         columns: expect.arrayContaining([
-          expect.objectContaining({
-            name: "id",
-            dataType: expect.stringMatching(/^uuid$/i),
-          }),
+          expect.objectContaining({ name: "id", dataType: expectedCharType }),
           expect.objectContaining({
             name: "title",
-            dataType: expect.stringMatching(/^text$/i),
+            dataType: expectedTextType,
           }),
         ]),
       }),

@@ -27,9 +27,38 @@ This is a style of managing database schema that is called as [Versioned Migrati
 |---------|----------------|--------------|
 | PostgreSQL | `postgres` | ✅ Docker container |
 | CockroachDB | `cockroachdb` | ✅ Docker container |
+| MySQL | `mysql` | ✅ Docker container |
+| MariaDB | `mariadb` | ✅ Docker container |
 | SQLite | `sqlite` | ✅ File-based (no Docker required) |
 
-> **Note:** The Dev Database container reuse feature (`kyrage dev start`) is only available for PostgreSQL and CockroachDB. SQLite uses a file-based dev database instead.
+> **Note:** The Dev Database container reuse feature (`kyrage dev start`) is available for PostgreSQL, CockroachDB, MySQL, and MariaDB. SQLite uses a file-based dev database instead.
+
+### MySQL and MariaDB
+
+```typescript
+import { column, defineConfig, defineTable } from "@izumisy/kyrage";
+
+export default defineConfig({
+  database: {
+    dialect: "mysql", // Use "mariadb" for MariaDB
+    connectionString: "mysql://user:password@localhost:3306/mydb",
+  },
+  dev: {
+    container: { image: "mysql:8" }, // Use "mariadb:11" for MariaDB
+  },
+  tables: [
+    defineTable("members", {
+      id: column("char(36)", { primaryKey: true }),
+      email: column("varchar(255)", { unique: true, notNull: true }),
+    }),
+  ],
+});
+```
+
+- Use MySQL-compatible types: `char(36)` instead of PostgreSQL's `uuid`, and bounded `varchar(n)` for indexed or unique strings instead of `text`.
+- Primary keys are stored as `PRIMARY`; custom primary-key names are ignored when comparing schemas.
+- Column changes are rejected if `MODIFY COLUMN` would discard unsupported attributes such as auto-increment, generated columns, update expressions, comments, or a custom collation. Manage these alterations explicitly rather than silently losing database behavior.
+- MySQL and MariaDB DDL is not transactional. A failed migration may leave earlier schema changes applied; inspect the database before retrying.
 
 ## Installation
 
@@ -382,7 +411,7 @@ import { defineConfig } from "@izumisy/kyrage";
 
 export default defineConfig({
   database: {
-    dialect: "postgres" | "cockroachdb",  // Database dialect
+    dialect: "postgres" | "cockroachdb" | "mysql" | "mariadb" | "sqlite", // Database dialect
     connectionString: string,             // Database connection string
   },
   // Optional: Development database configuration
