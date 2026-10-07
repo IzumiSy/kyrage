@@ -11,8 +11,6 @@ export type ColumnExtraAttribute = {
   table: string;
   name: string;
   dataType?: string;
-  /** Blocks full-definition column alterations that would lose unsupported attributes. */
-  alterationBlockedReason?: string;
   default: string | null;
   characterMaximumLength: number | null;
 };

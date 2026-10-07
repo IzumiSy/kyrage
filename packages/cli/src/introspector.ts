@@ -73,11 +73,6 @@ export const getIntrospector = (client: DBClient) => {
             default: extraInfo.default ?? null,
             characterMaximumLength: extraInfo.characterMaximumLength ?? null,
             notNull: !column.isNullable || isPrimaryKey,
-            ...(extraInfo.alterationBlockedReason
-              ? {
-                  alterationBlockedReason: extraInfo.alterationBlockedReason,
-                }
-              : {}),
           };
         }
 

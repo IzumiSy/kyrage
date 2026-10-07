@@ -16,9 +16,10 @@ export class SQLiteKyrageDialect implements KyrageDialect {
     return "sqlite" as const;
   }
 
+  /** Opens SQLite lazily so query-free validation and plan connections allocate no handle. */
   createKyselyDialect(connectionString: string) {
     return new SqliteDialect({
-      database: new Database(connectionString),
+      database: async () => new Database(connectionString),
     });
   }
 
