@@ -1,4 +1,5 @@
 import { describe, expect } from "vitest";
+import { DEFAULT_MIGRATION_TABLE } from "kysely";
 import {
   applyTable,
   defineConfigForTest,
@@ -7,6 +8,8 @@ import {
 import { column, defineTable } from "../src";
 import { vol } from "memfs";
 import { executeGenerate } from "../src/commands/generate";
+import { executeApply } from "../src/commands/apply";
+import { getAllMigrations, migrationDirName } from "../src/migration";
 import { defaultConsolaLogger } from "../src/logger";
 import { testForDialects } from "./fixtures";
 
@@ -217,6 +220,160 @@ describe("non-sqlite introspector constraints", () => {
       ).rejects.toThrow("auto_increment");
       expect(vol.toJSON()).toEqual(before);
       await dropTablesForDialect({ client, tableNames: ["legacy"] });
+    }
+  );
+
+  mysqlIt(
+    "should reject an unsafe migration before any earlier column addition executes",
+    async ({ testDB }) => {
+      const { client, database, baseDeps } = testDB;
+      const tableName = "live_validation";
+      await using db = client.getDB();
+      await db.schema
+        .createTable(tableName)
+        .addColumn("id", "integer", (col) => col.autoIncrement().primaryKey())
+        .execute();
+      let pendingPath: string | undefined;
+      let appliedId: string | undefined;
+      try {
+        const existingIds = new Set(
+          (await getAllMigrations(baseDeps)).map((migration) => migration.id)
+        );
+        let id = String(Date.now());
+        while (existingIds.has(id)) id = String(Number(id) + 1);
+        await baseDeps.fs.mkdir(migrationDirName, { recursive: true });
+        const path = `${migrationDirName}/${id}.json`;
+        await baseDeps.fs.writeFile(
+          path,
+          JSON.stringify({
+            id,
+            version: "1",
+            diff: {
+              operations: [
+                {
+                  type: "add_column",
+                  table: tableName,
+                  column: "before_failure",
+                  attributes: { type: "integer" },
+                },
+                {
+                  type: "alter_column",
+                  table: tableName,
+                  column: "id",
+                  before: { type: "integer", notNull: true },
+                  after: { type: "bigint", notNull: true },
+                },
+              ],
+            },
+          }),
+          "utf-8"
+        );
+        pendingPath = path;
+        await expect(
+          executeApply(
+            {
+              ...baseDeps,
+              logger: defaultConsolaLogger,
+              config: defineConfigForTest({
+                database,
+                tables: [
+                  defineTable(tableName, {
+                    id: column("integer", { primaryKey: true }),
+                  }),
+                ],
+              }),
+            },
+            { plan: false, pretty: false }
+          ).then(() => {
+            appliedId = id;
+          })
+        ).rejects.toThrow("auto_increment");
+        const table = (await db.introspection.getTables()).find(
+          (candidate) => candidate.name === tableName
+        );
+        expect(table?.columns.map((col) => col.name)).toEqual(["id"]);
+      } finally {
+        if (appliedId)
+          await db
+            .deleteFrom(DEFAULT_MIGRATION_TABLE)
+            .where("name", "=", appliedId)
+            .execute();
+        if (pendingPath) await baseDeps.fs.unlink(pendingPath);
+        await dropTablesForDialect({ client, tableNames: [tableName] });
+      }
+    }
+  );
+
+  mysqlIt(
+    "should reject newly added auto-increment metadata after migration generation",
+    async ({ testDB }) => {
+      const { client, database, baseDeps, introspector } = testDB;
+      const tableName = "validation_drift";
+      await using db = client.getDB();
+      await db.schema
+        .createTable(tableName)
+        .addColumn("id", "integer", (col) => col.primaryKey())
+        .execute();
+      const existingIds = new Set(
+        (await getAllMigrations(baseDeps)).map((migration) => migration.id)
+      );
+      let pendingIds: ReadonlyArray<string> = [];
+      let appliedId: string | undefined;
+      try {
+        const deps = {
+          ...baseDeps,
+          logger: defaultConsolaLogger,
+          config: defineConfigForTest({
+            database,
+            tables: [
+              defineTable(tableName, {
+                id: column("bigint", { primaryKey: true }),
+              }),
+            ],
+          }),
+        };
+        await executeGenerate(deps, { ignorePending: false, dev: false });
+        const generated = (await getAllMigrations(baseDeps)).filter(
+          (migration) => !existingIds.has(migration.id)
+        );
+        pendingIds = generated.map((migration) => migration.id);
+        expect(generated).toHaveLength(1);
+        expect(generated[0].diff.operations).toEqual([
+          expect.objectContaining({
+            type: "alter_column",
+            table: tableName,
+            column: "id",
+            before: expect.objectContaining({ type: "integer" }),
+            after: expect.objectContaining({ type: "bigint" }),
+          }),
+        ]);
+        await db.schema
+          .alterTable(tableName)
+          .modifyColumn("id", "integer", (col) => col.notNull().autoIncrement())
+          .execute();
+        await expect(
+          executeApply(deps, { plan: false, pretty: false }).then(() => {
+            appliedId = generated[0].id;
+          })
+        ).rejects.toThrow("auto_increment");
+        const snapshot = await introspector.introspect(deps.config);
+        expect(
+          snapshot.tables.find((table) => table.name === tableName)?.columns.id
+            .dataType
+        ).toBe("integer");
+      } finally {
+        if (appliedId)
+          await db
+            .deleteFrom(DEFAULT_MIGRATION_TABLE)
+            .where("name", "=", appliedId)
+            .execute();
+        await Promise.all(
+          pendingIds.map((id) =>
+            baseDeps.fs.unlink(`${migrationDirName}/${id}.json`)
+          )
+        );
+        await dropTablesForDialect({ client, tableNames: [tableName] });
+      }
     }
   );
 });

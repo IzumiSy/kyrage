@@ -20,10 +20,16 @@ export type SchemaComparison = {
 export type SchemaAdapter = {
   operationExecutors: OperationExecutors;
   prepareSchemaComparison: (comparison: SchemaComparison) => SchemaComparison;
+  /** Checks executable operations against live database facts before any DDL. */
+  validateOperations: (props: {
+    db: Kysely<any>;
+    operations: ReadonlyArray<Operation>;
+  }) => Promise<void>;
 };
 
 /** Uses standard operation executors and compares schema snapshots unchanged. */
 export const defaultSchemaAdapter: SchemaAdapter = {
   operationExecutors: {},
   prepareSchemaComparison: (comparison) => comparison,
+  validateOperations: async () => {},
 };

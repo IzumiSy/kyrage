@@ -4,10 +4,9 @@ import type {
   ForeignKeyConstraintSchema,
   Tables,
 } from "../operations/shared/types";
-import {
-  assertColumnModificationAllowed,
-  assertDataType,
-} from "../operations/shared/utils";
+import { assertDataType } from "../operations/shared/utils";
+import type { Operation } from "../operations/executor";
+import { readMysqlColumnMetadata } from "./mysql-column-metadata";
 import { createTableWithConstraintsOp } from "../operations/table/createTableWithConstraints";
 
 /** PRIMARY is a catalog identifier, not a valid explicit MariaDB index name. */
@@ -84,9 +83,98 @@ const prepareSchemaComparison = ({ current, ideal }: SchemaComparison) => ({
   },
 });
 
+/** An alteration for which the renderer issues a full MODIFY COLUMN definition. */
+type ColumnModification = Extract<Operation, { type: "alter_column" }>;
+
+/** Matches the renderer's type/nullability changes, excluding constraint-only no-ops. */
+const modifiesColumnDefinition = (
+  operation: Operation
+): operation is ColumnModification =>
+  operation.type === "alter_column" &&
+  (operation.before.type !== operation.after.type ||
+    Boolean(operation.before.notNull) !== Boolean(operation.after.notNull));
+
+/** Refuses unsafe or unverifiable full-definition changes before any operation executes. */
+const validateOperations: SchemaAdapter["validateOperations"] = async ({
+  db,
+  operations,
+}) => {
+  const modifications = operations.filter(modifiesColumnDefinition);
+  if (modifications.length === 0) return;
+
+  const changedTables = new Set<string>();
+  const changedColumns = new Set<string>();
+  for (const operation of operations) {
+    if (modifiesColumnDefinition(operation)) {
+      const key = JSON.stringify([operation.table, operation.column]);
+      if (changedTables.has(operation.table) || changedColumns.has(key)) {
+        throw new Error(
+          `Cannot validate modification of ${operation.table}.${operation.column}: state depends on earlier operations`
+        );
+      }
+      assertDataType(operation.after.type);
+      changedColumns.add(key);
+    } else if (
+      operation.type === "create_table" ||
+      operation.type === "create_table_with_constraints" ||
+      operation.type === "drop_table"
+    ) {
+      changedTables.add(operation.table);
+    } else if (
+      operation.type === "add_column" ||
+      operation.type === "drop_column"
+    ) {
+      changedColumns.add(JSON.stringify([operation.table, operation.column]));
+    }
+  }
+
+  const rows = await readMysqlColumnMetadata(db);
+  const columns = new Map(
+    rows.map((row) => [JSON.stringify([row.table_name, row.column_name]), row])
+  );
+  for (const operation of modifications) {
+    const column = columns.get(
+      JSON.stringify([operation.table, operation.column])
+    );
+    if (!column) {
+      throw new Error(
+        `Cannot validate modification of ${operation.table}.${operation.column}: column is missing from the current database`
+      );
+    }
+    const extra = (column.extra ?? "")
+      .replace(/\bDEFAULT_GENERATED\b/g, "")
+      .trim();
+    const unsupported = [
+      extra,
+      column.column_comment ? "column comment" : "",
+      column.custom_collation ? "custom collation" : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+    if (unsupported) {
+      throw new Error(
+        `Cannot safely modify column ${operation.table}.${operation.column}: ${unsupported}`
+      );
+    }
+    // An omitted desired default must preserve the live default, not an older snapshot.
+    const defaultSql =
+      operation.after.defaultSql ?? operation.before.defaultSql;
+    const renderedDefault = typeof defaultSql === "string" ? defaultSql : null;
+    if (
+      typeof operation.after.defaultSql !== "string" &&
+      renderedDefault !== column.column_default
+    ) {
+      throw new Error(
+        `Cannot safely modify column ${operation.table}.${operation.column}: default changed since generation`
+      );
+    }
+  }
+};
+
 /** Shares MySQL/MariaDB comparison rules and nonstandard schema-operation SQL. */
 export const mysqlSchemaAdapter: SchemaAdapter = {
   prepareSchemaComparison,
+  validateOperations,
   operationExecutors: {
     create_primary_key_constraint: async (db, operation) => {
       await db.schema
@@ -130,12 +218,7 @@ export const mysqlSchemaAdapter: SchemaAdapter = {
     },
     alter_column: async (db, operation) => {
       const { table, column, before, after } = operation;
-      assertColumnModificationAllowed(before, after);
-      if (
-        before.type === after.type &&
-        Boolean(before.notNull) === Boolean(after.notNull)
-      )
-        return;
+      if (!modifiesColumnDefinition(operation)) return;
       assertDataType(after.type);
       await db.schema
         .alterTable(table)

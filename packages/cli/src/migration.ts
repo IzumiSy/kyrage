@@ -1,10 +1,10 @@
-import { DEFAULT_MIGRATION_TABLE, Migration } from "kysely";
+import { DEFAULT_MIGRATION_TABLE, type Kysely, type Migration } from "kysely";
 import { join } from "path";
 import z from "zod";
 import { operationSchema, executeOperation } from "./operations/executor";
 import { buildReconciledOperations } from "./operations/reconciler";
 import { CommonDependencies, FSPromiseAPIs } from "./commands/common";
-import type { OperationExecutors } from "./dialect/schema-adapter";
+import type { SchemaAdapter } from "./dialect/schema-adapter";
 
 /** Migration sources and injected executors shared by actual and planned execution. */
 type CreateMigrationProviderProps = {
@@ -14,7 +14,9 @@ type CreateMigrationProviderProps = {
   options: {
     plan: boolean;
   };
-  operationExecutors: OperationExecutors;
+  schemaAdapter: SchemaAdapter;
+  /** Real read-only metadata source; the plan collector cannot answer catalog queries. */
+  validationDB?: Kysely<any>;
 };
 
 /** Captures dialect behavior outside the plain Kysely instances supplied by Migrator. */
@@ -24,14 +26,39 @@ export const createMigrationProvider = (
   return {
     getMigrations: async () => {
       const migrationFiles = await props.migrationsResolver();
+      const operationsById = Object.fromEntries(
+        migrationFiles.map((migration) => [
+          migration.id,
+          buildReconciledOperations(migration.diff.operations),
+        ])
+      );
+      if (props.options.plan) {
+        if (!props.validationDB) {
+          throw new Error(
+            "SQL planning requires a live database for validation"
+          );
+        }
+        await props.schemaAdapter.validateOperations({
+          db: props.validationDB,
+          operations: Object.keys(operationsById)
+            .sort()
+            .flatMap((id) => operationsById[id]),
+        });
+      }
+
       const migrations: Record<string, Migration> = {};
-      migrationFiles.forEach((migration) => {
-        migrations[migration.id] = {
+      Object.entries(operationsById).forEach(([id, operations]) => {
+        migrations[id] = {
           up: async (db) => {
-            for (const operation of buildReconciledOperations(
-              migration.diff.operations
-            )) {
-              await executeOperation(db, operation, props.operationExecutors);
+            if (!props.options.plan) {
+              await props.schemaAdapter.validateOperations({ db, operations });
+            }
+            for (const operation of operations) {
+              await executeOperation(
+                db,
+                operation,
+                props.schemaAdapter.operationExecutors
+              );
             }
           },
         };

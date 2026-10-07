@@ -83,8 +83,9 @@ Each dialect supplies a `SchemaAdapter` through `createSchemaAdapter()`. `DBClie
 
 - `prepareSchemaComparison`: Normalizes current/ideal snapshots before the generic diff engine compares them.
 - `operationExecutors`: A typed, partial map of operation overrides; omitted operations use their registered standard executor.
+- `validateOperations`: Asynchronously checks reconciled operations against live database metadata before saving or executing a migration. The default adapter is a no-op; MySQL/MariaDB own their full-definition column safety policy.
 
-PostgreSQL, CockroachDB, and SQLite use the default adapter. MySQL and MariaDB extend `MysqlCompatibleKyrageDialect`, which supplies their shared connections, introspection, schema adapter, and container reuse detection. Their concrete classes supply only database identity, container construction, and development configuration defaults. Both use `mysqlSchemaAdapter`, which owns their comparison rules and nonstandard DDL. Core diffing, commands, migration execution, and operation implementations do not inspect dialect names or native Kysely adapter classes.
+PostgreSQL, CockroachDB, and SQLite use the default adapter. MySQL and MariaDB extend `MysqlCompatibleKyrageDialect`, which supplies their shared connections, introspection, schema adapter, and container reuse detection. Their concrete classes supply only database identity, container construction, and development configuration defaults. Both use `mysqlSchemaAdapter`, which owns their comparison rules, validation policy, and nonstandard DDL. Introspection returns schema facts, not stored validation verdicts; common operation constructors do not enforce dialect-specific policy. Core diffing, commands, migration execution, and operation implementations do not inspect dialect names or native Kysely adapter classes.
 
 ### Benefits
 
@@ -253,12 +254,15 @@ const diff = diffSchema(comparison);
 const provider = createMigrationProvider({
   migrationsResolver,
   options: { plan },
-  operationExecutors: adapter.operationExecutors,
+  schemaAdapter: adapter,
+  validationDB: plan ? liveMetadataDB : undefined,
 });
 
-// The provider captures the injected executors, including for transactional Kysely instances.
+// For actual application, validation precedes every operation in this migration.
 const up = async (db: Kysely<any>) => {
-  for (const operation of buildReconciledOperations(diff.operations)) {
+  const operations = buildReconciledOperations(diff.operations);
+  await adapter.validateOperations({ db, operations });
+  for (const operation of operations) {
     await executeOperation(db, operation, adapter.operationExecutors);
   }
 };
@@ -274,7 +278,17 @@ const execute = executors[operation.type] ?? registeredOperation.execute;
 - Consistent error handling and transaction management
 - Automatic operation registration and schema validation
 
-Generic column, constraint, and index operations contain only standard SQL. The MySQL/MariaDB schema adapter supplies overrides for `MODIFY COLUMN`, `DROP PRIMARY KEY`, `DROP FOREIGN KEY`, unique-constraint index drops, and table-qualified index drops. Primary-key creation overrides omit the reserved catalog name `PRIMARY` from both `ALTER TABLE` and inline `CREATE TABLE` declarations, since MariaDB rejects it as an explicit index name. The migration provider receives these executors explicitly, so plan mode and real or transactional execution use the same behavior without inspecting database identity. Catalog defaults are reconstructed as SQL literals or parenthesized expressions. Full-definition column alterations are rejected during generation and execution when catalog metadata identifies unsupported attributes that would otherwise be lost (for example, auto-increment or custom collation). MySQL and MariaDB DDL is nontransactional, so a migration failure can leave preceding operations applied.
+Generic column, constraint, and index operations contain only standard SQL. The MySQL/MariaDB schema adapter supplies overrides for `MODIFY COLUMN`, `DROP PRIMARY KEY`, `DROP FOREIGN KEY`, unique-constraint index drops, and table-qualified index drops. Primary-key creation overrides omit the reserved catalog name `PRIMARY` from both `ALTER TABLE` and inline `CREATE TABLE` declarations, since MariaDB rejects it as an explicit index name. The migration provider receives these executors explicitly, so plan mode and real or transactional execution use the same behavior without inspecting database identity. Catalog defaults are reconstructed as SQL literals or parenthesized expressions. The adapter reads fresh native column metadata to reject full-definition modifications that would lose unsupported attributes or restore a stale default. This policy is not embedded in common column attributes or operation construction. MySQL and MariaDB DDL is nontransactional, so a migration failure can leave preceding operations applied.
+
+#### Operation Validation Boundaries
+
+Generation validates the reconciled execution plan before saving the original diff. Actual application validates each migration inside its `up(db)` callback, using the database state left by earlier migrations. Rejected validation issues no application-schema DDL from that migration; already-applied files and internal migration-table setup are not rolled back.
+
+SQL planning uses a separate real metadata connection because the collecting driver returns empty rows. It validates all pending migrations' reconciled operations, flattened in migration-name order, before collecting SQL. MySQL/MariaDB reject unknown future column states after earlier create/add/drop/modify operations rather than simulating schema effects. The same within-migration limit applies during actual execution. Errors are checked before printing any collected SQL.
+
+MySQL catalog facts are read by `mysql-column-metadata.ts`, shared by compatible introspection and the schema adapter without a circular dependency. Validation performs no DDL, but does not prevent concurrent schema changes after its metadata read or prove every possible server/data conversion succeeds. SQLite connections are initialized lazily so query-free default validation and planning allocate no native database handle.
+
+Squash selects pending sources without deleting them, excludes them from dev baseline application, and uses a fresh one-off dev database instead of reused state that may contain their effects. The replacement is validated and written exclusively under an unused migration ID before removing source files. Validation/write failures preserve those sources; deletion/process-crash atomicity is not provided. Startup failure cleans up one-off databases while preserving persistent instances.
 
 ### 7. Development Database Management (`dev/container.ts`)
 
@@ -391,6 +405,7 @@ export function createCommonDependencies(
     - `postgres.ts`: PostgreSQL dialect implementation with introspection driver (`PostgresKyrageDialect`, `postgresExtraIntrospectorDriver`).
     - `cockroachdb.ts`: CockroachDB dialect implementation extending PostgreSQL compatibility (`CockroachDBKyrageDialect`).
     - `mysql-compatible.ts`: Shared MySQL/MariaDB base class (`MysqlCompatibleKyrageDialect`) and catalog introspection.
+    - `mysql-column-metadata.ts`: Native MySQL/MariaDB column facts used independently by introspection and operation validation.
     - `mysql.ts`: MySQL-specific identity and development-container configuration (`MysqlKyrageDialect`).
     - `mariadb.ts`: MariaDB-specific identity and development-container configuration (`MariadbKyrageDialect`).
     - `sqlite.ts`: SQLite dialect implementation with file-backed development databases.

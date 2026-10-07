@@ -57,8 +57,9 @@ export default defineConfig({
 
 - Use MySQL-compatible types: `char(36)` instead of PostgreSQL's `uuid`, and bounded `varchar(n)` for indexed or unique strings instead of `text`.
 - Primary keys are stored as `PRIMARY`; custom primary-key names are ignored when comparing schemas.
-- Column changes are rejected if `MODIFY COLUMN` would discard unsupported attributes such as auto-increment, generated columns, update expressions, comments, or a custom collation. Manage these alterations explicitly rather than silently losing database behavior.
-- MySQL and MariaDB DDL is not transactional. A failed migration may leave earlier schema changes applied; inspect the database before retrying.
+- Before generation and application, column changes are checked against live metadata. `MODIFY COLUMN` is rejected if it would discard unsupported attributes such as auto-increment, generated columns, update expressions, comments, or a custom collation. A changed default is also rejected when no explicit desired default is supplied; regenerate the migration or declare the intended default.
+- Validation is strict: changing a column created, replaced, or already modified earlier in the same migration is unsupported. Define new columns in their final form or split the changes into separate migrations. `apply --plan` also rejects these dependencies across pending migrations because it does not execute earlier SQL to obtain the future metadata.
+- Application validation runs before the first application-schema operation of each migration, not atomically across all pending migrations. MySQL and MariaDB DDL is not transactional. A failed migration may leave earlier schema changes applied; inspect the database before retrying.
 
 ## Installation
 
@@ -359,7 +360,7 @@ $ ls migrations/
 1755525514200.json  # ⏳ pending (squashed)
 ```
 
-This consolidates multiple pending migrations into a single migration representing the final desired state. Applied migrations are never touched.
+This consolidates multiple pending migrations into a single migration representing the final desired state. Applied migrations are never touched. Existing pending files remain intact if replacement validation or writing fails. With `--dev`, squashing uses a fresh temporary database and excludes the superseded migrations from its baseline, even when a persistent dev database is running. Filesystem replacement is not atomic; if removal of old files fails after writing the replacement, inspect the migration directory before applying.
 
 ### Typical Development Workflow
 
