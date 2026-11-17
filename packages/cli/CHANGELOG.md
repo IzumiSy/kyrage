@@ -1,5 +1,11 @@
 # @izumisy/kyrage
 
+## 1.7.0
+
+### Minor Changes
+
+- [#238](https://github.com/IzumiSy/kyrage/pull/238) [`146a174`](https://github.com/IzumiSy/kyrage/commit/146a1749177a2336284b0411a84efa26ad52d534) Thanks [@IzumiSy](https://github.com/IzumiSy)! - Add MySQL and MariaDB dialect support, including schema introspection, migration generation and execution, and container-backed development databases.
+
 ## 1.6.1
 
 ### Patch Changes
