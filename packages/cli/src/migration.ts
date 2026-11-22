@@ -1,10 +1,13 @@
-import { DEFAULT_MIGRATION_TABLE, Migration } from "kysely";
+import { DEFAULT_MIGRATION_TABLE, type Kysely, type Migration } from "kysely";
 import { join } from "path";
 import z from "zod";
 import { operationSchema, executeOperation } from "./operations/executor";
 import { buildReconciledOperations } from "./operations/reconciler";
 import { CommonDependencies, FSPromiseAPIs } from "./commands/common";
-import type { OperationExecutors } from "./dialect/schema-adapter";
+import {
+  SchemaOperationValidationError,
+  type SchemaAdapter,
+} from "./dialect/schema-adapter";
 
 /** Migration sources and injected executors shared by actual and planned execution. */
 type CreateMigrationProviderProps = {
@@ -14,24 +17,92 @@ type CreateMigrationProviderProps = {
   options: {
     plan: boolean;
   };
-  operationExecutors: OperationExecutors;
+  schemaAdapter: SchemaAdapter;
+  /** Real read-only metadata source; the plan collector cannot answer catalog queries. */
+  validationDB?: Kysely<any>;
 };
 
 /** Captures dialect behavior outside the plain Kysely instances supplied by Migrator. */
 export const createMigrationProvider = (
-  props: CreateMigrationProviderProps
+  props: CreateMigrationProviderProps,
 ) => {
   return {
     getMigrations: async () => {
       const migrationFiles = await props.migrationsResolver();
+      const operationsById = Object.fromEntries(
+        migrationFiles.map((migration) => [
+          migration.id,
+          buildReconciledOperations(migration.diff.operations),
+        ]),
+      );
+      const orderedIds: ReadonlyArray<string> =
+        Object.keys(operationsById).sort();
+      let pendingPreflightDone = false;
+
+      /** Validates a pending suffix and maps global operation positions back to migration files. */
+      const validatePendingSequence = async (
+        db: Kysely<any>,
+        startIndex: number,
+      ) => {
+        const pendingOperations = orderedIds.slice(startIndex).flatMap((id) =>
+          operationsById[id].map((operation, operationIndex) => ({
+            id,
+            operation,
+            operationIndex,
+          })),
+        );
+        try {
+          await props.schemaAdapter.validateOperations({
+            db,
+            operations: pendingOperations.map(({ operation }) => operation),
+          });
+        } catch (error) {
+          const source =
+            error instanceof SchemaOperationValidationError
+              ? pendingOperations[error.operationIndex]
+              : undefined;
+          const location = source
+            ? ` at migration ${source.id}, operation ${source.operationIndex + 1}`
+            : "";
+          throw Object.assign(
+            new Error(
+              `Pending sequence preflight failed before application-schema execution${location}: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+            { cause: error },
+          );
+        }
+      };
+
+      if (props.options.plan) {
+        if (!props.validationDB) {
+          throw new Error(
+            "SQL planning requires a live database for validation",
+          );
+        }
+        await validatePendingSequence(props.validationDB, 0);
+      }
+
       const migrations: Record<string, Migration> = {};
-      migrationFiles.forEach((migration) => {
-        migrations[migration.id] = {
+      orderedIds.forEach((id, migrationIndex) => {
+        const operations = operationsById[id];
+        migrations[id] = {
           up: async (db) => {
-            for (const operation of buildReconciledOperations(
-              migration.diff.operations
-            )) {
-              await executeOperation(db, operation, props.operationExecutors);
+            if (!props.options.plan) {
+              if (!pendingPreflightDone) {
+                // ponytail: ordered migrateToLatest only; use explicit pending sets for future unordered/targeted runs.
+                // Kysely verifies applied history is a prefix before invoking up on its locked connection,
+                // so the first callback starts the pending suffix.
+                await validatePendingSequence(db, migrationIndex);
+                pendingPreflightDone = true;
+              }
+              await props.schemaAdapter.validateOperations({ db, operations });
+            }
+            for (const operation of operations) {
+              await executeOperation(
+                db,
+                operation,
+                props.schemaAdapter.operationExecutors,
+              );
             }
           },
         };
@@ -62,8 +133,8 @@ export const getAllMigrations = async (deps: { fs: FSPromiseAPIs }) => {
       .filter((file) => file.endsWith(".json"))
       .map(async (file) =>
         migrationSchema.parse(
-          JSON.parse(await fs.readFile(join(migrationDirName, file), "utf-8"))
-        )
+          JSON.parse(await fs.readFile(join(migrationDirName, file), "utf-8")),
+        ),
       );
     return await Promise.all(migrationJSONFiles);
   } catch (error) {
@@ -98,6 +169,6 @@ export const getPendingMigrations = async (deps: CommonDependencies) => {
     .execute();
 
   return migrationFiles.filter(
-    (file) => !executedMigrations.some((m) => m.name === file.id)
+    (file) => !executedMigrations.some((m) => m.name === file.id),
   );
 };

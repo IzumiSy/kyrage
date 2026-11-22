@@ -9,10 +9,12 @@ import {
 import { format } from "sql-formatter";
 import { defaultConsolaLogger } from "../logger";
 
-export interface ApplyOptions {
+/** Controls execution/preview and internal baseline migration selection. */
+export type ApplyOptions = {
   plan: boolean;
   pretty: boolean;
-}
+  excludedMigrationIds?: ReadonlyArray<string>;
+};
 
 export async function executeApply(
   deps: CommonDependencies,
@@ -25,14 +27,17 @@ export async function executeApply(
     plan: options.plan,
   });
 
+  await using validationDB = options.plan ? client.getDB() : null;
   const provider = createMigrationProvider({
-    operationExecutors: client.getSchemaAdapter().operationExecutors,
+    schemaAdapter: client.getSchemaAdapter(),
+    validationDB: validationDB ?? undefined,
     migrationsResolver: async () => {
-      if (options.plan) {
-        return await getPendingMigrations(deps);
-      } else {
-        return await getAllMigrations(deps);
-      }
+      const migrations = options.plan
+        ? await getPendingMigrations(deps)
+        : await getAllMigrations(deps);
+      return migrations.filter(
+        (migration) => !options.excludedMigrationIds?.includes(migration.id)
+      );
     },
     options: {
       plan: options.plan,
@@ -45,6 +50,18 @@ export async function executeApply(
 
   const { results: migrationResults, error: migrationError } =
     await migrator.migrateToLatest();
+
+  // A failed later migration must not turn partial plan output into success.
+  if (migrationError) {
+    migrationResults
+      ?.filter((result) => result.status === "Error")
+      .forEach((result) =>
+        reporter.error(`Migration failed: ${result.migrationName}`)
+      );
+    throw migrationError instanceof Error
+      ? migrationError
+      : new Error(`Migration error: ${migrationError}`);
+  }
 
   const plannedQueries = db.getPlannedQueries();
   if (plannedQueries.length > 0) {
@@ -64,14 +81,6 @@ export async function executeApply(
     });
   } else {
     reporter.info("No migrations to run");
-  }
-
-  if (migrationError) {
-    if (migrationError instanceof Error) {
-      throw migrationError;
-    } else {
-      throw new Error(`Migration error: ${migrationError}`);
-    }
   }
 }
 

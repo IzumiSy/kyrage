@@ -57,8 +57,9 @@ export default defineConfig({
 
 - Use MySQL-compatible types: `char(36)` instead of PostgreSQL's `uuid`, and bounded `varchar(n)` for indexed or unique strings instead of `text`.
 - Primary keys are stored as `PRIMARY`; custom primary-key names are ignored when comparing schemas.
-- Column changes are rejected if `MODIFY COLUMN` would discard unsupported attributes such as auto-increment, generated columns, update expressions, comments, or a custom collation. Manage these alterations explicitly rather than silently losing database behavior.
-- MySQL and MariaDB DDL is not transactional. A failed migration may leave earlier schema changes applied; inspect the database before retrying.
+- Generation, application, and `apply --plan` use the same ordered validation rules, starting from live metadata. `MODIFY COLUMN` is rejected if it would discard unsupported attributes such as auto-increment, generated columns, update expressions, comments, or a custom collation. A changed default is also rejected when no explicit desired default is supplied; regenerate the migration or declare the intended default.
+- Create/add/recreate-then-modify and repeated modifications are supported when the required metadata can be established. Validation predicts ordinary definitions without defaults and canonical, in-range signed integer defaults. Other future default expressions remain unknown; an explicit desired default can replace an unknown default, but cannot bypass unknown native attributes, including effects of unclassified raw default SQL. Temporal or type-alias effects that cannot be established are rejected only when a later modification needs those facts. Errors distinguish unsafe attributes, missing columns, stale defaults, and unverifiable future metadata.
+- Application preflights the entire pending sequence before any application-schema operation, then revalidates each migration against the live state left by its predecessors. Preflight failures identify the source migration and its one-based reconciled-operation position. Internal migration tables may already have been initialized. Preflight does not guarantee every DDL or data conversion will succeed, prevent external concurrent DDL, or make MySQL/MariaDB DDL transactional; an execution-time failure may still leave earlier changes applied. Inspect the database before retrying.
 
 ## Installation
 
@@ -359,7 +360,7 @@ $ ls migrations/
 1755525514200.json  # ⏳ pending (squashed)
 ```
 
-This consolidates multiple pending migrations into a single migration representing the final desired state. Applied migrations are never touched.
+This consolidates multiple pending migrations into a single migration representing the final desired state. Applied migrations are never touched. Existing pending files remain intact if replacement validation or writing fails. With `--dev`, squashing uses a fresh temporary database and excludes the superseded migrations from its baseline, even when a persistent dev database is running. Filesystem replacement is not atomic; if removal of old files fails after writing the replacement, inspect the migration directory before applying.
 
 ### Typical Development Workflow
 

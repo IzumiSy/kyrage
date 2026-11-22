@@ -316,40 +316,6 @@ describe.each(["mysql", "mariadb"] as const)(
         execute(db, {
           type: "alter_column",
           table: "orders",
-          column: "id",
-          before: {
-            type: "integer",
-            alterationBlockedReason: "auto_increment",
-          },
-          after: { type: "bigint" },
-        }),
-      ).rejects.toThrow("Cannot safely modify column: auto_increment");
-      expect(() =>
-        compareSchemas({
-          current: {
-            ...emptySnapshot,
-            tables: [
-              {
-                name: "orders",
-                columns: {
-                  id: {
-                    type: "integer",
-                    alterationBlockedReason: "auto_increment",
-                  },
-                },
-              },
-            ],
-          },
-          ideal: {
-            ...emptySnapshot,
-            tables: [{ name: "orders", columns: { id: { type: "bigint" } } }],
-          },
-        }),
-      ).toThrow("Cannot safely modify column");
-      await expect(
-        execute(db, {
-          type: "alter_column",
-          table: "orders",
           column: "quantity",
           before: { type: "integer" },
           after: { type: "integer; drop table orders" },
@@ -375,8 +341,8 @@ describe.each(["mysql", "mariadb"] as const)(
     it("retains injected migration executors on a plain transaction Kysely", async () => {
       await using db = createPlanDB(dialect);
       const provider = createMigrationProvider({
-        options: { plan: true },
-        operationExecutors: adapter.operationExecutors,
+        options: { plan: false },
+        schemaAdapter: adapter,
         migrationsResolver: async () => [
           {
             id: "drop_order_key",
@@ -489,6 +455,7 @@ it("groups ordered catalog rows without splitting comma-containing column names"
       table_name: "child",
       column_name: "amount",
       column_type: "decimal(10,2)",
+      is_nullable: "YES",
       column_default: null,
       character_maximum_length: null,
       extra: "DEFAULT_GENERATED",
@@ -500,6 +467,7 @@ it("groups ordered catalog rows without splitting comma-containing column names"
       table_name: "child",
       column_name: "id",
       column_type: "int",
+      is_nullable: "NO",
       column_default: null,
       character_maximum_length: null,
       extra: "auto_increment",
@@ -545,9 +513,24 @@ it("groups ordered catalog rows without splitting comma-containing column names"
     }),
   );
   const result = await doMysqlIntrospect(client)({ config });
-  expect(result.tables[0].dataType).toBe("decimal(10, 2)");
-  expect(result.tables[0].alterationBlockedReason).toBeUndefined();
-  expect(result.tables[1].alterationBlockedReason).toBe("auto_increment");
+  expect(result.tables).toEqual([
+    {
+      schema: "test",
+      table: "child",
+      name: "amount",
+      dataType: "decimal(10, 2)",
+      default: null,
+      characterMaximumLength: null,
+    },
+    {
+      schema: "test",
+      table: "child",
+      name: "id",
+      dataType: "integer",
+      default: null,
+      characterMaximumLength: null,
+    },
+  ]);
   expect(result.indexes).toEqual([]);
   expect(result.constraints.foreignKey).toEqual([
     expect.objectContaining({

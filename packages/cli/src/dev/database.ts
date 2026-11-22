@@ -16,7 +16,7 @@ import { DevDatabaseValue, DialectEnum } from "../config/loader";
 export const createDevDatabaseManager = async (
   devConfig: NonNullable<DevDatabaseValue>,
   dialect: DialectEnum,
-  manageType: DevDatabaseManageType,
+  manageType: DevDatabaseManageType
 ) => {
   const kyrageDialect = getDialect(dialect);
 
@@ -31,8 +31,10 @@ export const createDevDatabaseManager = async (
   };
 };
 
+/** Selects dev lifecycle and excludes superseded migrations from squash baselines. */
 type StartDevDatabaseOptions = {
   logger: Logger;
+  excludedMigrationIds?: ReadonlyArray<string>;
 } & (
   | {
       mode: "dev-start";
@@ -47,7 +49,7 @@ type StartDevDatabaseOptions = {
  */
 async function prepareDevManager(
   dependencies: CommonDependencies,
-  options: StartDevDatabaseOptions,
+  options: StartDevDatabaseOptions
 ) {
   const { config } = dependencies;
   const kyrageDialect = getDialect(config.database.dialect);
@@ -59,7 +61,7 @@ async function prepareDevManager(
       const { instance, manageType } = await createDevDatabaseManager(
         config.dev!,
         config.database.dialect,
-        "dev-start" as const,
+        "dev-start" as const
       );
 
       return {
@@ -72,11 +74,22 @@ async function prepareDevManager(
     // Generate a new dev database environment if needed, but reuse existing one if available
     case "generate-dev": {
       // Use dialect-specific logic to check for existing dev-start environments
-      const hasDevStart = await kyrageDialect.hasReusableDevDatabase();
+      // Squash needs a clean baseline, not a reused DB that already applied its sources.
+      const needsCleanBaseline = Boolean(options.excludedMigrationIds?.length);
+      const hasDevStart =
+        !needsCleanBaseline && (await kyrageDialect.hasReusableDevDatabase());
+      const devConfig = config.dev!;
+      const baselineConfig =
+        needsCleanBaseline && "container" in devConfig
+          ? {
+              ...devConfig,
+              container: { ...devConfig.container, name: undefined },
+            }
+          : devConfig;
       const { instance, manageType } = await createDevDatabaseManager(
-        config.dev!,
+        baselineConfig,
         config.database.dialect,
-        hasDevStart ? ("dev-start" as const) : ("one-off" as const),
+        hasDevStart ? ("dev-start" as const) : ("one-off" as const)
       );
 
       return {
@@ -99,7 +112,7 @@ type DatabaseStartupResult = {
  */
 export async function startDevDatabase(
   deps: CommonDependencies,
-  options: StartDevDatabaseOptions,
+  options: StartDevDatabaseOptions
 ): Promise<DatabaseStartupResult> {
   const { config } = deps;
   const logger = options.logger || nullLogger;
@@ -133,28 +146,37 @@ export async function startDevDatabase(
   });
 
   // Apply baseline migrations to dev database
-  const pendingMigrations = await getPendingMigrations(deps);
-  if (pendingMigrations.length > 0) {
-    reporter.info(
-      `🔄 Applying ${pendingMigrations.length} pending migrations...`,
+  const devDeps = { ...deps, client: devClient, logger: nullLogger };
+  try {
+    const pendingMigrations = (await getPendingMigrations(devDeps)).filter(
+      (migration) => !options.excludedMigrationIds?.includes(migration.id)
     );
+    if (pendingMigrations.length > 0) {
+      reporter.info(
+        `🔄 Applying ${pendingMigrations.length} pending migrations...`
+      );
 
-    await executeApply(
-      {
-        client: devClient,
-        logger: nullLogger,
-        fs: deps.fs,
-        config,
-      },
-      {
+      await executeApply(devDeps, {
         plan: false,
         pretty: false,
-      },
-    );
+        excludedMigrationIds: options.excludedMigrationIds,
+      });
 
-    reporter.success(`Applied ${pendingMigrations.length} migrations`);
-  } else {
-    reporter.info("No pending migrations found");
+      reporter.success(`Applied ${pendingMigrations.length} migrations`);
+    } else {
+      reporter.info("No pending migrations found");
+    }
+  } catch (error) {
+    if (manageType === "one-off") {
+      try {
+        await devManager.stop();
+      } catch (cleanupError) {
+        reporter.error(
+          `Failed to clean up dev database: ${String(cleanupError)}`
+        );
+      }
+    }
+    throw error;
   }
 
   // Cleanup function
@@ -162,7 +184,7 @@ export async function startDevDatabase(
     switch (options.mode) {
       case "dev-start":
         reporter.success(
-          "Persistent dev database ready: " + config.database.dialect,
+          "Persistent dev database ready: " + config.database.dialect
         );
         break;
       case "generate-dev":

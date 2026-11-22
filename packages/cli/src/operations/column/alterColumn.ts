@@ -5,7 +5,7 @@ import {
   TableColumnOpValue,
   TableColumnAttributes,
 } from "../shared/types";
-import { assertColumnModificationAllowed, assertDataType } from "../shared/utils";
+import { assertDataType } from "../shared/utils";
 import { defineOperation } from "../shared/operation";
 
 /** Alters column types and nullability using standard schema operations. */
@@ -47,12 +47,11 @@ export const alterColumnOp = defineOperation({
   },
 });
 
-/** Builds an alteration only when existing column attributes can be retained safely. */
+/** Describes a column alteration without applying dialect-specific execution policy. */
 export const alterColumn = (
   tableColumn: TableColumnOpValue,
   before: TableColumnAttributes,
   after: TableColumnAttributes
 ) => {
-  assertColumnModificationAllowed(before, after);
   return { ...tableColumn, type: "alter_column" as const, before, after };
 };

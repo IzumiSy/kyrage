@@ -5,6 +5,7 @@ import { defaultConsolaLogger, type Logger } from "../logger";
 import {
   migrationDirName,
   getPendingMigrations,
+  getAllMigrations,
   SchemaDiff,
 } from "../migration";
 import { diffSchema } from "../diff";
@@ -15,6 +16,7 @@ import { type DBClient } from "../client";
 import { type ConfigValue } from "../config/loader";
 import { startDevDatabase } from "../dev/database";
 import { executeApply } from "./apply";
+import { buildReconciledOperations } from "../operations/reconciler";
 
 export interface GenerateOptions {
   ignorePending: boolean;
@@ -29,10 +31,12 @@ export async function executeGenerate(
   const { logger, config, fs } = deps;
   const { reporter } = logger;
 
-  // Handle squash mode - do squash-specific work then continue with normal flow
-  // Squashing is just removing all pending migrations and creating a new one that combines their changes.
-  if (options.squash) {
-    await removePendingMigrations(deps);
+  // Keep squash sources intact until their replacement has been validated and saved.
+  const squashTargets = options.squash ? await getPendingMigrations(deps) : [];
+  const excludedMigrationIds = squashTargets.map((migration) => migration.id);
+  const excludedIds = new Set(excludedMigrationIds);
+  if (options.squash && squashTargets.length === 0) {
+    reporter.info("No pending migrations found, nothing to squash.");
   }
 
   // Create the appropriate client (dev or production)
@@ -40,6 +44,7 @@ export async function executeGenerate(
     ? await startDevDatabase(deps, {
         mode: "generate-dev",
         logger,
+        excludedMigrationIds,
       })
     : {
         client: deps.client,
@@ -49,7 +54,9 @@ export async function executeGenerate(
   try {
     // Check for pending migrations against the target database
     if (!options.ignorePending) {
-      const pm = await getPendingMigrations(deps);
+      const pm = (
+        await getPendingMigrations({ ...deps, client: targetClient })
+      ).filter((migration) => !excludedIds.has(migration.id));
       if (pm.length > 0) {
         if (options.dev) {
           // In dev mode, show info but continue processing since migrations will be auto-applied
@@ -75,18 +82,28 @@ export async function executeGenerate(
       config,
     });
     if (!newMigration) {
+      if (options.squash) await removePendingMigrations(deps, squashTargets);
       reporter.info("No changes detected, no migration needed.");
       return;
     }
 
+    // Preserve every existing migration, including already-applied history files.
+    const existingIds = new Set(
+      (await getAllMigrations(deps)).map((migration) => migration.id)
+    );
+    while (existingIds.has(newMigration.id)) {
+      newMigration.id = String(Number(newMigration.id) + 1);
+    }
     printPrettyDiff(logger, newMigration.diff);
 
     const migrationFilePath = `${migrationDirName}/${newMigration.id}.json`;
     await fs.mkdir(migrationDirName, { recursive: true });
     await fs.writeFile(
       migrationFilePath,
-      JSON.stringify(newMigration, null, 2)
+      JSON.stringify(newMigration, null, 2),
+      { encoding: "utf-8", flag: "wx" }
     );
+    if (options.squash) await removePendingMigrations(deps, squashTargets);
 
     const successMessage = options.squash
       ? `Generated squashed migration: ${migrationFilePath}`
@@ -111,19 +128,15 @@ export async function executeGenerate(
   }
 }
 
-/**
- * Remove all pending migrations from the migration directory.
- */
-const removePendingMigrations = async (deps: CommonDependencies) => {
+/** Removes the selected squash sources only after their replacement is safe. */
+const removePendingMigrations = async (
+  deps: CommonDependencies,
+  pendingMigrations: ReadonlyArray<{ id: string }>
+) => {
   const { logger, fs } = deps;
   const { reporter } = logger;
 
-  // Get pending migrations
-  const pendingMigrations = await getPendingMigrations(deps);
-  if (pendingMigrations.length === 0) {
-    reporter.info("No pending migrations found, nothing to squash.");
-    return;
-  }
+  if (pendingMigrations.length === 0) return;
 
   reporter.info(
     `Found ${pendingMigrations.length} pending migrations to squash:`
@@ -147,6 +160,7 @@ const removePendingMigrations = async (deps: CommonDependencies) => {
   }
 };
 
+/** Builds a generic diff and validates its executable operations before saving it. */
 const generateMigrationFromIntrospection = async (props: {
   client: DBClient;
   config: ConfigValue;
@@ -205,9 +219,6 @@ const generateMigrationFromIntrospection = async (props: {
             defaultSql: colDef.default ?? undefined,
             primaryKey,
             unique,
-            ...(colDef.alterationBlockedReason ? {
-              alterationBlockedReason: colDef.alterationBlockedReason,
-            } : {}),
           },
         ];
       })
@@ -240,7 +251,8 @@ const generateMigrationFromIntrospection = async (props: {
     ),
   }));
 
-  const comparison = client.getSchemaAdapter().prepareSchemaComparison({
+  const schemaAdapter = client.getSchemaAdapter();
+  const comparison = schemaAdapter.prepareSchemaComparison({
     current: {
       tables: dbTables,
       indexes,
@@ -258,6 +270,12 @@ const generateMigrationFromIntrospection = async (props: {
   if (diff.operations.length === 0) {
     return null;
   }
+
+  await using validationDB = client.getDB();
+  await schemaAdapter.validateOperations({
+    db: validationDB,
+    operations: buildReconciledOperations(diff.operations),
+  });
 
   const migrationID = Date.now();
   return {
